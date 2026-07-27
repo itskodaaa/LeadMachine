@@ -24,10 +24,10 @@ export interface ContactLog {
 export type LeadStatus = Lead['status'];
 
 export const STATUS_CONFIG: Record<LeadStatus, { label: string; color: string; bg: string }> = {
-  not_contacted: { label: 'New', color: 'text-zinc-400', bg: 'bg-zinc-500/20' },
-  contacted: { label: 'Sent', color: 'text-amber-400', bg: 'bg-amber-500/20' },
-  responded: { label: 'Replied', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
-  closed: { label: 'Closed', color: 'text-zinc-500', bg: 'bg-zinc-600/20' }
+  not_contacted: { label: 'New', color: 'text-stone-600', bg: 'bg-stone-100' },
+  contacted: { label: 'Sent', color: 'text-accent', bg: 'bg-accent-light' },
+  responded: { label: 'Replied', color: 'text-success', bg: 'bg-success-light' },
+  closed: { label: 'Closed', color: 'text-text-muted', bg: 'bg-bg-input' }
 };
 
 export const US_STATES = [

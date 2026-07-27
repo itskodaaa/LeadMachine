@@ -62,74 +62,76 @@
 </script>
 
 {#if open}
-  <div class="fixed inset-0 z-50 flex items-center justify-center">
-    <button class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick={onClose} aria-label="Close"></button>
-    <div class="relative bg-bg-surface border border-border rounded-sm w-full max-w-lg mx-4 p-0 shadow-2xl" style="animation: slideUp 0.2s ease-out">
-      <div class="flex items-center justify-between px-6 py-4 border-b border-border">
-        <h2 class="text-lg font-semibold tracking-tight">{lead ? 'Edit Lead' : 'Add Lead'}</h2>
-        <button onclick={onClose} class="text-text-muted hover:text-text-primary transition-colors">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <button class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick={onClose} aria-label="Close"></button>
+    <div class="relative bg-bg-card rounded-2xl w-full max-w-lg shadow-2xl border border-border" style="animation: slideUp 0.25s ease-out">
+      <div class="flex items-center justify-between px-6 py-5 border-b border-border">
+        <h2 class="text-lg font-bold text-text-heading">{lead ? 'Edit Lead' : 'Add New Lead'}</h2>
+        <button onclick={onClose} class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-bg-input transition-colors text-text-muted hover:text-text-heading" aria-label="Close">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </button>
       </div>
 
-      <form onsubmit={handleSubmit} class="p-6 space-y-4">
+      <form onsubmit={handleSubmit} class="p-6 space-y-5">
         {#if error}
-          <div class="bg-danger/10 border border-danger/30 text-danger text-sm px-4 py-2 rounded-sm">{error}</div>
+          <div class="bg-danger-light border border-danger/20 text-danger text-sm px-4 py-3 rounded-xl font-medium">{error}</div>
         {/if}
 
-        <div class="grid grid-cols-2 gap-4">
-          <div class="col-span-2">
-            <label class="block text-xs font-mono text-text-muted uppercase tracking-wider mb-1.5">Company Name *</label>
-            <input bind:value={form.company_name} type="text" required class="w-full bg-bg-primary border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-accent/50 transition-colors" placeholder="ABC Construction" />
-          </div>
-
-          <div class="col-span-2">
-            <label class="block text-xs font-mono text-text-muted uppercase tracking-wider mb-1.5">Website *</label>
-            <input bind:value={form.website} type="text" required class="w-full bg-bg-primary border border-border rounded-sm px-3 py-2 text-sm font-mono focus:outline-none focus:border-accent/50 transition-colors" placeholder="abcconstruction.com" />
+        <div class="space-y-4">
+          <div>
+            <label for="company_name" class="block text-sm font-semibold text-text-heading mb-1.5">Company Name <span class="text-danger">*</span></label>
+            <input id="company_name" bind:value={form.company_name} type="text" required class="w-full bg-bg-input border border-border rounded-xl px-4 py-2.5 text-sm text-text-heading placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/40 transition-all" placeholder="ABC Construction" />
           </div>
 
           <div>
-            <label class="block text-xs font-mono text-text-muted uppercase tracking-wider mb-1.5">City</label>
-            <input bind:value={form.city} type="text" class="w-full bg-bg-primary border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-accent/50 transition-colors" placeholder="Dallas" />
+            <label for="website" class="block text-sm font-semibold text-text-heading mb-1.5">Website <span class="text-danger">*</span></label>
+            <input id="website" bind:value={form.website} type="text" required class="w-full bg-bg-input border border-border rounded-xl px-4 py-2.5 text-sm font-mono text-text-heading placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/40 transition-all" placeholder="abcconstruction.com" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label for="city" class="block text-sm font-semibold text-text-heading mb-1.5">City</label>
+              <input id="city" bind:value={form.city} type="text" class="w-full bg-bg-input border border-border rounded-xl px-4 py-2.5 text-sm text-text-heading placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/40 transition-all" placeholder="Dallas" />
+            </div>
+            <div>
+              <label for="state" class="block text-sm font-semibold text-text-heading mb-1.5">State</label>
+              <select id="state" bind:value={form.state} class="w-full bg-bg-input border border-border rounded-xl px-4 py-2.5 text-sm text-text-heading focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/40 cursor-pointer transition-all">
+                <option value="">Select state</option>
+                {#each US_STATES as s}
+                  <option value={s}>{s}</option>
+                {/each}
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label for="phone" class="block text-sm font-semibold text-text-heading mb-1.5">Phone</label>
+              <input id="phone" bind:value={form.phone} type="tel" class="w-full bg-bg-input border border-border rounded-xl px-4 py-2.5 text-sm text-text-heading placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/40 transition-all" placeholder="555-1234" />
+            </div>
+            <div>
+              <label for="email" class="block text-sm font-semibold text-text-heading mb-1.5">Email</label>
+              <input id="email" bind:value={form.email} type="email" class="w-full bg-bg-input border border-border rounded-xl px-4 py-2.5 text-sm text-text-heading placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/40 transition-all" placeholder="info@abc.com" />
+            </div>
           </div>
 
           <div>
-            <label class="block text-xs font-mono text-text-muted uppercase tracking-wider mb-1.5">State</label>
-            <select bind:value={form.state} class="w-full bg-bg-primary border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-accent/50 transition-colors cursor-pointer">
-              <option value="">--</option>
-              {#each US_STATES as s}
-                <option value={s}>{s}</option>
-              {/each}
-            </select>
+            <label for="contact_person" class="block text-sm font-semibold text-text-heading mb-1.5">Contact Person</label>
+            <input id="contact_person" bind:value={form.contact_person} type="text" class="w-full bg-bg-input border border-border rounded-xl px-4 py-2.5 text-sm text-text-heading placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/40 transition-all" placeholder="John Smith" />
           </div>
 
           <div>
-            <label class="block text-xs font-mono text-text-muted uppercase tracking-wider mb-1.5">Phone</label>
-            <input bind:value={form.phone} type="tel" class="w-full bg-bg-primary border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-accent/50 transition-colors" placeholder="555-1234" />
-          </div>
-
-          <div>
-            <label class="block text-xs font-mono text-text-muted uppercase tracking-wider mb-1.5">Email</label>
-            <input bind:value={form.email} type="email" class="w-full bg-bg-primary border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-accent/50 transition-colors" placeholder="info@abc.com" />
-          </div>
-
-          <div class="col-span-2">
-            <label class="block text-xs font-mono text-text-muted uppercase tracking-wider mb-1.5">Contact Person</label>
-            <input bind:value={form.contact_person} type="text" class="w-full bg-bg-primary border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-accent/50 transition-colors" placeholder="John Smith" />
-          </div>
-
-          <div class="col-span-2">
-            <label class="block text-xs font-mono text-text-muted uppercase tracking-wider mb-1.5">Notes</label>
-            <textarea bind:value={form.notes} rows="2" class="w-full bg-bg-primary border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-accent/50 transition-colors resize-none" placeholder="Any notes..."></textarea>
+            <label for="notes" class="block text-sm font-semibold text-text-heading mb-1.5">Notes</label>
+            <textarea id="notes" bind:value={form.notes} rows="3" class="w-full bg-bg-input border border-border rounded-xl px-4 py-2.5 text-sm text-text-heading placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/40 transition-all resize-none" placeholder="Any additional notes..."></textarea>
           </div>
         </div>
 
         <div class="flex justify-end gap-3 pt-2">
-          <button type="button" onclick={onClose} class="px-4 py-2 text-sm text-text-secondary hover:text-text-primary transition-colors">Cancel</button>
-          <button type="submit" disabled={saving} class="px-5 py-2 bg-accent hover:bg-accent-hover text-black text-sm font-semibold rounded-sm transition-colors disabled:opacity-50">
-            {saving ? 'Saving...' : (lead ? 'Update' : 'Add Lead')}
+          <button type="button" onclick={onClose} class="px-5 py-2.5 text-sm font-medium text-text-body hover:text-text-heading hover:bg-bg-input rounded-xl transition-colors">Cancel</button>
+          <button type="submit" disabled={saving} class="px-6 py-2.5 bg-accent hover:bg-accent-hover text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm">
+            {saving ? 'Saving...' : (lead ? 'Update Lead' : 'Add Lead')}
           </button>
         </div>
       </form>

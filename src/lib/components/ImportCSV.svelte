@@ -122,54 +122,55 @@
 </script>
 
 {#if open}
-  <div class="fixed inset-0 z-50 flex items-center justify-center">
-    <button class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick={handleClose} aria-label="Close"></button>
-    <div class="relative bg-bg-surface border border-border rounded-sm w-full max-w-2xl mx-4 shadow-2xl" style="animation: slideUp 0.2s ease-out">
-      <div class="flex items-center justify-between px-6 py-4 border-b border-border">
-        <h2 class="text-lg font-semibold tracking-tight">Import Leads</h2>
-        <button onclick={handleClose} class="text-text-muted hover:text-text-primary transition-colors">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <button class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick={handleClose} aria-label="Close"></button>
+    <div class="relative bg-bg-card rounded-2xl w-full max-w-2xl shadow-2xl border border-border" style="animation: slideUp 0.25s ease-out">
+      <div class="flex items-center justify-between px-6 py-5 border-b border-border">
+        <h2 class="text-lg font-bold text-text-heading">Import Leads from CSV</h2>
+        <button onclick={handleClose} class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-bg-input transition-colors text-text-muted hover:text-text-heading" aria-label="Close">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </button>
       </div>
 
       <div class="p-6">
         {#if step === 'upload'}
-          <div
-            class="border-2 border-dashed border-border rounded-sm p-8 text-center hover:border-accent/30 transition-colors cursor-pointer"
+          <button
+            class="w-full border-2 border-dashed border-border rounded-2xl p-12 text-center hover:border-accent/40 hover:bg-accent-light/30 transition-all cursor-pointer"
+            onclick={() => document.getElementById('csv-input')?.click()}
             ondragover={(e) => e.preventDefault()}
             ondrop={handleDrop}
-            onclick={() => document.getElementById('csv-input')?.click()}
-            role="button"
-            tabindex="0"
           >
-            <svg class="w-10 h-10 mx-auto mb-3 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-            </svg>
-            <p class="text-sm text-text-secondary mb-1">Drop CSV file here or <span class="text-accent">browse</span></p>
-            <p class="text-xs text-text-muted font-mono">.csv files only</p>
+            <div class="w-14 h-14 bg-bg-input rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <svg class="w-7 h-7 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+              </svg>
+            </div>
+            <p class="text-sm font-semibold text-text-heading mb-1">Drop your CSV file here</p>
+            <p class="text-sm text-text-muted">or <span class="text-accent font-medium">browse</span> to upload</p>
+            <p class="text-xs text-text-muted mt-3 font-mono">.csv files up to 10MB</p>
             <input id="csv-input" type="file" accept=".csv" onchange={handleFileSelect} class="hidden" />
-          </div>
+          </button>
 
         {:else if step === 'map'}
-          <div class="space-y-4">
-            <div class="bg-bg-primary border border-border rounded-sm p-3">
-              <p class="text-xs text-text-muted mb-2 font-mono uppercase tracking-wider">Preview (first 5 rows)</p>
-              <div class="overflow-x-auto">
+          <div class="space-y-6">
+            <div class="bg-bg-input rounded-xl p-4">
+              <p class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Preview (first 5 rows)</p>
+              <div class="overflow-x-auto rounded-lg">
                 <table class="w-full text-xs">
                   <thead>
-                    <tr>
+                    <tr class="border-b border-border">
                       {#each headers as h}
-                        <th class="px-2 py-1 text-left text-text-muted font-mono">{h}</th>
+                        <th class="px-3 py-2.5 text-left text-text-muted font-semibold">{h}</th>
                       {/each}
                     </tr>
                   </thead>
                   <tbody>
                     {#each preview as row}
-                      <tr class="border-t border-border/50">
+                      <tr class="border-b border-border/50 last:border-0">
                         {#each headers as h}
-                          <td class="px-2 py-1 text-text-secondary">{row[h] || '—'}</td>
+                          <td class="px-3 py-2.5 text-text-body">{row[h] || '—'}</td>
                         {/each}
                       </tr>
                     {/each}
@@ -179,17 +180,17 @@
             </div>
 
             <div>
-              <p class="text-xs text-text-muted mb-3 font-mono uppercase tracking-wider">Map CSV columns to fields</p>
-              <div class="grid grid-cols-2 gap-3">
+              <p class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Map CSV columns to fields</p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {#each headers as h}
-                  <div class="flex items-center gap-2">
-                    <span class="text-xs text-text-secondary truncate w-24" title={h}>{h}</span>
-                    <svg class="w-3 h-3 text-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                  <div class="flex items-center gap-3 bg-bg-input rounded-xl px-4 py-3">
+                    <span class="text-sm text-text-body truncate flex-1" title={h}>{h}</span>
+                    <svg class="w-4 h-4 text-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
                     </svg>
                     <select
                       bind:value={mapping[h]}
-                      class="flex-1 bg-bg-primary border border-border rounded-sm px-2 py-1 text-xs focus:outline-none focus:border-accent/50 cursor-pointer"
+                      class="flex-1 bg-bg-card border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 cursor-pointer"
                     >
                       <option value="">Skip</option>
                       {#each REQUIRED_FIELDS as f}
@@ -205,32 +206,34 @@
             </div>
 
             <div class="flex justify-end gap-3 pt-2">
-              <button onclick={reset} class="px-4 py-2 text-sm text-text-secondary hover:text-text-primary transition-colors">Back</button>
-              <button onclick={doImport} disabled={importing || !mapping[Object.keys(mapping).find(k => mapping[k] === 'website') || '']} class="px-5 py-2 bg-accent hover:bg-accent-hover text-black text-sm font-semibold rounded-sm transition-colors disabled:opacity-50">
+              <button onclick={reset} class="px-5 py-2.5 text-sm font-medium text-text-body hover:bg-bg-input rounded-xl transition-colors">Back</button>
+              <button onclick={doImport} disabled={importing || !mapping[Object.keys(mapping).find(k => mapping[k] === 'website') || '']} class="px-6 py-2.5 bg-accent hover:bg-accent-hover text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm">
                 {importing ? 'Importing...' : 'Import Leads'}
               </button>
             </div>
           </div>
 
         {:else if step === 'done' && result}
-          <div class="text-center py-6">
-            <div class="w-14 h-14 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg class="w-7 h-7 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+          <div class="text-center py-8">
+            <div class="w-16 h-16 bg-success-light rounded-2xl flex items-center justify-center mx-auto mb-5">
+              <svg class="w-8 h-8 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
               </svg>
             </div>
-            <h3 class="text-lg font-semibold mb-2">Import Complete</h3>
-            <div class="flex justify-center gap-6 text-sm">
-              <div>
-                <span class="text-success font-mono text-2xl font-bold">{result.imported}</span>
-                <p class="text-text-muted text-xs mt-1">Imported</p>
+            <h3 class="text-xl font-bold text-text-heading mb-2">Import Complete</h3>
+            <p class="text-sm text-text-muted mb-6">Your leads have been added to the database</p>
+            <div class="flex justify-center gap-8">
+              <div class="text-center">
+                <p class="text-3xl font-bold text-success">{result.imported}</p>
+                <p class="text-xs text-text-muted mt-1 font-medium">Imported</p>
               </div>
-              <div>
-                <span class="text-warning font-mono text-2xl font-bold">{result.skipped}</span>
-                <p class="text-text-muted text-xs mt-1">Skipped</p>
+              <div class="w-px bg-border"></div>
+              <div class="text-center">
+                <p class="text-3xl font-bold text-warning">{result.skipped}</p>
+                <p class="text-xs text-text-muted mt-1 font-medium">Skipped</p>
               </div>
             </div>
-            <button onclick={handleClose} class="mt-6 px-6 py-2 bg-accent hover:bg-accent-hover text-black text-sm font-semibold rounded-sm transition-colors">
+            <button onclick={handleClose} class="mt-8 px-8 py-2.5 bg-accent hover:bg-accent-hover text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
               Done
             </button>
           </div>
