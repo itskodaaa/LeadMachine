@@ -23,11 +23,11 @@ export interface ContactLog {
 
 export type LeadStatus = Lead['status'];
 
-export const STATUS_CONFIG: Record<LeadStatus, { label: string; color: string; bg: string }> = {
-  not_contacted: { label: 'New', color: 'text-stone-600', bg: 'bg-stone-100' },
-  contacted: { label: 'Sent', color: 'text-accent', bg: 'bg-accent-light' },
-  responded: { label: 'Replied', color: 'text-success', bg: 'bg-success-light' },
-  closed: { label: 'Closed', color: 'text-text-muted', bg: 'bg-bg-input' }
+export const STATUS_CONFIG: Record<LeadStatus, { label: string; cls: string }> = {
+  not_contacted: { label: 'New', cls: 'badge-new' },
+  contacted: { label: 'Sent', cls: 'badge-sent' },
+  responded: { label: 'Replied', cls: 'badge-replied' },
+  closed: { label: 'Closed', cls: 'badge-closed' }
 };
 
 export const US_STATES = [
