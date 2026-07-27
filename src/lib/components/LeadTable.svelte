@@ -8,7 +8,7 @@
     onSelect: (ids: number[]) => void;
     onEdit: (lead: Lead) => void;
     onDelete: (id: number) => void;
-    onStatusChange: (id: number, status: string) => void;
+    onStatusChange: () => void;
   }
 
   let { leads, selected, onSelect, onEdit, onDelete, onStatusChange }: Props = $props();
@@ -19,10 +19,6 @@
   function toggleAll() {
     onSelect(selected.length === leads.length ? [] : leads.map(l => l.id));
   }
-  function otherStatuses(cur: string) {
-    return ['not_contacted','contacted','responded','closed'].filter(s => s !== cur);
-  }
-  const labelMap: Record<string, string> = { not_contacted: 'New', contacted: 'Sent', responded: 'Replied', closed: 'Closed' };
 </script>
 
 <div class="table-wrap">
@@ -76,16 +72,7 @@
               {#if !lead.phone && !lead.email}<span style="color:var(--muted)">—</span>{/if}
             </td>
             <td>
-              <div class="status-cell">
-                <StatusBadge status={lead.status} />
-                <div class="status-dropdown">
-                  {#each otherStatuses(lead.status) as action}
-                    <button class="status-opt" onclick={() => onStatusChange(lead.id, action)}>
-                      {labelMap[action]}
-                    </button>
-                  {/each}
-                </div>
-              </div>
+              <StatusBadge status={lead.status} leadId={lead.id} {onStatusChange} />
             </td>
             <td>
               <div class="cell-actions">

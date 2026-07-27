@@ -1,10 +1,27 @@
-<script lang="ts">
-  import { STATUS_CONFIG, type LeadStatus } from '$lib/types';
-  let { status }: { status: LeadStatus } = $props();
-  const cfg = STATUS_CONFIG[status];
+<script>
+  import { STATUS_CONFIG } from '$lib/types.js';
+  let { status, leadId, onStatusChange } = $props();
+
+  const ORDER = ['not_contacted', 'contacted', 'responded', 'closed'];
+
+  function cycle() {
+    const idx = ORDER.indexOf(status);
+    const next = ORDER[(idx + 1) % ORDER.length];
+    fetch(`/api/leads/${leadId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: next })
+    }).then(r => r.json()).then(() => {
+      if (onStatusChange) onStatusChange();
+    });
+  }
 </script>
 
-<span class="badge {cfg.cls}">
-  <span class="badge-dot {status === 'contacted' ? 'animate-pulse' : ''}"></span>
-  {cfg.label}
-</span>
+<button
+  class="badge-btn badge-{status === 'not_contacted' ? 'new' : status === 'contacted' ? 'sent' : status}"
+  onclick={cycle}
+  title="Click to change status"
+>
+  <span class="badge-dot"></span>
+  {STATUS_CONFIG[status]?.label || status}
+</button>

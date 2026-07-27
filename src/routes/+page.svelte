@@ -59,11 +59,6 @@
     selected = selected.filter(i => i !== id); fetchLeads(); fetchStats();
   }
 
-  async function handleStatusChange(id: number, s: string) {
-    await fetch(`/api/leads/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status:s}) });
-    fetchLeads(); fetchStats();
-  }
-
   function handleEdit(l: Lead) { editingLead = l; showForm = true; }
 
   function handleBulkStatus(s: string) {
@@ -109,102 +104,88 @@
 
 <svelte:head><title>LeadFlow</title></svelte:head>
 
-<div class="shell">
-  <header class="topbar">
-    <div class="topbar-left">
-      <div class="topbar-logo">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
-      </div>
-      <div>
-        <div class="topbar-title">LeadFlow</div>
-        <div class="topbar-sub">Construction Leads</div>
-      </div>
+<div class="stats">
+  {#each statCards as c}
+    <div class="stat-card">
+      <div class="stat-label">{c.label}</div>
+      <div class="stat-value">{c.value.toLocaleString()}</div>
     </div>
-    <div class="topbar-right">
-      {#if selected.length > 0}
-        <div class="bulk-bar">
-          {selected.length} selected
-          <span class="bulk-divider"></span>
-          <select onchange={(e) => handleBulkStatus((e.target as HTMLSelectElement).value)} style="background:transparent;border:none;color:var(--accent);font-size:11px;font-weight:600;font-family:var(--font);cursor:pointer;height:auto;padding:0">
-            <option value="">Status</option>
-            <option value="not_contacted">New</option>
-            <option value="contacted">Sent</option>
-            <option value="responded">Replied</option>
-            <option value="closed">Closed</option>
-          </select>
-          <button class="btn btn-sm btn-danger" onclick={handleBulkDelete}>Delete</button>
-        </div>
-      {/if}
-      <button class="btn btn-accent" onclick={() => { editingLead = null; showForm = true; }}>
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-        <span>Add Lead</span>
-      </button>
-      <button class="btn" onclick={() => showImport = true}>
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
-        <span>Import</span>
-      </button>
-      <button class="btn" onclick={handleExport}>
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
-        <span>Export</span>
-      </button>
-    </div>
-  </header>
-
-  <main class="main">
-    <div class="stats">
-      {#each statCards as c}
-        <div class="stat-card">
-          <div class="stat-label">{c.label}</div>
-          <div class="stat-value">{c.value.toLocaleString()}</div>
-        </div>
-      {/each}
-    </div>
-
-    <div class="toolbar">
-      <div class="search-wrap">
-        <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
-        <input class="search-input" type="text" bind:value={search} oninput={() => doSearch()} placeholder="Search name, website, city..." />
-      </div>
-      <select bind:value={status} onchange={() => doFilter()}>
-        <option value="all">All Status</option>
-        <option value="not_contacted">New</option>
-        <option value="contacted">Sent</option>
-        <option value="responded">Replied</option>
-        <option value="closed">Closed</option>
-      </select>
-      <select bind:value={stateFilter} onchange={() => doFilter()} style="max-width:90px">
-        <option value="all">State</option>
-        {#each ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'] as s}
-          <option value={s}>{s}</option>
-        {/each}
-      </select>
-    </div>
-
-    {#if loading}
-      <div class="table-wrap" style="text-align:center;padding:40px">
-        <div class="spinner"></div>
-        <div style="font-size:11px;color:var(--muted)">Loading...</div>
-      </div>
-    {:else}
-      <LeadTable {leads} {selected} onSelect={(ids) => selected = ids} onEdit={handleEdit} onDelete={handleDelete} onStatusChange={handleStatusChange} />
-    {/if}
-
-    {#if totalPages > 1}
-      <div class="pagination">
-        <span class="page-info">Showing {((page-1)*25)+1}–{Math.min(page*25,total)} of {total.toLocaleString()}</span>
-        <div class="page-btns">
-          <button class="page-btn" onclick={() => { page=1; fetchLeads(); }} disabled={page===1}>«</button>
-          <button class="page-btn" onclick={() => { page--; fetchLeads(); }} disabled={page===1}>‹</button>
-          {#each Array.from({length: Math.min(5, totalPages)}, (_, i) => Math.max(1, Math.min(page-2, totalPages-4)) + i).filter(p => p <= totalPages) as p}
-            <button class="page-btn {p===page?'active':''}" onclick={() => { page=p; fetchLeads(); }}>{p}</button>
-          {/each}
-          <button class="page-btn" onclick={() => { page++; fetchLeads(); }} disabled={page===totalPages}>›</button>
-          <button class="page-btn" onclick={() => { page=totalPages; fetchLeads(); }} disabled={page===totalPages}>»</button>
-        </div>
-      </div>
-    {/if}
-  </main>
+  {/each}
 </div>
+
+<div class="toolbar">
+  <div class="search-wrap">
+    <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+    <input class="search-input" type="text" bind:value={search} oninput={() => doSearch()} placeholder="Search name, website, city..." />
+  </div>
+  <select bind:value={status} onchange={() => doFilter()}>
+    <option value="all">All Status</option>
+    <option value="not_contacted">New</option>
+    <option value="contacted">Sent</option>
+    <option value="responded">Replied</option>
+    <option value="closed">Closed</option>
+  </select>
+  <select bind:value={stateFilter} onchange={() => doFilter()} style="max-width:90px">
+    <option value="all">State</option>
+    {#each ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'] as s}
+      <option value={s}>{s}</option>
+    {/each}
+  </select>
+</div>
+
+{#if selected.length > 0}
+  <div class="bulk-bar">
+    {selected.length} selected
+    <span class="bulk-divider"></span>
+    <select onchange={(e) => handleBulkStatus((e.target as HTMLSelectElement).value)} style="background:transparent;border:none;color:var(--accent);font-size:11px;font-weight:600;font-family:var(--font);cursor:pointer;height:auto;padding:0">
+      <option value="">Status</option>
+      <option value="not_contacted">New</option>
+      <option value="contacted">Sent</option>
+      <option value="responded">Replied</option>
+      <option value="closed">Closed</option>
+    </select>
+    <button class="btn btn-sm btn-danger" onclick={handleBulkDelete}>Delete</button>
+  </div>
+{/if}
+
+{#if loading}
+  <div class="table-wrap" style="text-align:center;padding:40px">
+    <div class="spinner"></div>
+    <div style="font-size:11px;color:var(--muted)">Loading...</div>
+  </div>
+{:else}
+  <LeadTable {leads} {selected} onSelect={(ids) => selected = ids} onEdit={handleEdit} onDelete={handleDelete} onStatusChange={() => { fetchLeads(); fetchStats(); }} />
+{/if}
+
+{#if totalPages > 1}
+  <div class="pagination">
+    <span class="page-info">Showing {((page-1)*25)+1}–{Math.min(page*25,total)} of {total.toLocaleString()}</span>
+    <div class="page-btns">
+      <button class="page-btn" onclick={() => { page=1; fetchLeads(); }} disabled={page===1}>«</button>
+      <button class="page-btn" onclick={() => { page--; fetchLeads(); }} disabled={page===1}>‹</button>
+      {#each Array.from({length: Math.min(5, totalPages)}, (_, i) => Math.max(1, Math.min(page-2, totalPages-4)) + i).filter(p => p <= totalPages) as p}
+        <button class="page-btn {p===page?'active':''}" onclick={() => { page=p; fetchLeads(); }}>{p}</button>
+      {/each}
+      <button class="page-btn" onclick={() => { page++; fetchLeads(); }} disabled={page===totalPages}>›</button>
+      <button class="page-btn" onclick={() => { page=totalPages; fetchLeads(); }} disabled={page===totalPages}>»</button>
+    </div>
+  </div>
+{/if}
 
 <LeadForm bind:open={showForm} lead={editingLead} onClose={() => { showForm = false; editingLead = null; }} onSave={handleSave} />
 <ImportCSV open={showImport} onClose={() => showImport = false} onImport={() => { fetchLeads(); fetchStats(); }} />
+
+<div style="text-align:center;margin-top:16px;padding:12px">
+  <button class="btn btn-accent" onclick={() => { editingLead = null; showForm = true; }}>
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+    <span>Add Lead</span>
+  </button>
+  <button class="btn" onclick={() => showImport = true}>
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+    <span>Import CSV</span>
+  </button>
+  <button class="btn" onclick={handleExport}>
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+    <span>Export</span>
+  </button>
+</div>
