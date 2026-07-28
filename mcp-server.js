@@ -10,7 +10,7 @@ const dbPath = path.join(__dirname, 'data', 'leads.db');
 const tools = [
   {
     name: "add_lead",
-    description: "Add a new construction lead to LeadFlow. It performs duplicate checking on both the website domain and the company name, skipping the operation and returning a warning if a duplicate is found.",
+    description: "Add a single new construction lead to LeadFlow. Performs duplicate checks on both website domain and company name, skipping the save and logging a warning to the database if it exists.",
     inputSchema: {
       type: "object",
       properties: {
@@ -24,6 +24,33 @@ const tools = [
         notes: { type: "string", description: "Any notes or details about the company" }
       },
       required: ["company_name", "website"]
+    }
+  },
+  {
+    name: "add_leads_batch",
+    description: "Add multiple construction leads to LeadFlow in a batch. Performs duplicate checks on each lead. Skips duplicates, logs warnings to the database, and returns a summary.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        leads: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              company_name: { type: "string", description: "The name of the construction company" },
+              website: { type: "string", description: "Company website URL" },
+              city: { type: "string", description: "City location" },
+              state: { type: "string", description: "Two-letter US state code" },
+              phone: { type: "string", description: "Phone number" },
+              email: { type: "string", description: "Contact email address" },
+              contact_person: { type: "string", description: "Primary contact person's name" },
+              notes: { type: "string", description: "Any notes or details about the company" }
+            },
+            required: ["company_name", "website"]
+          }
+        }
+      },
+      required: ["leads"]
     }
   }
 ];
@@ -82,6 +109,12 @@ function handleAddLead(args) {
     // Check for duplicate by website
     const existingWebsite = db.prepare('SELECT id, company_name FROM leads WHERE website = ?').get(normalizedWebsite);
     if (existingWebsite) {
+      const reason = `Website '${normalizedWebsite}' already exists (Company: '${existingWebsite.company_name}').`;
+      db.prepare(`
+        INSERT INTO duplicate_warnings (company_name, website, reason, source)
+        VALUES (?, ?, ?, 'mcp')
+      `).run(company_name, normalizedWebsite, reason);
+
       return {
         content: [{
           type: "text",
@@ -93,6 +126,12 @@ function handleAddLead(args) {
     // Check for duplicate by company name
     const existingName = db.prepare('SELECT id, website FROM leads WHERE LOWER(company_name) = ?').get(company_name.toLowerCase());
     if (existingName) {
+      const reason = `Company name '${company_name}' already exists (Website: '${existingName.website}').`;
+      db.prepare(`
+        INSERT INTO duplicate_warnings (company_name, website, reason, source)
+        VALUES (?, ?, ?, 'mcp')
+      `).run(company_name, normalizedWebsite, reason);
+
       return {
         content: [{
           type: "text",
@@ -135,6 +174,101 @@ function handleAddLead(args) {
   }
 }
 
+function handleAddLeadsBatch(args) {
+  const { leads } = args;
+  if (!Array.isArray(leads) || leads.length === 0) {
+    return {
+      isError: true,
+      content: [{ type: "text", text: "Error: leads array is required and must not be empty." }]
+    };
+  }
+
+  try {
+    const db = new Database(dbPath);
+    let imported = 0;
+    let skipped = 0;
+    const results = [];
+
+    const insert = db.prepare(`
+      INSERT INTO leads (company_name, website, city, state, phone, email, contact_person, notes, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'not_contacted')
+    `);
+
+    // Run in transaction for speed
+    db.transaction(() => {
+      for (const lead of leads) {
+        const { company_name, website, city, state, phone, email, contact_person, notes } = lead;
+        if (!company_name || !website) {
+          skipped++;
+          results.push({ company_name: company_name || "Unknown", website: website || "Unknown", status: "skipped", reason: "Missing required fields" });
+          continue;
+        }
+
+        const normalizedWebsite = website.toLowerCase()
+          .replace(/^https?:\/\//, '')
+          .replace(/^www\./, '')
+          .replace(/\/+$/, '')
+          .split('/')[0];
+
+        // Check website duplicate
+        const existingWebsite = db.prepare('SELECT id, company_name FROM leads WHERE website = ?').get(normalizedWebsite);
+        if (existingWebsite) {
+          skipped++;
+          const reason = `Website '${normalizedWebsite}' already exists (Company: '${existingWebsite.company_name}').`;
+          db.prepare(`
+            INSERT INTO duplicate_warnings (company_name, website, reason, source)
+            VALUES (?, ?, ?, 'mcp')
+          `).run(company_name, normalizedWebsite, reason);
+          results.push({ company_name, website: normalizedWebsite, status: "skipped", reason: "Duplicate website" });
+          continue;
+        }
+
+        // Check company name duplicate
+        const existingName = db.prepare('SELECT id, website FROM leads WHERE LOWER(company_name) = ?').get(company_name.toLowerCase());
+        if (existingName) {
+          skipped++;
+          const reason = `Company name '${company_name}' already exists (Website: '${existingName.website}').`;
+          db.prepare(`
+            INSERT INTO duplicate_warnings (company_name, website, reason, source)
+            VALUES (?, ?, ?, 'mcp')
+          `).run(company_name, normalizedWebsite, reason);
+          results.push({ company_name, website: normalizedWebsite, status: "skipped", reason: "Duplicate company name" });
+          continue;
+        }
+
+        // Insert lead
+        insert.run(
+          company_name,
+          normalizedWebsite,
+          city || null,
+          state ? state.toUpperCase() : null,
+          phone || null,
+          email || null,
+          contact_person || null,
+          notes || null
+        );
+        imported++;
+        results.push({ company_name, website: normalizedWebsite, status: "imported" });
+      }
+    })();
+
+    return {
+      content: [{
+        type: "text",
+        text: `Batch completed: ${imported} leads successfully imported, ${skipped} skipped (duplicates/errors).`
+      }]
+    };
+  } catch (err) {
+    return {
+      isError: true,
+      content: [{
+        type: "text",
+        text: `Error processing batch: ${err.message}`
+      }]
+    };
+  }
+}
+
 function handleRequest(req) {
   const { id, method, params } = req;
   
@@ -160,6 +294,10 @@ function handleRequest(req) {
       }
       if (params.name === 'add_lead') {
         const res = handleAddLead(params.arguments || {});
+        return sendResponse(id, res);
+      }
+      if (params.name === 'add_leads_batch') {
+        const res = handleAddLeadsBatch(params.arguments || {});
         return sendResponse(id, res);
       }
       return sendError(id, -32601, `Tool not found: ${params.name}`);

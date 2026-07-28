@@ -42,10 +42,21 @@ db.exec(`
     FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS duplicate_warnings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_name TEXT NOT NULL,
+    website TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    source TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    dismissed INTEGER DEFAULT 0
+  );
+
   CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
   CREATE INDEX IF NOT EXISTS idx_leads_state ON leads(state);
   CREATE INDEX IF NOT EXISTS idx_leads_website ON leads(website);
   CREATE INDEX IF NOT EXISTS idx_contact_logs_lead ON contact_logs(lead_id);
+  CREATE INDEX IF NOT EXISTS idx_duplicate_warnings_dismissed ON duplicate_warnings(dismissed);
 `);
 
 export default db;

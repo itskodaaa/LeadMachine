@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import LeadTable from '$lib/components/LeadTable.svelte';
   import LeadForm from '$lib/components/LeadForm.svelte';
   import ImportCSV from '$lib/components/ImportCSV.svelte';
@@ -20,6 +20,7 @@
   let editingLead = $state<Lead | null>(null);
 
   let stats = $state({ total: 0, byStatus: [] as any[], byState: [] as any[] });
+  let duplicateWarnings = $state<any[]>([]);
 
   async function fetchLeads() {
     loading = true;
@@ -40,7 +41,54 @@
     try { const r = await fetch('/api/leads?stats=true'); stats = await r.json(); } catch {}
   }
 
-  onMount(() => { fetchLeads(); fetchStats(); });
+  async function fetchWarnings() {
+    try {
+      const res = await fetch('/api/duplicate-warnings');
+      const data = await res.json();
+      duplicateWarnings = data.warnings || [];
+    } catch (e) {
+      console.error('Failed to fetch warnings', e);
+    }
+  }
+
+  async function dismissWarning(id: number) {
+    try {
+      await fetch('/api/duplicate-warnings', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      duplicateWarnings = duplicateWarnings.filter(w => w.id !== id);
+    } catch (e) {
+      console.error('Failed to dismiss warning', e);
+    }
+  }
+
+  async function clearAllWarnings() {
+    try {
+      await fetch('/api/duplicate-warnings', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true })
+      });
+      duplicateWarnings = [];
+    } catch (e) {
+      console.error('Failed to clear warnings', e);
+    }
+  }
+
+  let warningTimer: any;
+
+  onMount(() => {
+    fetchLeads();
+    fetchStats();
+    fetchWarnings();
+    warningTimer = setInterval(fetchWarnings, 10000);
+  });
+
+  onDestroy(() => {
+    clearInterval(warningTimer);
+  });
 
   function doSearch() { page = 1; selected = []; fetchLeads(); }
   function doFilter() { page = 1; selected = []; fetchLeads(); }
@@ -105,6 +153,28 @@
 </script>
 
 <svelte:head><title>LeadFlow</title></svelte:head>
+
+{#if duplicateWarnings.length > 0}
+  <div class="duplicate-banner">
+    <div class="banner-header">
+      <svg class="banner-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+      </svg>
+      <span class="banner-title">{duplicateWarnings.length} Duplicate Lead Alert{duplicateWarnings.length > 1 ? 's' : ''} (from AI Agent)</span>
+      <button class="btn-clear-all" onclick={clearAllWarnings}>Dismiss All</button>
+    </div>
+    <div class="banner-body">
+      {#each duplicateWarnings as w}
+        <div class="warning-item">
+          <span class="warning-text">
+            <strong>{w.company_name}</strong> ({w.website}) was skipped: {w.reason}
+          </span>
+          <button class="btn-dismiss-warning" onclick={() => dismissWarning(w.id)} aria-label="Dismiss warning">✕</button>
+        </div>
+      {/each}
+    </div>
+  </div>
+{/if}
 
 <div class="stats">
   {#each statCards as c}
@@ -195,3 +265,85 @@
     <span>Export</span>
   </button>
 </div>
+
+<style>
+  .duplicate-banner {
+    background: var(--warning-bg);
+    border: 1px solid rgba(199, 122, 0, 0.25);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    animation: fadeIn 0.2s ease-out;
+  }
+  .banner-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px dashed rgba(199, 122, 0, 0.15);
+    padding-bottom: 8px;
+  }
+  .banner-icon {
+    width: 16px;
+    height: 16px;
+    color: var(--warning);
+  }
+  .banner-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--warning);
+    flex: 1;
+    text-align: left;
+  }
+  .btn-clear-all {
+    background: none;
+    border: none;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    cursor: pointer;
+  }
+  .btn-clear-all:hover {
+    text-decoration: underline;
+  }
+  .banner-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 150px;
+    overflow-y: auto;
+  }
+  .warning-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text2);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 10px;
+  }
+  .warning-text {
+    flex: 1;
+    text-align: left;
+  }
+  .btn-dismiss-warning {
+    background: none;
+    border: none;
+    font-size: 10px;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 2px 6px;
+    transition: color 0.1s;
+  }
+  .btn-dismiss-warning:hover {
+    color: var(--danger);
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
