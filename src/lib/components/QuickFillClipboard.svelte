@@ -44,6 +44,15 @@
   }
 </script>
 
+{#if isOpen}
+  <button 
+    class="clipboard-backdrop" 
+    onclick={() => isOpen = false}
+    aria-label="Close clipboard"
+    type="button"
+  ></button>
+{/if}
+
 <!-- Slide-out Clipboard Panel (Drops directly from topbar) -->
 <div class="clipboard-drawer {isOpen ? 'open' : ''}">
   <div class="drawer-header">
@@ -405,5 +414,30 @@
       left: 12px;
       right: 12px;
     }
+  }
+
+  /* Backdrop Overlay */
+  .clipboard-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    border: none;
+    padding: 0;
+    cursor: default;
+    z-index: 35;
+    pointer-events: auto;
+    
+    /* Fade animation */
+    animation: fade-in 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 </style>
