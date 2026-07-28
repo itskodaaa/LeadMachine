@@ -16,18 +16,6 @@
     message: 'I am currently incurring a server and need to speak with a sales representative about your machining services.'
   });
 
-  const fields = [
-    { key: 'name', label: 'Name', placeholder: 'Full Name' },
-    { key: 'email', label: 'Email', placeholder: 'Email Address' },
-    { key: 'phone', label: 'Phone', placeholder: 'Phone Number' },
-    { key: 'company', label: 'Company', placeholder: 'Company Name' },
-    { key: 'website', label: 'Website', placeholder: 'Company Website' },
-    { key: 'city', label: 'City', placeholder: 'City' },
-    { key: 'state', label: 'State', placeholder: 'State (e.g. VA)' },
-    { key: 'zip', label: 'Zip Code', placeholder: 'Zip Code' },
-    { key: 'message', label: 'Message', placeholder: 'Message Template', isTextArea: true }
-  ];
-
   onMount(() => {
     const saved = localStorage.getItem('leadflow_fill_details');
     if (saved) {
@@ -67,42 +55,110 @@
         </svg>
         <span class="header-title">Quick Copy Clipboard</span>
       </div>
-      <p class="header-subtitle">Edit details below. Click "Copy" next to any field to copy it instantly.</p>
+      <p class="header-subtitle">Click "Copy" inside any field to copy instantly.</p>
     </div>
 
     <div class="drawer-body">
-      {#each fields as field}
-        <div class="field-box">
-          <div class="field-label-row">
-            <label for="clip-{field.key}">{field.label}</label>
-            <button 
-              type="button"
-              class="btn-copy {copiedField === field.key ? 'copied' : ''}" 
-              onclick={() => copyToClipboard((details as any)[field.key], field.key)}
-            >
-              {copiedField === field.key ? 'Copied ✓' : 'Copy'}
+      <!-- Row 1: Name -->
+      <div class="form-row">
+        <div class="form-group full-width">
+          <label for="clip-name">Name</label>
+          <div class="input-wrapper">
+            <input id="clip-name" type="text" bind:value={details.name} oninput={saveDetails} placeholder="Full Name" />
+            <button class="btn-copy {copiedField === 'name' ? 'copied' : ''}" onclick={() => copyToClipboard(details.name, 'name')}>
+              {copiedField === 'name' ? 'Copied ✓' : 'Copy'}
             </button>
           </div>
-          
-          {#if field.isTextArea}
-            <textarea
-              id="clip-{field.key}"
-              bind:value={(details as any)[field.key]}
-              oninput={saveDetails}
-              placeholder={field.placeholder}
-              rows="4"
-            ></textarea>
-          {:else}
-            <input
-              id="clip-{field.key}"
-              type="text"
-              bind:value={(details as any)[field.key]}
-              oninput={saveDetails}
-              placeholder={field.placeholder}
-            />
-          {/if}
         </div>
-      {/each}
+      </div>
+
+      <!-- Row 2: Company & Website -->
+      <div class="form-row">
+        <div class="form-group half-width">
+          <label for="clip-company">Company</label>
+          <div class="input-wrapper">
+            <input id="clip-company" type="text" bind:value={details.company} oninput={saveDetails} placeholder="Company Name" />
+            <button class="btn-copy {copiedField === 'company' ? 'copied' : ''}" onclick={() => copyToClipboard(details.company, 'company')}>
+              {copiedField === 'company' ? 'Copied ✓' : 'Copy'}
+            </button>
+          </div>
+        </div>
+        <div class="form-group half-width">
+          <label for="clip-website">Website</label>
+          <div class="input-wrapper">
+            <input id="clip-website" type="text" bind:value={details.website} oninput={saveDetails} placeholder="Website" />
+            <button class="btn-copy {copiedField === 'website' ? 'copied' : ''}" onclick={() => copyToClipboard(details.website, 'website')}>
+              {copiedField === 'website' ? 'Copied ✓' : 'Copy'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 3: Email & Phone -->
+      <div class="form-row">
+        <div class="form-group half-width">
+          <label for="clip-email">Email</label>
+          <div class="input-wrapper">
+            <input id="clip-email" type="text" bind:value={details.email} oninput={saveDetails} placeholder="Email Address" />
+            <button class="btn-copy {copiedField === 'email' ? 'copied' : ''}" onclick={() => copyToClipboard(details.email, 'email')}>
+              {copiedField === 'email' ? 'Copied ✓' : 'Copy'}
+            </button>
+          </div>
+        </div>
+        <div class="form-group half-width">
+          <label for="clip-phone">Phone</label>
+          <div class="input-wrapper">
+            <input id="clip-phone" type="text" bind:value={details.phone} oninput={saveDetails} placeholder="Phone Number" />
+            <button class="btn-copy {copiedField === 'phone' ? 'copied' : ''}" onclick={() => copyToClipboard(details.phone, 'phone')}>
+              {copiedField === 'phone' ? 'Copied ✓' : 'Copy'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 4: City, State, Zip -->
+      <div class="form-row">
+        <div class="form-group city-width">
+          <label for="clip-city">City</label>
+          <div class="input-wrapper">
+            <input id="clip-city" type="text" bind:value={details.city} oninput={saveDetails} placeholder="City" />
+            <button class="btn-copy {copiedField === 'city' ? 'copied' : ''}" onclick={() => copyToClipboard(details.city, 'city')}>
+              {copiedField === 'city' ? 'Copied ✓' : 'Copy'}
+            </button>
+          </div>
+        </div>
+        <div class="form-group state-width">
+          <label for="clip-state">State</label>
+          <div class="input-wrapper">
+            <input id="clip-state" type="text" bind:value={details.state} oninput={saveDetails} placeholder="ST" />
+            <button class="btn-copy {copiedField === 'state' ? 'copied' : ''}" onclick={() => copyToClipboard(details.state, 'state')}>
+              {copiedField === 'state' ? 'Copied ✓' : 'Copy'}
+            </button>
+          </div>
+        </div>
+        <div class="form-group zip-width">
+          <label for="clip-zip">Zip</label>
+          <div class="input-wrapper">
+            <input id="clip-zip" type="text" bind:value={details.zip} oninput={saveDetails} placeholder="Zip" />
+            <button class="btn-copy {copiedField === 'zip' ? 'copied' : ''}" onclick={() => copyToClipboard(details.zip, 'zip')}>
+              {copiedField === 'zip' ? 'Copied ✓' : 'Copy'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 5: Message -->
+      <div class="form-row">
+        <div class="form-group full-width">
+          <label for="clip-message">Message Template</label>
+          <div class="input-wrapper">
+            <textarea id="clip-message" bind:value={details.message} oninput={saveDetails} placeholder="Message template..." rows="3"></textarea>
+            <button class="btn-copy btn-copy-textarea {copiedField === 'message' ? 'copied' : ''}" onclick={() => copyToClipboard(details.message, 'message')}>
+              {copiedField === 'message' ? 'Copied ✓' : 'Copy'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -120,7 +176,7 @@
     pointer-events: none;
     z-index: 40;
   }
-  
+
   /* Drawer Panel */
   .clipboard-drawer {
     position: absolute;
@@ -144,7 +200,7 @@
   }
 
   .drawer-header {
-    padding: 16px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--border);
     background: var(--bg);
   }
@@ -166,7 +222,7 @@
   .header-subtitle {
     font-size: 11px;
     color: var(--muted);
-    margin-top: 4px;
+    margin-top: 2px;
     line-height: 1.4;
     text-align: left;
   }
@@ -174,64 +230,118 @@
   .drawer-body {
     flex: 1;
     overflow-y: auto;
-    padding: 16px;
+    padding: 12px 16px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
   }
 
-  /* Fields styling */
-  .field-box {
+  /* Compact Form Grid styling */
+  .form-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+  }
+  .form-group {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
+    text-align: left;
   }
-  .field-label-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  .full-width {
+    width: 100%;
   }
-  .field-label-row label {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text2);
+  .half-width {
+    flex: 1;
+    min-width: 0;
   }
-  .btn-copy {
-    background: none;
-    border: none;
-    padding: 2px 6px;
-    border-radius: 4px;
+  .city-width {
+    flex: 2.2;
+    min-width: 0;
+  }
+  .state-width {
+    flex: 1;
+    min-width: 0;
+  }
+  .zip-width {
+    flex: 1.5;
+    min-width: 0;
+  }
+
+  .form-group label {
     font-size: 10px;
     font-weight: 600;
-    color: var(--accent);
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-  }
-  .btn-copy:hover {
-    background: var(--accent-light);
-  }
-  .btn-copy.copied {
-    color: var(--success);
-    background: var(--success-bg);
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
   }
 
-  .field-box input, .field-box textarea {
+  .input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
     width: 100%;
+  }
+
+  .input-wrapper input {
+    width: 100%;
+    height: 26px;
+    padding: 0 52px 0 6px;
+    font-size: 11px;
     background: var(--input);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 6px 8px;
-    font-size: 11px;
     color: var(--text);
     outline: none;
+    text-overflow: ellipsis;
   }
-  .field-box input:focus, .field-box textarea:focus {
-    border-color: var(--accent);
-  }
-  .field-box textarea {
+
+  .input-wrapper textarea {
+    width: 100%;
+    padding: 6px 52px 6px 6px;
+    font-size: 11px;
+    background: var(--input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    outline: none;
     resize: none;
     font-family: inherit;
     line-height: 1.4;
+  }
+
+  .input-wrapper input:focus, .input-wrapper textarea:focus {
+    border-color: var(--accent);
+  }
+
+  .btn-copy {
+    position: absolute;
+    right: 3px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 600;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+  }
+  .btn-copy:hover {
+    background: var(--accent-hover);
+  }
+  .btn-copy.copied {
+    background: var(--success);
+    color: #fff;
+  }
+
+  .btn-copy-textarea {
+    top: 4px;
   }
 
   /* Responsive styling */
