@@ -7,7 +7,7 @@ export interface Lead {
   phone: string | null;
   email: string | null;
   contact_person: string | null;
-  status: 'not_contacted' | 'contacted' | 'responded' | 'unable_to_reach' | 'won' | 'closed';
+  status: 'not_contacted' | 'pending' | 'contacted' | 'responded' | 'unable_to_reach' | 'won' | 'closed';
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -25,6 +25,7 @@ export type LeadStatus = Lead['status'];
 
 export const STATUS_CONFIG: Record<LeadStatus, { label: string; cls: string }> = {
   not_contacted: { label: 'New', cls: 'badge-new' },
+  pending: { label: 'Pending', cls: 'badge-pending' },
   contacted: { label: 'Sent', cls: 'badge-sent' },
   responded: { label: 'Replied', cls: 'badge-replied' },
   unable_to_reach: { label: 'Unreachable', cls: 'badge-unreachable' },

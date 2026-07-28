@@ -2,7 +2,7 @@
   import { STATUS_CONFIG } from '$lib/types.js';
   let { status, leadId, onStatusChange } = $props();
 
-  const ORDER = ['not_contacted', 'contacted', 'responded', 'unable_to_reach', 'won', 'closed'];
+  const ORDER = ['not_contacted', 'pending', 'contacted', 'responded', 'unable_to_reach', 'won', 'closed'];
 
   function cycle() {
     const idx = ORDER.indexOf(status);

@@ -144,6 +144,7 @@ tr:hover .cell-actions { opacity: 1; }
 }
 .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 .badge-new { background: var(--input); color: var(--text2); }
+.badge-pending { background: var(--warning-bg); color: var(--warning); }
 .badge-sent { background: var(--accent-light); color: var(--accent); }
 .badge-replied { background: var(--success-bg); color: var(--success); }
 .badge-unreachable { background: var(--danger-bg); color: var(--danger); }

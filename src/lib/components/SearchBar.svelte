@@ -52,6 +52,7 @@
   >
     <option value="all">All Status</option>
     <option value="not_contacted">New</option>
+    <option value="pending">Pending</option>
     <option value="contacted">Sent</option>
     <option value="responded">Replied</option>
     <option value="unable_to_reach">Unreachable</option>

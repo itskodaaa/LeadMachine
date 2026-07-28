@@ -27,7 +27,7 @@ db.exec(`
     phone TEXT,
     email TEXT,
     contact_person TEXT,
-    status TEXT DEFAULT 'not_contacted' CHECK(status IN ('not_contacted', 'contacted', 'responded', 'unable_to_reach', 'won', 'closed')),
+    status TEXT DEFAULT 'not_contacted' CHECK(status IN ('not_contacted', 'pending', 'contacted', 'responded', 'unable_to_reach', 'won', 'closed')),
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -155,6 +155,23 @@ export function updateLead(id: number, input: UpdateLeadInput) {
   values.push(id);
 
   db.prepare(`UPDATE leads SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+
+  if (input.status === 'pending') {
+    setTimeout(() => {
+      try {
+        db.prepare(`
+          UPDATE leads 
+          SET status = 'not_contacted', updated_at = CURRENT_TIMESTAMP 
+          WHERE id = ? 
+            AND status = 'pending' 
+            AND strftime('%s', 'now') - strftime('%s', updated_at) >= 600
+        `).run(id);
+      } catch (e) {
+        console.error('Pending status check failed for lead ID:', id, e);
+      }
+    }, 10 * 60 * 1000);
+  }
+
   return getLeadById(id);
 }
 

@@ -90,7 +90,7 @@ const tools = [
         email: { type: "string", description: "Updated email address" },
         contact_person: { type: "string", description: "Updated contact person name" },
         notes: { type: "string", description: "Updated notes" },
-        status: { type: "string", enum: ["not_contacted", "contacted", "responded", "unable_to_reach", "won", "closed"], description: "Updated status" }
+        status: { type: "string", enum: ["not_contacted", "pending", "contacted", "responded", "unable_to_reach", "won", "closed"], description: "Updated status" }
       },
       required: ["id"]
     }
@@ -123,7 +123,7 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        status: { type: "string", enum: ["all", "not_contacted", "contacted", "responded", "unable_to_reach", "won", "closed"], description: "Optional status filter" }
+        status: { type: "string", enum: ["all", "not_contacted", "pending", "contacted", "responded", "unable_to_reach", "won", "closed"], description: "Optional status filter" }
       }
     }
   },
@@ -163,7 +163,7 @@ const tools = [
               email: { type: "string", description: "Updated email address" },
               contact_person: { type: "string", description: "Updated contact person name" },
               notes: { type: "string", description: "Updated notes" },
-              status: { type: "string", enum: ["not_contacted", "contacted", "responded", "unable_to_reach", "won", "closed"], description: "Updated status" }
+              status: { type: "string", enum: ["not_contacted", "pending", "contacted", "responded", "unable_to_reach", "won", "closed"], description: "Updated status" }
             },
             required: ["id"]
           }

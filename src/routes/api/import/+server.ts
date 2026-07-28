@@ -37,9 +37,11 @@ const FIELD_MAP: Record<string, string> = {
 };
 
 const STATUS_MAP: Record<string, string> = {
-  new: 'not_contacted', fresh: 'not_contacted', pending: 'not_contacted',
+  new: 'not_contacted', fresh: 'not_contacted',
   not_contacted: 'not_contacted', untouched: 'not_contacted', inactive: 'not_contacted',
   open: 'not_contacted', lead: 'not_contacted', prospect: 'not_contacted',
+
+  pending: 'pending', snooze: 'pending', snoozed: 'pending',
 
   contacted: 'contacted', sent: 'contacted', outreach: 'contacted',
   reached_out: 'contacted', emailed: 'contacted', called: 'contacted',

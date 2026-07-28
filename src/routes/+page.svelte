@@ -143,6 +143,7 @@
   const statCards = $derived([
     { label: 'Total', value: stats.total },
     { label: 'New', value: stats.byStatus.find((s:any)=>s.status==='not_contacted')?.count||0 },
+    { label: 'Pending', value: stats.byStatus.find((s:any)=>s.status==='pending')?.count||0 },
     { label: 'Sent', value: stats.byStatus.find((s:any)=>s.status==='contacted')?.count||0 },
     { label: 'Replied', value: stats.byStatus.find((s:any)=>s.status==='responded')?.count||0 },
     { label: 'Unreachable', value: stats.byStatus.find((s:any)=>s.status==='unable_to_reach')?.count||0 },
@@ -193,6 +194,7 @@
   <select bind:value={status} onchange={() => doFilter()}>
     <option value="all">All Status</option>
     <option value="not_contacted">New</option>
+    <option value="pending">Pending</option>
     <option value="contacted">Sent</option>
     <option value="responded">Replied</option>
     <option value="unable_to_reach">Unreachable</option>
@@ -214,6 +216,7 @@
     <select onchange={(e) => handleBulkStatus((e.target as HTMLSelectElement).value)} style="background:transparent;border:none;color:var(--accent);font-size:11px;font-weight:600;font-family:var(--font);cursor:pointer;height:auto;padding:0">
       <option value="">Status</option>
       <option value="not_contacted">New</option>
+      <option value="pending">Pending</option>
       <option value="contacted">Sent</option>
       <option value="responded">Replied</option>
       <option value="unable_to_reach">Unreachable</option>
