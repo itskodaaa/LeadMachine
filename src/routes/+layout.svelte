@@ -2,6 +2,7 @@
   import '../app.css';
   import { page } from '$app/stores';
   import { Settings, Home } from '@lucide/svelte';
+  import QuickFillClipboard from '$lib/components/QuickFillClipboard.svelte';
   let { children } = $props();
 </script>
 
@@ -33,4 +34,5 @@
   <main class="main">
     {@render children()}
   </main>
+  <QuickFillClipboard />
 </div>
