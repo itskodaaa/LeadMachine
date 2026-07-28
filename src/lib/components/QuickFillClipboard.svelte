@@ -55,7 +55,7 @@
         </svg>
         <span class="header-title">Quick Copy Clipboard</span>
       </div>
-      <p class="header-subtitle">Click "Copy" inside any field to copy instantly.</p>
+      <p class="header-subtitle">Click inside any field to view/edit in full. Click "Copy" to copy instantly.</p>
     </div>
 
     <div class="drawer-body">
@@ -151,9 +151,9 @@
       <div class="form-row">
         <div class="form-group full-width">
           <label for="clip-message">Message Template</label>
-          <div class="input-wrapper">
+          <div class="textarea-wrapper">
             <textarea id="clip-message" bind:value={details.message} oninput={saveDetails} placeholder="Message template..." rows="3"></textarea>
-            <button class="btn-copy btn-copy-textarea {copiedField === 'message' ? 'copied' : ''}" onclick={() => copyToClipboard(details.message, 'message')}>
+            <button class="btn-copy-textarea {copiedField === 'message' ? 'copied' : ''}" onclick={() => copyToClipboard(details.message, 'message')}>
               {copiedField === 'message' ? 'Copied ✓' : 'Copy'}
             </button>
           </div>
@@ -177,26 +177,24 @@
     z-index: 40;
   }
 
-  /* Dropdown Panel (drops from navigation bar) */
+  /* Drawer Panel */
   .clipboard-drawer {
     position: absolute;
-    top: 8px; /* Positioned just below the top navigation bar */
-    right: 16px; /* Right-aligned inside the max-width layout */
+    top: 0;
+    right: -320px;
+    bottom: 0;
     width: 320px;
-    max-height: calc(100vh - 120px); /* Keeps panel bounded on smaller screens */
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
     display: flex;
     flex-direction: column;
+    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.2s;
     pointer-events: auto;
-    
-    /* Drop-down transition */
+    visibility: hidden;
     opacity: 0;
     transform: translateY(-12px);
-    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.2s;
-    visibility: hidden;
   }
   .clipboard-drawer.open {
     opacity: 1;
@@ -239,6 +237,7 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+    position: relative; /* Position anchor for focused absolute inputs */
   }
 
   /* Compact Form Grid styling */
@@ -248,12 +247,14 @@
     width: 100%;
   }
   .form-group {
+    height: 38px;
     display: flex;
     flex-direction: column;
     gap: 2px;
     text-align: left;
   }
-  .full-width {
+  .form-group.full-width {
+    height: auto;
     width: 100%;
   }
   .half-width {
@@ -281,11 +282,14 @@
     letter-spacing: 0.3px;
   }
 
+  /* Input wrapper normal state */
   .input-wrapper {
     position: relative;
     display: flex;
     align-items: center;
     width: 100%;
+    height: 26px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .input-wrapper input {
@@ -299,9 +303,41 @@
     color: var(--text);
     outline: none;
     text-overflow: ellipsis;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  .input-wrapper textarea {
+  /* Clean UI Expansion on Focus */
+  .input-wrapper:focus-within {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    width: auto;
+    z-index: 50;
+    height: 30px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  }
+  .input-wrapper:focus-within input {
+    height: 30px;
+    font-size: 12px;
+    border-color: var(--accent);
+    background: var(--card); /* Solid background to overlay neighboring fields */
+    box-shadow: 0 0 0 2px var(--accent-light);
+  }
+  .input-wrapper:focus-within .btn-copy {
+    height: 24px;
+    font-size: 10px;
+    right: 4px;
+  }
+
+  /* Textarea Wrapper - stays inline as it is already full-width */
+  .textarea-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+  }
+
+  .textarea-wrapper textarea {
     width: 100%;
     padding: 6px 52px 6px 6px;
     font-size: 11px;
@@ -314,8 +350,7 @@
     font-family: inherit;
     line-height: 1.4;
   }
-
-  .input-wrapper input:focus, .input-wrapper textarea:focus {
+  .textarea-wrapper textarea:focus {
     border-color: var(--accent);
   }
 
@@ -331,7 +366,7 @@
     color: #fff;
     border: none;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    transition: all 0.15s ease;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -346,7 +381,29 @@
   }
 
   .btn-copy-textarea {
+    position: absolute;
+    right: 3px;
     top: 4px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 600;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .btn-copy-textarea:hover {
+    background: var(--accent-hover);
+  }
+  .btn-copy-textarea.copied {
+    background: var(--success);
+    color: #fff;
   }
 
   /* Responsive styling */
@@ -356,6 +413,10 @@
       right: 16px;
       width: auto;
       max-height: calc(100vh - 100px);
+    }
+    .input-wrapper:focus-within {
+      left: 12px;
+      right: 12px;
     }
   }
 </style>
