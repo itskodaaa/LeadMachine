@@ -163,10 +163,10 @@ export function getContactLogs(leadId: number) {
   return db.prepare('SELECT * FROM contact_logs WHERE lead_id = ? ORDER BY created_at DESC').all(leadId);
 }
 
-export function importLeads(leads: CreateLeadInput[]) {
+export function importLeads(leads: Record<string, string>[]) {
   const insert = db.prepare(`
-    INSERT OR IGNORE INTO leads (company_name, website, city, state, phone, email, contact_person, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT OR IGNORE INTO leads (company_name, website, city, state, phone, email, contact_person, notes, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   let imported = 0;
@@ -174,21 +174,20 @@ export function importLeads(leads: CreateLeadInput[]) {
 
   const transaction = db.transaction(() => {
     for (const lead of leads) {
-      const website = lead.website.toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
-      const existing = db.prepare('SELECT id FROM leads WHERE website = ?').get(website);
-      if (existing) {
-        skipped++;
-        continue;
-      }
+      const website = (lead.website || '').toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+      if (!website && !lead.company_name) continue;
+      const existing = website ? db.prepare('SELECT id FROM leads WHERE website = ?').get(website) : null;
+      if (existing) { skipped++; continue; }
       insert.run(
-        lead.company_name,
-        website,
+        lead.company_name || null,
+        website || null,
         lead.city || null,
         lead.state?.toUpperCase() || null,
         lead.phone || null,
         lead.email || null,
         lead.contact_person || null,
-        lead.notes || null
+        lead.notes || null,
+        lead.status || 'not_contacted'
       );
       imported++;
     }

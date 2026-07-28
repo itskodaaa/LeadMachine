@@ -1,5 +1,7 @@
 <script>
   import '../app.css';
+  import { page } from '$app/stores';
+  import { Settings, Home } from '@lucide/svelte';
   let { children } = $props();
 </script>
 
@@ -7,13 +9,24 @@
   <nav class="topbar">
     <div class="topbar-inner">
       <div class="topbar-left">
-        <div class="topbar-logo">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-        </div>
         <span class="topbar-title">LeadFlow</span>
       </div>
       <div class="topbar-right">
-        <span style="font-size:10px;color:var(--muted)">localhost</span>
+        <button
+          type="button"
+          title={$page.url.pathname.endsWith('/settings') ? 'Home' : 'Settings'}
+          aria-label={$page.url.pathname.endsWith('/settings') ? 'Home' : 'Settings'}
+          onclick={() => {
+            $page.url.pathname.endsWith('/settings') ? window.location.href = '/' : window.location.href = '/settings';
+          }}
+          style="font-size:10px;color:var(--muted);cursor:pointer;background:none;border:none;padding:0;display:inline-flex;align-items:center;justify-content:center;"
+        >
+          {#if $page.url.pathname.endsWith('/settings')}
+            <Home size={15} />
+          {:else}
+            <Settings size={15} />
+          {/if}
+        </button>
       </div>
     </div>
   </nav>
