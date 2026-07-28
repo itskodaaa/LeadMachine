@@ -45,9 +45,9 @@
         </button>
       </div>
     </div>
+    <QuickFillClipboard bind:isOpen={isClipboardOpen} />
   </nav>
   <main class="main">
     {@render children()}
   </main>
-  <QuickFillClipboard bind:isOpen={isClipboardOpen} />
 </div>

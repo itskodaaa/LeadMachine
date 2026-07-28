@@ -44,119 +44,116 @@
   }
 </script>
 
-<!-- Floating Container aligned with max-width -->
-<div class="clipboard-container">
-  <!-- Slide-out Clipboard Panel -->
-  <div class="clipboard-drawer {isOpen ? 'open' : ''}">
-    <div class="drawer-header">
-      <div class="header-title-row">
-        <svg class="header-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-        </svg>
-        <span class="header-title">Quick Copy Clipboard</span>
+<!-- Slide-out Clipboard Panel (Drops directly from topbar) -->
+<div class="clipboard-drawer {isOpen ? 'open' : ''}">
+  <div class="drawer-header">
+    <div class="header-title-row">
+      <svg class="header-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+      </svg>
+      <span class="header-title">Quick Copy Clipboard</span>
+    </div>
+    <p class="header-subtitle">Click inside any field to view/edit in full. Click "Copy" to copy instantly.</p>
+  </div>
+
+  <div class="drawer-body">
+    <!-- Row 1: Name -->
+    <div class="form-row">
+      <div class="form-group full-width">
+        <label for="clip-name">Name</label>
+        <div class="input-wrapper">
+          <input id="clip-name" type="text" bind:value={details.name} oninput={saveDetails} placeholder="Full Name" />
+          <button class="btn-copy {copiedField === 'name' ? 'copied' : ''}" onclick={() => copyToClipboard(details.name, 'name')}>
+            {copiedField === 'name' ? 'Copied ✓' : 'Copy'}
+          </button>
+        </div>
       </div>
-      <p class="header-subtitle">Click inside any field to view/edit in full. Click "Copy" to copy instantly.</p>
     </div>
 
-    <div class="drawer-body">
-      <!-- Row 1: Name -->
-      <div class="form-row">
-        <div class="form-group full-width">
-          <label for="clip-name">Name</label>
-          <div class="input-wrapper">
-            <input id="clip-name" type="text" bind:value={details.name} oninput={saveDetails} placeholder="Full Name" />
-            <button class="btn-copy {copiedField === 'name' ? 'copied' : ''}" onclick={() => copyToClipboard(details.name, 'name')}>
-              {copiedField === 'name' ? 'Copied ✓' : 'Copy'}
-            </button>
-          </div>
+    <!-- Row 2: Company & Website -->
+    <div class="form-row">
+      <div class="form-group half-width">
+        <label for="clip-company">Company</label>
+        <div class="input-wrapper">
+          <input id="clip-company" type="text" bind:value={details.company} oninput={saveDetails} placeholder="Company Name" />
+          <button class="btn-copy {copiedField === 'company' ? 'copied' : ''}" onclick={() => copyToClipboard(details.company, 'company')}>
+            {copiedField === 'company' ? 'Copied ✓' : 'Copy'}
+          </button>
         </div>
       </div>
-
-      <!-- Row 2: Company & Website -->
-      <div class="form-row">
-        <div class="form-group half-width">
-          <label for="clip-company">Company</label>
-          <div class="input-wrapper">
-            <input id="clip-company" type="text" bind:value={details.company} oninput={saveDetails} placeholder="Company Name" />
-            <button class="btn-copy {copiedField === 'company' ? 'copied' : ''}" onclick={() => copyToClipboard(details.company, 'company')}>
-              {copiedField === 'company' ? 'Copied ✓' : 'Copy'}
-            </button>
-          </div>
-        </div>
-        <div class="form-group half-width">
-          <label for="clip-website">Website</label>
-          <div class="input-wrapper">
-            <input id="clip-website" type="text" bind:value={details.website} oninput={saveDetails} placeholder="Website" />
-            <button class="btn-copy {copiedField === 'website' ? 'copied' : ''}" onclick={() => copyToClipboard(details.website, 'website')}>
-              {copiedField === 'website' ? 'Copied ✓' : 'Copy'}
-            </button>
-          </div>
+      <div class="form-group half-width">
+        <label for="clip-website">Website</label>
+        <div class="input-wrapper">
+          <input id="clip-website" type="text" bind:value={details.website} oninput={saveDetails} placeholder="Website" />
+          <button class="btn-copy {copiedField === 'website' ? 'copied' : ''}" onclick={() => copyToClipboard(details.website, 'website')}>
+            {copiedField === 'website' ? 'Copied ✓' : 'Copy'}
+          </button>
         </div>
       </div>
+    </div>
 
-      <!-- Row 3: Email & Phone -->
-      <div class="form-row">
-        <div class="form-group half-width">
-          <label for="clip-email">Email</label>
-          <div class="input-wrapper">
-            <input id="clip-email" type="text" bind:value={details.email} oninput={saveDetails} placeholder="Email Address" />
-            <button class="btn-copy {copiedField === 'email' ? 'copied' : ''}" onclick={() => copyToClipboard(details.email, 'email')}>
-              {copiedField === 'email' ? 'Copied ✓' : 'Copy'}
-            </button>
-          </div>
-        </div>
-        <div class="form-group half-width">
-          <label for="clip-phone">Phone</label>
-          <div class="input-wrapper">
-            <input id="clip-phone" type="text" bind:value={details.phone} oninput={saveDetails} placeholder="Phone Number" />
-            <button class="btn-copy {copiedField === 'phone' ? 'copied' : ''}" onclick={() => copyToClipboard(details.phone, 'phone')}>
-              {copiedField === 'phone' ? 'Copied ✓' : 'Copy'}
-            </button>
-          </div>
+    <!-- Row 3: Email & Phone -->
+    <div class="form-row">
+      <div class="form-group half-width">
+        <label for="clip-email">Email</label>
+        <div class="input-wrapper">
+          <input id="clip-email" type="text" bind:value={details.email} oninput={saveDetails} placeholder="Email Address" />
+          <button class="btn-copy {copiedField === 'email' ? 'copied' : ''}" onclick={() => copyToClipboard(details.email, 'email')}>
+            {copiedField === 'email' ? 'Copied ✓' : 'Copy'}
+          </button>
         </div>
       </div>
-
-      <!-- Row 4: City, State, Zip -->
-      <div class="form-row">
-        <div class="form-group city-width">
-          <label for="clip-city">City</label>
-          <div class="input-wrapper">
-            <input id="clip-city" type="text" bind:value={details.city} oninput={saveDetails} placeholder="City" />
-            <button class="btn-copy {copiedField === 'city' ? 'copied' : ''}" onclick={() => copyToClipboard(details.city, 'city')}>
-              {copiedField === 'city' ? 'Copied ✓' : 'Copy'}
-            </button>
-          </div>
-        </div>
-        <div class="form-group state-width">
-          <label for="clip-state">State</label>
-          <div class="input-wrapper">
-            <input id="clip-state" type="text" bind:value={details.state} oninput={saveDetails} placeholder="ST" />
-            <button class="btn-copy {copiedField === 'state' ? 'copied' : ''}" onclick={() => copyToClipboard(details.state, 'state')}>
-              {copiedField === 'state' ? 'Copied ✓' : 'Copy'}
-            </button>
-          </div>
-        </div>
-        <div class="form-group zip-width">
-          <label for="clip-zip">Zip</label>
-          <div class="input-wrapper">
-            <input id="clip-zip" type="text" bind:value={details.zip} oninput={saveDetails} placeholder="Zip" />
-            <button class="btn-copy {copiedField === 'zip' ? 'copied' : ''}" onclick={() => copyToClipboard(details.zip, 'zip')}>
-              {copiedField === 'zip' ? 'Copied ✓' : 'Copy'}
-            </button>
-          </div>
+      <div class="form-group half-width">
+        <label for="clip-phone">Phone</label>
+        <div class="input-wrapper">
+          <input id="clip-phone" type="text" bind:value={details.phone} oninput={saveDetails} placeholder="Phone Number" />
+          <button class="btn-copy {copiedField === 'phone' ? 'copied' : ''}" onclick={() => copyToClipboard(details.phone, 'phone')}>
+            {copiedField === 'phone' ? 'Copied ✓' : 'Copy'}
+          </button>
         </div>
       </div>
+    </div>
 
-      <!-- Row 5: Message -->
-      <div class="form-row">
-        <div class="form-group full-width">
-          <label for="clip-message">Message Template</label>
-          <div class="textarea-wrapper">
-            <textarea id="clip-message" bind:value={details.message} oninput={saveDetails} placeholder="Message template..." rows="3"></textarea>
-            <button class="btn-copy-textarea {copiedField === 'message' ? 'copied' : ''}" onclick={() => copyToClipboard(details.message, 'message')}>
-              {copiedField === 'message' ? 'Copied ✓' : 'Copy'}
-            </button>
-          </div>
+    <!-- Row 4: City, State, Zip -->
+    <div class="form-row">
+      <div class="form-group city-width">
+        <label for="clip-city">City</label>
+        <div class="input-wrapper">
+          <input id="clip-city" type="text" bind:value={details.city} oninput={saveDetails} placeholder="City" />
+          <button class="btn-copy {copiedField === 'city' ? 'copied' : ''}" onclick={() => copyToClipboard(details.city, 'city')}>
+            {copiedField === 'city' ? 'Copied ✓' : 'Copy'}
+          </button>
+        </div>
+      </div>
+      <div class="form-group state-width">
+        <label for="clip-state">State</label>
+        <div class="input-wrapper">
+          <input id="clip-state" type="text" bind:value={details.state} oninput={saveDetails} placeholder="ST" />
+          <button class="btn-copy {copiedField === 'state' ? 'copied' : ''}" onclick={() => copyToClipboard(details.state, 'state')}>
+            {copiedField === 'state' ? 'Copied ✓' : 'Copy'}
+          </button>
+        </div>
+      </div>
+      <div class="form-group zip-width">
+        <label for="clip-zip">Zip</label>
+        <div class="input-wrapper">
+          <input id="clip-zip" type="text" bind:value={details.zip} oninput={saveDetails} placeholder="Zip" />
+          <button class="btn-copy {copiedField === 'zip' ? 'copied' : ''}" onclick={() => copyToClipboard(details.zip, 'zip')}>
+            {copiedField === 'zip' ? 'Copied ✓' : 'Copy'}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 5: Message -->
+    <div class="form-row">
+      <div class="form-group full-width">
+        <label for="clip-message">Message Template</label>
+        <div class="textarea-wrapper">
+          <textarea id="clip-message" bind:value={details.message} oninput={saveDetails} placeholder="Message template..." rows="3"></textarea>
+          <button class="btn-copy-textarea {copiedField === 'message' ? 'copied' : ''}" onclick={() => copyToClipboard(details.message, 'message')}>
+            {copiedField === 'message' ? 'Copied ✓' : 'Copy'}
+          </button>
         </div>
       </div>
     </div>
@@ -164,37 +161,27 @@
 </div>
 
 <style>
-  /* Container Wrapper */
-  .clipboard-container {
-    position: fixed;
-    top: 76px; /* Aligned below the topbar: topbar height 36px + margin-top 40px = 76px */
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100%;
-    max-width: 960px;
-    pointer-events: none;
-    z-index: 40;
-  }
-
-  /* Drawer Panel */
+  /* Dropdown Panel (positioned absolute relative to the topbar container) */
   .clipboard-drawer {
     position: absolute;
-    top: 0;
-    right: -320px;
-    bottom: 0;
+    top: 42px; /* Positioned directly below the navigation bar border */
+    right: 16px; /* Align with right margin of layout */
     width: 320px;
+    max-height: calc(100vh - 120px); /* Keeps panel bounded on smaller screens */
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
     display: flex;
     flex-direction: column;
-    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.2s;
     pointer-events: auto;
-    visibility: hidden;
+    z-index: 40;
+    
+    /* Drop-down transition */
     opacity: 0;
     transform: translateY(-12px);
+    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.2s;
+    visibility: hidden;
   }
   .clipboard-drawer.open {
     opacity: 1;
