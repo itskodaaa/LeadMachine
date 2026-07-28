@@ -96,7 +96,9 @@
     { label: 'Total', value: stats.total },
     { label: 'New', value: stats.byStatus.find((s:any)=>s.status==='not_contacted')?.count||0 },
     { label: 'Sent', value: stats.byStatus.find((s:any)=>s.status==='contacted')?.count||0 },
-    { label: 'Replied', value: stats.byStatus.find((s:any)=>s.status==='responded')?.count||0 }
+    { label: 'Replied', value: stats.byStatus.find((s:any)=>s.status==='responded')?.count||0 },
+    { label: 'Unreachable', value: stats.byStatus.find((s:any)=>s.status==='unable_to_reach')?.count||0 },
+    { label: 'Won', value: stats.byStatus.find((s:any)=>s.status==='won')?.count||0 }
   ]);
 
   let searchInput = $state('');
@@ -123,6 +125,8 @@
     <option value="not_contacted">New</option>
     <option value="contacted">Sent</option>
     <option value="responded">Replied</option>
+    <option value="unable_to_reach">Unreachable</option>
+    <option value="won">Won</option>
     <option value="closed">Closed</option>
   </select>
   <select bind:value={stateFilter} onchange={() => doFilter()} style="max-width:90px">
@@ -142,6 +146,8 @@
       <option value="not_contacted">New</option>
       <option value="contacted">Sent</option>
       <option value="responded">Replied</option>
+      <option value="unable_to_reach">Unreachable</option>
+      <option value="won">Won</option>
       <option value="closed">Closed</option>
     </select>
     <button class="btn btn-sm btn-danger" onclick={handleBulkDelete}>Delete</button>

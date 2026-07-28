@@ -64,7 +64,7 @@ body {
 .main { flex: 1; padding: 14px 16px; width: 100%; max-width: 960px; }
 
 /* Stats row */
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px; }
 .stat-card {
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 10px 12px;
@@ -146,6 +146,8 @@ tr:hover .cell-actions { opacity: 1; }
 .badge-new { background: var(--input); color: var(--text2); }
 .badge-sent { background: var(--accent-light); color: var(--accent); }
 .badge-replied { background: var(--success-bg); color: var(--success); }
+.badge-unreachable { background: var(--danger-bg); color: var(--danger); }
+.badge-won { background: #ebf5ff; color: #1e40af; }
 .badge-closed { background: var(--input); color: var(--muted); }
 
 /* Status badge (clickable to cycle) */

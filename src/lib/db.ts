@@ -27,7 +27,7 @@ db.exec(`
     phone TEXT,
     email TEXT,
     contact_person TEXT,
-    status TEXT DEFAULT 'not_contacted' CHECK(status IN ('not_contacted', 'contacted', 'responded', 'closed')),
+    status TEXT DEFAULT 'not_contacted' CHECK(status IN ('not_contacted', 'contacted', 'responded', 'unable_to_reach', 'won', 'closed')),
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP

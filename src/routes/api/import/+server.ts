@@ -51,8 +51,17 @@ const STATUS_MAP: Record<string, string> = {
   qualified: 'responded', warm: 'responded', hot: 'responded',
   proposal_sent: 'responded', negotiating: 'responded',
 
-  closed: 'closed', won: 'closed', lost: 'closed', dead: 'closed',
-  done: 'closed', complete: 'completed', completed: 'closed',
+  unreachable: 'unable_to_reach', unable_to_reach: 'unable_to_reach',
+  unabletoreach: 'unable_to_reach', no_reply: 'unable_to_reach',
+  noreply: 'unable_to_reach', no_response: 'unable_to_reach',
+  noresponse: 'unable_to_reach', failed_contact: 'unable_to_reach',
+  failed: 'unable_to_reach',
+
+  won: 'won', job_won: 'won', jobwon: 'won', wonjob: 'won',
+  won_job: 'won', success: 'won',
+
+  closed: 'closed', lost: 'closed', dead: 'closed',
+  done: 'closed', complete: 'closed', completed: 'closed',
   converted: 'closed', customer: 'closed', client: 'closed',
   archived: 'closed', inactive_closed: 'closed',
 };

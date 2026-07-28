@@ -2,7 +2,7 @@
   import { STATUS_CONFIG } from '$lib/types.js';
   let { status, leadId, onStatusChange } = $props();
 
-  const ORDER = ['not_contacted', 'contacted', 'responded', 'closed'];
+  const ORDER = ['not_contacted', 'contacted', 'responded', 'unable_to_reach', 'won', 'closed'];
 
   function cycle() {
     const idx = ORDER.indexOf(status);
@@ -18,7 +18,7 @@
 </script>
 
 <button
-  class="badge-btn badge-{status === 'not_contacted' ? 'new' : status === 'contacted' ? 'sent' : status}"
+  class="badge-btn {STATUS_CONFIG[status]?.cls || 'badge-new'}"
   onclick={cycle}
   title="Click to change status"
 >

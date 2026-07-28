@@ -54,6 +54,8 @@
     <option value="not_contacted">New</option>
     <option value="contacted">Sent</option>
     <option value="responded">Replied</option>
+    <option value="unable_to_reach">Unreachable</option>
+    <option value="won">Won</option>
     <option value="closed">Closed</option>
   </select>
 
