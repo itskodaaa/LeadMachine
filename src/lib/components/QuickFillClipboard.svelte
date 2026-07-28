@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  let isOpen = $state(false);
+  let { isOpen = $bindable(false) }: { isOpen: boolean } = $props();
   let copiedField = $state<string | null>(null);
 
   let details = $state({
@@ -58,25 +58,6 @@
 
 <!-- Floating Container aligned with max-width -->
 <div class="clipboard-container">
-  <!-- Floating Toggle Button -->
-  <button 
-    class="clipboard-toggle {isOpen ? 'open' : ''}" 
-    onclick={() => isOpen = !isOpen}
-    title="Form Filler Clipboard"
-    aria-label="Toggle Clipboard"
-  >
-    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-      {#if isOpen}
-        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-      {:else}
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
-      {/if}
-    </svg>
-    {#if !isOpen}
-      <span class="badge-count">Clipboard</span>
-    {/if}
-  </button>
-
   <!-- Slide-out Clipboard Panel -->
   <div class="clipboard-drawer {isOpen ? 'open' : ''}">
     <div class="drawer-header">
@@ -139,47 +120,7 @@
     pointer-events: none;
     z-index: 40;
   }
-
-  /* Floating Button */
-  .clipboard-toggle {
-    position: absolute;
-    bottom: 0px;
-    right: 16px;
-    height: 40px;
-    padding: 0 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 20px;
-    box-shadow: 0 4px 12px rgba(224, 90, 0, 0.25);
-    cursor: pointer;
-    transition: all 0.2s ease-in-out;
-    pointer-events: auto;
-  }
-  .clipboard-toggle:hover {
-    background: var(--accent-hover);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(224, 90, 0, 0.35);
-  }
-  .clipboard-toggle.open {
-    background: var(--text);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  }
-  .clipboard-toggle.open:hover {
-    background: #000;
-  }
-  .clipboard-toggle .icon {
-    width: 16px;
-    height: 16px;
-  }
-  .badge-count {
-    font-size: 11px;
-    font-weight: 600;
-  }
-
+  
   /* Drawer Panel */
   .clipboard-drawer {
     position: absolute;
