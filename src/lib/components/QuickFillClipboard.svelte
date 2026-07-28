@@ -56,80 +56,95 @@
   }
 </script>
 
-<!-- Floating Toggle Button -->
-<button 
-  class="clipboard-toggle {isOpen ? 'open' : ''}" 
-  onclick={() => isOpen = !isOpen}
-  title="Form Filler Clipboard"
-  aria-label="Toggle Clipboard"
->
-  <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-    {#if isOpen}
-      <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-    {:else}
-      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+<!-- Floating Container aligned with max-width -->
+<div class="clipboard-container">
+  <!-- Floating Toggle Button -->
+  <button 
+    class="clipboard-toggle {isOpen ? 'open' : ''}" 
+    onclick={() => isOpen = !isOpen}
+    title="Form Filler Clipboard"
+    aria-label="Toggle Clipboard"
+  >
+    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+      {#if isOpen}
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+      {:else}
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+      {/if}
+    </svg>
+    {#if !isOpen}
+      <span class="badge-count">Clipboard</span>
     {/if}
-  </svg>
-  {#if !isOpen}
-    <span class="badge-count">Clipboard</span>
-  {/if}
-</button>
+  </button>
 
-<!-- Slide-out Clipboard Panel -->
-<div class="clipboard-drawer {isOpen ? 'open' : ''}">
-  <div class="drawer-header">
-    <div class="header-title-row">
-      <svg class="header-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-      </svg>
-      <span class="header-title">Quick Copy Clipboard</span>
-    </div>
-    <p class="header-subtitle">Edit details below. Click "Copy" next to any field to copy it instantly.</p>
-  </div>
-
-  <div class="drawer-body">
-    {#each fields as field}
-      <div class="field-box">
-        <div class="field-label-row">
-          <label for="clip-{field.key}">{field.label}</label>
-          <button 
-            type="button"
-            class="btn-copy {copiedField === field.key ? 'copied' : ''}" 
-            onclick={() => copyToClipboard((details as any)[field.key], field.key)}
-          >
-            {copiedField === field.key ? 'Copied ✓' : 'Copy'}
-          </button>
-        </div>
-        
-        {#if field.isTextArea}
-          <textarea
-            id="clip-{field.key}"
-            bind:value={(details as any)[field.key]}
-            oninput={saveDetails}
-            placeholder={field.placeholder}
-            rows="4"
-          ></textarea>
-        {:else}
-          <input
-            id="clip-{field.key}"
-            type="text"
-            bind:value={(details as any)[field.key]}
-            oninput={saveDetails}
-            placeholder={field.placeholder}
-          />
-        {/if}
+  <!-- Slide-out Clipboard Panel -->
+  <div class="clipboard-drawer {isOpen ? 'open' : ''}">
+    <div class="drawer-header">
+      <div class="header-title-row">
+        <svg class="header-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+        <span class="header-title">Quick Copy Clipboard</span>
       </div>
-    {/each}
+      <p class="header-subtitle">Edit details below. Click "Copy" next to any field to copy it instantly.</p>
+    </div>
+
+    <div class="drawer-body">
+      {#each fields as field}
+        <div class="field-box">
+          <div class="field-label-row">
+            <label for="clip-{field.key}">{field.label}</label>
+            <button 
+              type="button"
+              class="btn-copy {copiedField === field.key ? 'copied' : ''}" 
+              onclick={() => copyToClipboard((details as any)[field.key], field.key)}
+            >
+              {copiedField === field.key ? 'Copied ✓' : 'Copy'}
+            </button>
+          </div>
+          
+          {#if field.isTextArea}
+            <textarea
+              id="clip-{field.key}"
+              bind:value={(details as any)[field.key]}
+              oninput={saveDetails}
+              placeholder={field.placeholder}
+              rows="4"
+            ></textarea>
+          {:else}
+            <input
+              id="clip-{field.key}"
+              type="text"
+              bind:value={(details as any)[field.key]}
+              oninput={saveDetails}
+              placeholder={field.placeholder}
+            />
+          {/if}
+        </div>
+      {/each}
+    </div>
   </div>
 </div>
 
 <style>
+  /* Container Wrapper */
+  .clipboard-container {
+    position: fixed;
+    top: 76px; /* Aligned below the topbar: topbar height 36px + margin-top 40px = 76px */
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 960px;
+    pointer-events: none;
+    z-index: 40;
+  }
+
   /* Floating Button */
   .clipboard-toggle {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 45;
+    position: absolute;
+    bottom: 0px;
+    right: 16px;
     height: 40px;
     padding: 0 16px;
     display: flex;
@@ -142,6 +157,7 @@
     box-shadow: 0 4px 12px rgba(224, 90, 0, 0.25);
     cursor: pointer;
     transition: all 0.2s ease-in-out;
+    pointer-events: auto;
   }
   .clipboard-toggle:hover {
     background: var(--accent-hover);
@@ -166,21 +182,24 @@
 
   /* Drawer Panel */
   .clipboard-drawer {
-    position: fixed;
-    top: 40px; /* Header aligned */
+    position: absolute;
+    top: 0;
     right: -320px;
     bottom: 0;
     width: 320px;
     background: var(--card);
-    border-left: 1px solid var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     box-shadow: -4px 0 24px rgba(0,0,0,0.05);
-    z-index: 40;
     display: flex;
     flex-direction: column;
-    transition: right 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: right 0.25s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.25s;
+    pointer-events: auto;
+    visibility: hidden;
   }
   .clipboard-drawer.open {
-    right: 0;
+    right: 16px;
+    visibility: visible;
   }
 
   .drawer-header {
