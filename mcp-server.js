@@ -142,6 +142,35 @@ const tools = [
       type: "object",
       properties: {}
     }
+  },
+  {
+    name: "leadflow__update_leads_batch",
+    description: "Update fields of multiple existing leads in a batch. Performs duplicate validation checks.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        updates: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "integer", description: "The unique ID of the lead to update" },
+              company_name: { type: "string", description: "Updated company name" },
+              website: { type: "string", description: "Updated website URL" },
+              city: { type: "string", description: "Updated city" },
+              state: { type: "string", description: "Updated state (two-letter code)" },
+              phone: { type: "string", description: "Updated phone number" },
+              email: { type: "string", description: "Updated email address" },
+              contact_person: { type: "string", description: "Updated contact person name" },
+              notes: { type: "string", description: "Updated notes" },
+              status: { type: "string", enum: ["not_contacted", "contacted", "responded", "unable_to_reach", "won", "closed"], description: "Updated status" }
+            },
+            required: ["id"]
+          }
+        }
+      },
+      required: ["updates"]
+    }
   }
 ];
 
@@ -444,6 +473,101 @@ function handleUpdateLead(args) {
   }
 }
 
+function handleUpdateLeadsBatch(args) {
+  const { updates } = args;
+  if (!Array.isArray(updates) || updates.length === 0) {
+    return {
+      isError: true,
+      content: [{ type: "text", text: "Error: updates array is required and must not be empty." }]
+    };
+  }
+
+  try {
+    const db = new Database(dbPath);
+    let updated = 0;
+    let skipped = 0;
+    const details = [];
+
+    db.transaction(() => {
+      for (const item of updates) {
+        const { id, company_name, website, city, state, phone, email, contact_person, notes, status } = item;
+        if (id == null) {
+          skipped++;
+          details.push({ id: "Unknown", status: "skipped", reason: "Missing lead ID" });
+          continue;
+        }
+
+        const existing = db.prepare('SELECT id FROM leads WHERE id = ?').get(id);
+        if (!existing) {
+          skipped++;
+          details.push({ id, status: "skipped", reason: "Lead not found" });
+          continue;
+        }
+
+        const updatesQuery = [];
+        const params = [];
+
+        if (company_name !== undefined) {
+          const duplicateName = db.prepare('SELECT id FROM leads WHERE LOWER(company_name) = ? AND id != ?').get(company_name.toLowerCase(), id);
+          if (duplicateName) {
+            skipped++;
+            details.push({ id, status: "skipped", reason: `Duplicate company name '${company_name}' in lead ID ${duplicateName.id}` });
+            continue;
+          }
+          updatesQuery.push('company_name = ?');
+          params.push(company_name);
+        }
+
+        if (website !== undefined) {
+          const normalized = normalizeWebsite(website);
+          const duplicateWebsite = db.prepare('SELECT id FROM leads WHERE website = ? AND id != ?').get(normalized, id);
+          if (duplicateWebsite) {
+            skipped++;
+            details.push({ id, status: "skipped", reason: `Duplicate website '${normalized}' in lead ID ${duplicateWebsite.id}` });
+            continue;
+          }
+          updatesQuery.push('website = ?');
+          params.push(normalized);
+        }
+
+        if (city !== undefined) { updatesQuery.push('city = ?'); params.push(city || null); }
+        if (state !== undefined) { updatesQuery.push('state = ?'); params.push(state ? state.toUpperCase() : null); }
+        if (phone !== undefined) { updatesQuery.push('phone = ?'); params.push(phone || null); }
+        if (email !== undefined) { updatesQuery.push('email = ?'); params.push(email || null); }
+        if (contact_person !== undefined) { updatesQuery.push('contact_person = ?'); params.push(contact_person || null); }
+        if (notes !== undefined) { updatesQuery.push('notes = ?'); params.push(notes || null); }
+        if (status !== undefined) { updatesQuery.push('status = ?'); params.push(status); }
+
+        if (updatesQuery.length === 0) {
+          skipped++;
+          details.push({ id, status: "skipped", reason: "No updates provided" });
+          continue;
+        }
+
+        updatesQuery.push('updated_at = CURRENT_TIMESTAMP');
+        params.push(id);
+
+        const stmt = db.prepare(`UPDATE leads SET ${updatesQuery.join(', ')} WHERE id = ?`);
+        stmt.run(...params);
+        updated++;
+        details.push({ id, status: "updated" });
+      }
+    })();
+
+    return {
+      content: [{
+        type: "text",
+        text: `Batch update completed: ${updated} leads updated, ${skipped} skipped. Detail summary: ${JSON.stringify(details)}`
+      }]
+    };
+  } catch (err) {
+    return {
+      isError: true,
+      content: [{ type: "text", text: `Error processing batch update: ${err.message}` }]
+    };
+  }
+}
+
 function handleSearchLeads(args) {
   const { query } = args;
   if (!query) {
@@ -595,6 +719,8 @@ function handleRequest(req) {
           return sendResponse(id, handleGetLead(args));
         case 'leadflow__update_lead':
           return sendResponse(id, handleUpdateLead(args));
+        case 'leadflow__update_leads_batch':
+          return sendResponse(id, handleUpdateLeadsBatch(args));
         case 'leadflow__search_leads':
           return sendResponse(id, handleSearchLeads(args));
         case 'leadflow__delete_lead':
