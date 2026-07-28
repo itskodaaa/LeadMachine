@@ -177,25 +177,30 @@
     z-index: 40;
   }
 
-  /* Drawer Panel */
+  /* Dropdown Panel (drops from navigation bar) */
   .clipboard-drawer {
     position: absolute;
-    top: 0;
-    right: -320px;
-    bottom: 0;
+    top: 8px; /* Positioned just below the top navigation bar */
+    right: 16px; /* Right-aligned inside the max-width layout */
     width: 320px;
+    max-height: calc(100vh - 120px); /* Keeps panel bounded on smaller screens */
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: -4px 0 24px rgba(0,0,0,0.05);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
     display: flex;
     flex-direction: column;
-    transition: right 0.25s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.25s;
     pointer-events: auto;
+    
+    /* Drop-down transition */
+    opacity: 0;
+    transform: translateY(-12px);
+    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.2s;
     visibility: hidden;
   }
   .clipboard-drawer.open {
-    right: 16px;
+    opacity: 1;
+    transform: translateY(0);
     visibility: visible;
   }
 
@@ -347,12 +352,10 @@
   /* Responsive styling */
   @media (max-width: 768px) {
     .clipboard-drawer {
-      width: 100%;
-      right: -100%;
-      top: 40px;
-    }
-    .clipboard-drawer.open {
-      right: 0;
+      left: 16px;
+      right: 16px;
+      width: auto;
+      max-height: calc(100vh - 100px);
     }
   }
 </style>
