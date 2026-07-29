@@ -6,14 +6,24 @@
 
   let details = $state({
     name: 'Pamela Jameson',
+    position: 'Purchase Director',
+    company: 'Northeast Precision Machinery, Inc.',
+    phone: '+1 708-568-3708',
+    address: '1908 Mount Vernon Ave, Alexandria, VA 22301',
+    website: 'https://northeastprecision.com/',
+    country: 'United States.',
     email: 'pamela.jameson@nortiheastprecision.com',
-    phone: '571-555-0142',
-    company: 'Northeast Precision',
-    website: 'northeastprecision.com',
-    city: 'Alexandria',
-    state: 'VA',
-    zip: '22301',
-    message: 'I am currently incurring a server and need to speak with a sales representative about your machining services.'
+    message: `Hello,
+
+I am reaching out to express our interest in purchasing your products and would appreciate the opportunity to explore a potential business relationship. Kindly arrange for a sales representative to contact us at your earliest convenience to discuss product details, pricing, and possible collaboration.
+
+We look forward to your response and the possibility of working together.
+
+Thank you for your time and attention.
+
+Sincerely.
+
+Pamela Jameson`
   });
 
   onMount(() => {
@@ -66,14 +76,23 @@
   </div>
 
   <div class="drawer-body">
-    <!-- Row 1: Name -->
+    <!-- Row 1: Name & Position -->
     <div class="form-row">
-      <div class="form-group full-width">
+      <div class="form-group half-width">
         <label for="clip-name">Name</label>
         <div class="input-wrapper">
           <input id="clip-name" type="text" bind:value={details.name} oninput={saveDetails} placeholder="Full Name" />
           <button class="btn-copy {copiedField === 'name' ? 'copied' : ''}" onclick={() => copyToClipboard(details.name, 'name')}>
             {copiedField === 'name' ? 'Copied ✓' : 'Copy'}
+          </button>
+        </div>
+      </div>
+      <div class="form-group half-width">
+        <label for="clip-position">Position</label>
+        <div class="input-wrapper">
+          <input id="clip-position" type="text" bind:value={details.position} oninput={saveDetails} placeholder="Position" />
+          <button class="btn-copy {copiedField === 'position' ? 'copied' : ''}" onclick={() => copyToClipboard(details.position, 'position')}>
+            {copiedField === 'position' ? 'Copied ✓' : 'Copy'}
           </button>
         </div>
       </div>
@@ -123,32 +142,23 @@
       </div>
     </div>
 
-    <!-- Row 4: City, State, Zip -->
+    <!-- Row 4: Address & Country -->
     <div class="form-row">
       <div class="form-group city-width">
-        <label for="clip-city">City</label>
+        <label for="clip-address">Address</label>
         <div class="input-wrapper">
-          <input id="clip-city" type="text" bind:value={details.city} oninput={saveDetails} placeholder="City" />
-          <button class="btn-copy {copiedField === 'city' ? 'copied' : ''}" onclick={() => copyToClipboard(details.city, 'city')}>
-            {copiedField === 'city' ? 'Copied ✓' : 'Copy'}
+          <input id="clip-address" type="text" bind:value={details.address} oninput={saveDetails} placeholder="Address" />
+          <button class="btn-copy {copiedField === 'address' ? 'copied' : ''}" onclick={() => copyToClipboard(details.address, 'address')}>
+            {copiedField === 'address' ? 'Copied ✓' : 'Copy'}
           </button>
         </div>
       </div>
       <div class="form-group state-width">
-        <label for="clip-state">State</label>
+        <label for="clip-country">Country</label>
         <div class="input-wrapper">
-          <input id="clip-state" type="text" bind:value={details.state} oninput={saveDetails} placeholder="ST" />
-          <button class="btn-copy {copiedField === 'state' ? 'copied' : ''}" onclick={() => copyToClipboard(details.state, 'state')}>
-            {copiedField === 'state' ? 'Copied ✓' : 'Copy'}
-          </button>
-        </div>
-      </div>
-      <div class="form-group zip-width">
-        <label for="clip-zip">Zip</label>
-        <div class="input-wrapper">
-          <input id="clip-zip" type="text" bind:value={details.zip} oninput={saveDetails} placeholder="Zip" />
-          <button class="btn-copy {copiedField === 'zip' ? 'copied' : ''}" onclick={() => copyToClipboard(details.zip, 'zip')}>
-            {copiedField === 'zip' ? 'Copied ✓' : 'Copy'}
+          <input id="clip-country" type="text" bind:value={details.country} oninput={saveDetails} placeholder="Country" />
+          <button class="btn-copy {copiedField === 'country' ? 'copied' : ''}" onclick={() => copyToClipboard(details.country, 'country')}>
+            {copiedField === 'country' ? 'Copied ✓' : 'Copy'}
           </button>
         </div>
       </div>
@@ -159,7 +169,7 @@
       <div class="form-group full-width">
         <label for="clip-message">Message Template</label>
         <div class="textarea-wrapper">
-          <textarea id="clip-message" bind:value={details.message} oninput={saveDetails} placeholder="Message template..." rows="3"></textarea>
+          <textarea id="clip-message" bind:value={details.message} oninput={saveDetails} placeholder="Message template..." rows="4"></textarea>
           <button class="btn-copy-textarea {copiedField === 'message' ? 'copied' : ''}" onclick={() => copyToClipboard(details.message, 'message')}>
             {copiedField === 'message' ? 'Copied ✓' : 'Copy'}
           </button>
@@ -180,28 +190,27 @@
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-    display: flex;
-    flex-direction: column;
-    pointer-events: auto;
-    z-index: 40;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    z-index: 40; /* Make sure it lays above main page but below overlays if any */
+    padding: 16px;
     
-    /* Drop-down transition */
+    /* Animation: slide drop from nav */
     opacity: 0;
-    transform: translateY(-12px);
-    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.2s;
-    visibility: hidden;
+    transform: translateY(-8px);
+    pointer-events: none;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
+
   .clipboard-drawer.open {
     opacity: 1;
     transform: translateY(0);
-    visibility: visible;
+    pointer-events: auto;
   }
 
   .drawer-header {
-    padding: 12px 16px;
+    margin-bottom: 12px;
     border-bottom: 1px solid var(--border);
-    background: var(--bg);
+    padding-bottom: 8px;
   }
   .header-title-row {
     display: flex;
@@ -209,8 +218,8 @@
     gap: 6px;
   }
   .header-icon {
-    width: 15px;
-    height: 15px;
+    width: 14px;
+    height: 14px;
     color: var(--accent);
   }
   .header-title {
@@ -219,24 +228,18 @@
     color: var(--text);
   }
   .header-subtitle {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--muted);
     margin-top: 2px;
-    line-height: 1.4;
     text-align: left;
   }
 
   .drawer-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px 16px;
     display: flex;
     flex-direction: column;
     gap: 10px;
-    position: relative; /* Position anchor for focused absolute inputs */
   }
 
-  /* Compact Form Grid styling */
   .form-row {
     display: flex;
     gap: 8px;
@@ -262,10 +265,6 @@
     min-width: 0;
   }
   .state-width {
-    flex: 1;
-    min-width: 0;
-  }
-  .zip-width {
     flex: 1.5;
     min-width: 0;
   }
@@ -302,8 +301,8 @@
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Clean UI Expansion on Focus */
-  .input-wrapper:focus-within {
+  /* Clean UI Expansion on Focus (Only when the input itself is focused, not when copy button is focused/clicked) */
+  .input-wrapper:has(input:focus) {
     position: absolute;
     left: 16px;
     right: 16px;
@@ -312,14 +311,14 @@
     height: 30px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   }
-  .input-wrapper:focus-within input {
+  .input-wrapper:has(input:focus) input {
     height: 30px;
     font-size: 12px;
     border-color: var(--accent);
     background: var(--card); /* Solid background to overlay neighboring fields */
     box-shadow: 0 0 0 2px var(--accent-light);
   }
-  .input-wrapper:focus-within .btn-copy {
+  .input-wrapper:has(input:focus) .btn-copy {
     height: 24px;
     font-size: 10px;
     right: 4px;
@@ -366,7 +365,6 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    pointer-events: auto;
   }
   .btn-copy:hover {
     background: var(--accent-hover);
@@ -378,12 +376,12 @@
 
   .btn-copy-textarea {
     position: absolute;
-    right: 3px;
-    top: 4px;
-    height: 20px;
-    padding: 0 6px;
+    right: 4px;
+    bottom: 4px;
+    height: 22px;
+    padding: 0 8px;
     border-radius: 4px;
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 600;
     background: var(--accent);
     color: #fff;
@@ -410,7 +408,7 @@
       width: auto;
       max-height: calc(100vh - 100px);
     }
-    .input-wrapper:focus-within {
+    .input-wrapper:has(input:focus) {
       left: 12px;
       right: 12px;
     }
