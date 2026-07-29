@@ -15,15 +15,40 @@
     email: 'pamela.jameson@nortiheastprecision.com',
     message: `Hello,
 
-I am reaching out to express our interest in purchasing your products and would appreciate the opportunity to explore a potential business relationship. Kindly arrange for a sales representative to contact us at your earliest convenience to discuss product details, pricing, and possible collaboration.
+I am reaching out to express our interest in your services and would appreciate the opportunity to explore a potential business relationship. Kindly arrange for a representative to contact us at your earliest convenience to discuss details, pricing, and possible collaboration on upcoming projects.
 
 We look forward to your response and the possibility of working together.
 
 Thank you for your time and attention.
 
-Sincerely.
+Sincerely,
 
 Pamela Jameson`
+  });
+
+  let bookmarkletLink = $derived.by(() => {
+    const code = `(function(){
+      const d = ${JSON.stringify(details)};
+      function fill(sels, val) {
+        if(!val) return;
+        for(const s of sels) {
+          const el = document.querySelector(s);
+          if(el) {
+            el.value = val;
+            el.dispatchEvent(new Event('input', {bubbles:true}));
+            el.dispatchEvent(new Event('change', {bubbles:true}));
+            break;
+          }
+        }
+      }
+      fill(['input[name*="name" i]', 'input[id*="name" i]', 'input[placeholder*="name" i]'], d.name);
+      fill(['input[name*="email" i]', 'input[type="email"]', 'input[id*="email" i]'], d.email);
+      fill(['input[name*="phone" i]', 'input[name*="tel" i]', 'input[type="tel"]'], d.phone);
+      fill(['input[name*="company" i]', 'input[name*="org" i]', 'input[id*="company" i]'], d.company);
+      fill(['input[name*="web" i]', 'input[name*="url" i]'], d.website);
+      fill(['textarea[name*="message" i]', 'textarea[name*="comment" i]', 'textarea[placeholder*="message" i]'], d.message);
+    })()`;
+    return 'javascript:' + encodeURIComponent(code.replace(/\s+/g, ' '));
   });
 
   onMount(() => {
@@ -52,6 +77,14 @@ Pamela Jameson`
       console.error('Failed to copy: ', err);
     }
   }
+
+  function submitAutofill() {
+    const formEl = document.getElementById('autofill-form') as HTMLFormElement;
+    if (formEl) {
+      formEl.submit();
+      alert('Autofill profile submitted! Click "Save" or "Update" in your browser popup to register these details for auto-filling external forms.');
+    }
+  }
 </script>
 
 {#if isOpen}
@@ -72,7 +105,18 @@ Pamela Jameson`
       </svg>
       <span class="header-title">Quick Copy Clipboard</span>
     </div>
-    <p class="header-subtitle">Click inside any field to view/edit in full. Click "Copy" to copy instantly.</p>
+    <p class="header-subtitle">Drag the button below to Bookmarks to autofill forms in 1-click on any website!</p>
+    
+    <div class="autofill-tools">
+      <a class="btn-bookmarklet" href={bookmarkletLink} title="Drag this button to your Browser Bookmarks Bar. Click it on any website to auto-fill the form instantly!">
+        <svg class="tool-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.907c.961 0 1.36 1.24.588 1.81l-3.97 2.883a1 1 0 00-.364 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.971-2.883a1 1 0 00-1.17 0l-3.97 2.883c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.364-1.118L2.98 9.42c-.77-.58-.371-1.81.588-1.81h4.906a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+        <span>Draggable Fill Button</span>
+      </a>
+      <button class="btn-save-autofill" onclick={submitAutofill} type="button" title="Saves this profile to your Browser's native AutoFill database">
+        <svg class="tool-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+        <span>Trigger Browser Autofill</span>
+      </button>
+    </div>
   </div>
 
   <div class="drawer-body">
@@ -179,6 +223,16 @@ Pamela Jameson`
   </div>
 </div>
 
+<iframe name="hidden-iframe" id="hidden-iframe" style="display:none" title="hidden-iframe"></iframe>
+<form id="autofill-form" action="about:blank" target="hidden-iframe" method="POST" style="display:none">
+  <input type="text" name="name" autocomplete="name" value={details.name} />
+  <input type="text" name="organization" autocomplete="organization" value={details.company} />
+  <input type="tel" name="phone" autocomplete="tel" value={details.phone} />
+  <input type="text" name="address" autocomplete="street-address" value={details.address} />
+  <input type="text" name="country" autocomplete="country" value={details.country} />
+  <input type="email" name="email" autocomplete="email" value={details.email} />
+</form>
+
 <style>
   /* Dropdown Panel (positioned absolute relative to the topbar container) */
   .clipboard-drawer {
@@ -232,6 +286,51 @@ Pamela Jameson`
     color: var(--muted);
     margin-top: 2px;
     text-align: left;
+  }
+
+  .autofill-tools {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    padding-bottom: 4px;
+  }
+  .btn-bookmarklet, .btn-save-autofill {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 5px 8px;
+    font-size: 9px;
+    font-weight: 700;
+    text-decoration: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .btn-bookmarklet {
+    background: var(--accent-light);
+    color: var(--accent);
+    border: 1px solid rgba(224, 90, 0, 0.2);
+  }
+  .btn-bookmarklet:hover {
+    background: var(--accent);
+    color: #fff;
+    cursor: grab;
+  }
+  .btn-save-autofill {
+    background: var(--input);
+    color: var(--text2);
+    border: 1px solid var(--border);
+  }
+  .btn-save-autofill:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .tool-icon {
+    width: 11px;
+    height: 11px;
+    flex-shrink: 0;
   }
 
   .drawer-body {
