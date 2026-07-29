@@ -12,7 +12,7 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: next })
     }).then(r => r.json()).then(() => {
-      if (onStatusChange) onStatusChange();
+      if (onStatusChange) onStatusChange(next);
     });
   }
 </script>

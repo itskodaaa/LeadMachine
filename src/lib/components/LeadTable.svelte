@@ -8,7 +8,7 @@
     onSelect: (ids: number[]) => void;
     onEdit: (lead: Lead) => void;
     onDelete: (id: number) => void;
-    onStatusChange: () => void;
+    onStatusChange: (leadId: number, nextStatus: string) => void;
   }
 
   let { leads, selected, onSelect, onEdit, onDelete, onStatusChange }: Props = $props();
@@ -82,7 +82,7 @@
               {#if !lead.phone && !lead.email}<span style="color:var(--muted)">—</span>{/if}
             </td>
             <td>
-              <StatusBadge status={lead.status} leadId={lead.id} {onStatusChange} />
+              <StatusBadge status={lead.status} leadId={lead.id} onStatusChange={(next) => onStatusChange(lead.id, next)} />
             </td>
             <td>
               <div class="cell-actions">

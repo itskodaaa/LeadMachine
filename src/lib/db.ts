@@ -98,8 +98,15 @@ export function getLeads(filters: LeadFilters = {}) {
   }
 
   if (status && status !== 'all') {
-    where += ' AND status = ?';
-    params.push(status);
+    if (status.includes(',')) {
+      const parts = status.split(',');
+      const placeholders = parts.map(() => '?').join(', ');
+      where += ` AND status IN (${placeholders})`;
+      params.push(...parts);
+    } else {
+      where += ' AND status = ?';
+      params.push(status);
+    }
   }
 
   if (state && state !== 'all') {

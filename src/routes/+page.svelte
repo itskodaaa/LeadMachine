@@ -4,13 +4,18 @@
   import LeadForm from '$lib/components/LeadForm.svelte';
   import ImportCSV from '$lib/components/ImportCSV.svelte';
   import type { Lead } from '$lib/types';
+  import { STATUS_CONFIG } from '$lib/types';
 
   let leads = $state<Lead[]>([]);
   let total = $state(0);
   let page = $state(1);
   let totalPages = $state(1);
   let search = $state('');
-  let status = $state('all');
+  
+  // Custom multi-select status state
+  let selectedStatuses = $state<string[]>(['not_contacted', 'pending', 'contacted', 'responded', 'unable_to_reach', 'won', 'closed']);
+  let isFilterDropdownOpen = $state(false);
+
   let stateFilter = $state('all');
   let selected = $state<number[]>([]);
   let loading = $state(true);
@@ -22,11 +27,44 @@
   let stats = $state({ total: 0, byStatus: [] as any[], byState: [] as any[] });
   let duplicateWarnings = $state<any[]>([]);
 
+  // Temporary leads in status-change grace period (20 seconds)
+  let temporaryLeads = $state<Record<number, { lead: Lead; expiresAt: number }>>({});
+
+  // Derived list of leads to display, merging active temporary leads to prevent instant disappearance
+  const displayedLeads = $derived.by(() => {
+    const now = Date.now();
+    const list = [...leads];
+    
+    // Find active temporary leads (not expired)
+    const activeTemps = Object.values(temporaryLeads).filter(t => t.expiresAt > now);
+    
+    for (const t of activeTemps) {
+      const idx = list.findIndex(l => l.id === t.lead.id);
+      if (idx !== -1) {
+        // If the lead is already in the server results, update its status locally to match the temporary state
+        list[idx] = t.lead;
+      } else {
+        // If the lead is NOT in the server results (because it is excluded by current filters), keep it visible!
+        list.push(t.lead);
+      }
+    }
+    
+    return list;
+  });
+
   async function fetchLeads() {
     loading = true;
     const p = new URLSearchParams();
     if (search) p.set('search', search);
-    if (status !== 'all') p.set('status', status);
+    
+    if (selectedStatuses.length === 7) {
+      p.set('status', 'all');
+    } else if (selectedStatuses.length === 0) {
+      p.set('status', 'none');
+    } else {
+      p.set('status', selectedStatuses.join(','));
+    }
+
     if (stateFilter !== 'all') p.set('state', stateFilter);
     p.set('page', String(page));
     p.set('limit', '25');
@@ -93,6 +131,65 @@
   function doSearch() { page = 1; selected = []; fetchLeads(); }
   function doFilter() { page = 1; selected = []; fetchLeads(); }
 
+  // Advanced Filter UI toggles
+  function toggleStatusFilter(statusKey: string) {
+    if (selectedStatuses.includes(statusKey)) {
+      selectedStatuses = selectedStatuses.filter(s => s !== statusKey);
+    } else {
+      selectedStatuses = [...selectedStatuses, statusKey];
+    }
+    doFilter();
+  }
+
+  function toggleAllStatusFilter() {
+    if (selectedStatuses.length === 7) {
+      selectedStatuses = [];
+    } else {
+      selectedStatuses = ['not_contacted', 'pending', 'contacted', 'responded', 'unable_to_reach', 'won', 'closed'];
+    }
+    doFilter();
+  }
+
+  function getFilterLabel() {
+    if (selectedStatuses.length === 7) return 'All';
+    if (selectedStatuses.length === 0) return 'None';
+    if (selectedStatuses.length === 6) {
+      const missing = ['not_contacted', 'pending', 'contacted', 'responded', 'unable_to_reach', 'won', 'closed'].find(s => !selectedStatuses.includes(s));
+      if (missing) return `All except ${STATUS_CONFIG[missing as any]?.label}`;
+    }
+    return selectedStatuses.map(s => STATUS_CONFIG[s as any]?.label).join(', ');
+  }
+
+  // Grace Period Handler for lead status changes
+  function handleStatusChange(leadId: number, nextStatus: string) {
+    const lead = displayedLeads.find(l => l.id === leadId);
+    if (lead) {
+      temporaryLeads[leadId] = {
+        lead: { ...lead, status: nextStatus as any },
+        expiresAt: Date.now() + 20000 // 20 seconds grace period
+      };
+      
+      // Force reactivity reload in 20s
+      setTimeout(() => {
+        const updatedTemps = { ...temporaryLeads };
+        delete updatedTemps[leadId];
+        temporaryLeads = updatedTemps;
+      }, 20000);
+    }
+
+    // Call SvelteKit API in background
+    fetch(`/api/leads/${leadId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: nextStatus })
+    }).then(r => {
+      if (r.ok) {
+        fetchLeads();
+        fetchStats();
+      }
+    });
+  }
+
   async function handleSave(data: any) {
     const method = editingLead ? 'PUT' : 'POST';
     const url = editingLead ? `/api/leads/${editingLead.id}` : '/api/leads';
@@ -126,7 +223,15 @@
   function handleExport() {
     const p = new URLSearchParams();
     if (search) p.set('search', search);
-    if (status !== 'all') p.set('status', status);
+    
+    if (selectedStatuses.length === 7) {
+      p.set('status', 'all');
+    } else if (selectedStatuses.length === 0) {
+      p.set('status', 'none');
+    } else {
+      p.set('status', selectedStatuses.join(','));
+    }
+
     if (stateFilter !== 'all') p.set('state', stateFilter);
     p.set('limit', '9999');
     fetch(`/api/leads?${p}`).then(r=>r.json()).then(d => {
@@ -191,16 +296,31 @@
     <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
     <input class="search-input" type="text" bind:value={search} oninput={() => doSearch()} placeholder="Search name, website, city..." />
   </div>
-  <select bind:value={status} onchange={() => doFilter()}>
-    <option value="all">All Status</option>
-    <option value="not_contacted">New</option>
-    <option value="pending">Pending</option>
-    <option value="contacted">Sent</option>
-    <option value="responded">Replied</option>
-    <option value="unable_to_reach">Unreachable</option>
-    <option value="won">Won</option>
-    <option value="closed">Closed</option>
-  </select>
+  <div class="dropdown-container">
+    <button class="btn btn-dropdown" onclick={() => isFilterDropdownOpen = !isFilterDropdownOpen} type="button">
+      <span>Status: {getFilterLabel()}</span>
+      <svg class="chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
+    </button>
+    {#if isFilterDropdownOpen}
+      <button class="dropdown-backdrop" onclick={() => isFilterDropdownOpen = false} aria-label="Close status dropdown" type="button"></button>
+      <div class="dropdown-list">
+        <label class="dropdown-item select-all">
+          <input type="checkbox" checked={selectedStatuses.length === 7} onchange={toggleAllStatusFilter} />
+          <span style="font-weight:600">Select All</span>
+        </label>
+        <div class="dropdown-divider"></div>
+        {#each Object.entries(STATUS_CONFIG) as [key, value]}
+          <label class="dropdown-item">
+            <input type="checkbox" checked={selectedStatuses.includes(key)} onchange={() => toggleStatusFilter(key)} />
+            <span class="badge {value.cls}" style="margin-left: 6px;">
+              <span class="badge-dot"></span>
+              {value.label}
+            </span>
+          </label>
+        {/each}
+      </div>
+    {/if}
+  </div>
   <select bind:value={stateFilter} onchange={() => doFilter()} style="max-width:90px">
     <option value="all">State</option>
     {#each ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'] as s}
@@ -233,7 +353,7 @@
     <div style="font-size:11px;color:var(--muted)">Loading...</div>
   </div>
 {:else}
-  <LeadTable {leads} {selected} onSelect={(ids) => selected = ids} onEdit={handleEdit} onDelete={handleDelete} onStatusChange={() => { fetchLeads(); fetchStats(); }} />
+  <LeadTable leads={displayedLeads} {selected} onSelect={(ids) => selected = ids} onEdit={handleEdit} onDelete={handleDelete} onStatusChange={handleStatusChange} />
 {/if}
 
 {#if totalPages > 1}
@@ -348,5 +468,88 @@
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(-4px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Custom Multiselect Status Dropdown */
+  .dropdown-container {
+    position: relative;
+    display: inline-block;
+  }
+  .btn-dropdown {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    height: 30px;
+    padding: 0 10px;
+    background: var(--input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    min-width: 140px;
+    max-width: 240px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .btn-dropdown:hover {
+    border-color: var(--accent);
+  }
+  .btn-dropdown .chevron {
+    width: 10px;
+    height: 10px;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .dropdown-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background: transparent;
+    border: none;
+    cursor: default;
+  }
+  .dropdown-list {
+    position: absolute;
+    top: 34px;
+    left: 0;
+    z-index: 50;
+    min-width: 160px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    padding: 6px 0;
+    animation: fadeIn 0.15s ease-out;
+  }
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text2);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.1s;
+  }
+  .dropdown-item:hover {
+    background: var(--hover);
+  }
+  .dropdown-item input[type="checkbox"] {
+    width: 12px;
+    height: 12px;
+    margin: 0;
+  }
+  .dropdown-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
   }
 </style>
