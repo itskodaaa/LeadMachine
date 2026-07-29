@@ -21,13 +21,9 @@
   }
   function markAsPending(lead: Lead) {
     if (lead.status !== 'not_contacted') return;
-    fetch(`/api/leads/${lead.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'pending' })
-    }).then(r => {
-      if (r.ok && onStatusChange) onStatusChange();
-    });
+    if (onStatusChange) {
+      onStatusChange(lead.id, 'pending');
+    }
   }
 </script>
 
