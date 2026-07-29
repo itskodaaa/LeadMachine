@@ -27,33 +27,11 @@
   let stats = $state({ total: 0, byStatus: [] as any[], byState: [] as any[] });
   let duplicateWarnings = $state<any[]>([]);
 
-  // Temporary leads in status-change grace period (20 seconds)
+  // Temporary leads in status-change grace period (60 seconds)
   let temporaryLeads = $state<Record<number, { lead: Lead; expiresAt: number }>>({});
 
-  // Derived list of leads to display, merging active temporary leads to prevent instant disappearance
-  const displayedLeads = $derived.by(() => {
-    const now = Date.now();
-    const list = [...leads];
-    
-    // Find active temporary leads (not expired)
-    const activeTemps = Object.values(temporaryLeads).filter(t => t.expiresAt > now);
-    
-    for (const t of activeTemps) {
-      const idx = list.findIndex(l => l.id === t.lead.id);
-      if (idx !== -1) {
-        // If the lead is already in the server results, update its status locally to match the temporary state
-        list[idx] = t.lead;
-      } else {
-        // If the lead is NOT in the server results (because it is excluded by current filters), keep it visible!
-        list.push(t.lead);
-      }
-    }
-    
-    return list;
-  });
-
-  async function fetchLeads() {
-    loading = true;
+  async function fetchLeads(silent = false) {
+    if (!silent) loading = true;
     const p = new URLSearchParams();
     if (search) p.set('search', search);
     
@@ -71,7 +49,30 @@
     try {
       const r = await fetch(`/api/leads?${p}`);
       const d = await r.json();
-      leads = d.leads || []; total = d.total || 0; totalPages = d.totalPages || 1;
+      const serverLeads = d.leads || [];
+      
+      // Merge the new server list with active temporary leads to preserve index order and status
+      const mergedLeads = [...serverLeads];
+      const now = Date.now();
+      const activeTemps = Object.values(temporaryLeads).filter(t => t.expiresAt > now);
+      
+      for (const t of activeTemps) {
+        const idxInMerged = mergedLeads.findIndex(l => l.id === t.lead.id);
+        if (idxInMerged === -1) {
+          const prevIdx = leads.findIndex(l => l.id === t.lead.id);
+          if (prevIdx !== -1) {
+            mergedLeads.splice(prevIdx, 0, t.lead);
+          } else {
+            mergedLeads.push(t.lead);
+          }
+        } else {
+          mergedLeads[idxInMerged] = t.lead;
+        }
+      }
+      
+      leads = mergedLeads;
+      total = d.total || 0;
+      totalPages = d.totalPages || 1;
     } catch { console.error('fetch failed'); } finally { loading = false; }
   }
 
@@ -162,19 +163,26 @@
 
   // Grace Period Handler for lead status changes
   function handleStatusChange(leadId: number, nextStatus: string) {
-    const lead = displayedLeads.find(l => l.id === leadId);
-    if (lead) {
+    const leadIdx = leads.findIndex(l => l.id === leadId);
+    if (leadIdx !== -1) {
+      const updatedLead = { ...leads[leadIdx], status: nextStatus as any };
+      
+      // Update locally immediately to change status badge instantly
+      leads[leadIdx] = updatedLead;
+
+      // Add to temporary grace period map (60 seconds)
       temporaryLeads[leadId] = {
-        lead: { ...lead, status: nextStatus as any },
-        expiresAt: Date.now() + 20000 // 20 seconds grace period
+        lead: updatedLead,
+        expiresAt: Date.now() + 60000
       };
       
-      // Force reactivity reload in 20s
+      // Clean up from grace period after 60s and fetch silently to apply filters
       setTimeout(() => {
         const updatedTemps = { ...temporaryLeads };
         delete updatedTemps[leadId];
         temporaryLeads = updatedTemps;
-      }, 20000);
+        fetchLeads(true);
+      }, 60000);
     }
 
     // Call SvelteKit API in background
@@ -184,7 +192,7 @@
       body: JSON.stringify({ status: nextStatus })
     }).then(r => {
       if (r.ok) {
-        fetchLeads();
+        fetchLeads(true);
         fetchStats();
       }
     });
@@ -353,7 +361,7 @@
     <div style="font-size:11px;color:var(--muted)">Loading...</div>
   </div>
 {:else}
-  <LeadTable leads={displayedLeads} {selected} onSelect={(ids) => selected = ids} onEdit={handleEdit} onDelete={handleDelete} onStatusChange={handleStatusChange} />
+  <LeadTable {leads} {selected} onSelect={(ids) => selected = ids} onEdit={handleEdit} onDelete={handleDelete} onStatusChange={handleStatusChange} />
 {/if}
 
 {#if totalPages > 1}
