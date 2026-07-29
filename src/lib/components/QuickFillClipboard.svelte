@@ -13,6 +13,7 @@
     website: 'https://northeastprecision.com/',
     country: 'United States.',
     email: 'pamela.jameson@nortiheastprecision.com',
+    subject: 'Exploring Collaboration Opportunities',
     message: `Hello,
 
 I am reaching out to express our interest in your services and would appreciate the opportunity to explore a potential business relationship. Kindly arrange for a representative to contact us at your earliest convenience to discuss details, pricing, and possible collaboration on upcoming projects.
@@ -46,6 +47,7 @@ Pamela Jameson`
       fill(['input[name*="phone" i]', 'input[name*="tel" i]', 'input[type="tel"]'], d.phone);
       fill(['input[name*="company" i]', 'input[name*="org" i]', 'input[id*="company" i]'], d.company);
       fill(['input[name*="web" i]', 'input[name*="url" i]'], d.website);
+      fill(['input[name*="subject" i]', 'input[id*="subject" i]', 'input[placeholder*="subject" i]'], d.subject);
       fill(['textarea[name*="message" i]', 'textarea[name*="comment" i]', 'textarea[placeholder*="message" i]'], d.message);
     })()`;
     return 'javascript:' + encodeURIComponent(code.replace(/\s+/g, ' '));
@@ -208,7 +210,20 @@ Pamela Jameson`
       </div>
     </div>
 
-    <!-- Row 5: Message -->
+    <!-- Row 5: Subject -->
+    <div class="form-row">
+      <div class="form-group full-width">
+        <label for="clip-subject">Subject</label>
+        <div class="input-wrapper">
+          <input id="clip-subject" type="text" bind:value={details.subject} oninput={saveDetails} placeholder="Subject line" />
+          <button class="btn-copy {copiedField === 'subject' ? 'copied' : ''}" onclick={() => copyToClipboard(details.subject, 'subject')}>
+            {copiedField === 'subject' ? 'Copied ✓' : 'Copy'}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 6: Message -->
     <div class="form-row">
       <div class="form-group full-width">
         <label for="clip-message">Message Template</label>
