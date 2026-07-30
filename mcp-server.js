@@ -28,7 +28,7 @@ const tools = [
   },
   {
     name: "leadflow__add_leads_batch",
-    description: "Add multiple construction leads to LeadFlow in a batch. Performs duplicate checks on each lead. Skips duplicates, logs warnings, and returns a summary.",
+    description: "Add multiple construction leads to LeadFlow in a batch. Performs duplicate checks based on deduplicate_mode.",
     inputSchema: {
       type: "object",
       properties: {
@@ -48,9 +48,42 @@ const tools = [
             },
             required: ["company_name", "website"]
           }
-        }
+        },
+        deduplicate_mode: { type: "string", enum: ["skip", "update", "error", "off"], description: "Mode for duplicate check handling. 'off' bypasses checks, 'skip' ignores duplicates silently, 'update' upserts fields, 'error' skips and logs warnings.", default: "error" }
       },
       required: ["leads"]
+    }
+  },
+  {
+    name: "leadflow__import_csv",
+    description: "Bulk import construction leads from a CSV formatted string. Extremely fast and recommended for high-volume adds.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        csv_content: { type: "string", description: "The full CSV content string to import." },
+        deduplicate_mode: { type: "string", enum: ["skip", "update", "error", "off"], description: "Mode for duplicate check handling. 'off' bypasses checks, 'skip' ignores duplicates silently, 'update' upserts fields, 'error' skips and logs warnings.", default: "error" }
+      },
+      required: ["csv_content"]
+    }
+  },
+  {
+    name: "leadflow__import_from_json",
+    description: "Bulk import construction leads from a JSON array or a JSON array string. Extremely fast and recommended for high-volume adds.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        json_content: { type: "string", description: "JSON string containing an array of lead objects." },
+        deduplicate_mode: { type: "string", enum: ["skip", "update", "error", "off"], description: "Mode for duplicate check handling.", default: "error" }
+      },
+      required: ["json_content"]
+    }
+  },
+  {
+    name: "leadflow__clear_duplicate_warnings",
+    description: "Clear/dismiss all active duplicate warning logs in the system.",
+    inputSchema: {
+      type: "object",
+      properties: {}
     }
   },
   {
@@ -215,6 +248,148 @@ function normalizeWebsite(website) {
     .split('/')[0];
 }
 
+// Custom CSV Parser
+function parseCSV(csvText) {
+  const lines = [];
+  let row = [""];
+  let inQuotes = false;
+
+  for (let i = 0; i < csvText.length; i++) {
+    const c = csvText[i];
+    const next = csvText[i+1];
+
+    if (c === '"') {
+      if (inQuotes && next === '"') {
+        row[row.length - 1] += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (c === ',' && !inQuotes) {
+      row.push('');
+    } else if ((c === '\r' || c === '\n') && !inQuotes) {
+      if (c === '\r' && next === '\n') {
+        i++;
+      }
+      lines.push(row);
+      row = [""];
+    } else {
+      row[row.length - 1] += c;
+    }
+  }
+  if (row.length > 1 || row[0] !== '') {
+    lines.push(row);
+  }
+  return lines;
+}
+
+// Unified high-performance bulk lead import logic supporting different deduplicate modes
+function importLeadsBatch(db, leads, deduplicateMode = 'error') {
+  let imported = 0;
+  let skipped = 0;
+  let updated = 0;
+  const details = [];
+
+  const insertStmt = db.prepare(`
+    INSERT INTO leads (company_name, website, city, state, phone, email, contact_person, notes, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'not_contacted')
+  `);
+
+  const updateStmt = db.prepare(`
+    UPDATE leads 
+    SET company_name = COALESCE(?, company_name),
+        city = COALESCE(?, city),
+        state = COALESCE(?, state),
+        phone = COALESCE(?, phone),
+        email = COALESCE(?, email),
+        contact_person = COALESCE(?, contact_person),
+        notes = COALESCE(?, notes),
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+
+  db.transaction(() => {
+    for (const lead of leads) {
+      const { company_name, website, city, state, phone, email, contact_person, notes } = lead;
+      if (!company_name || !website) {
+        skipped++;
+        details.push({ company_name: company_name || "Unknown", website: website || "Unknown", status: "skipped", reason: "Missing required fields" });
+        continue;
+      }
+
+      const normalized = normalizeWebsite(website);
+
+      if (deduplicateMode === 'off') {
+        insertStmt.run(
+          company_name,
+          normalized,
+          city || null,
+          state ? state.toUpperCase() : null,
+          phone || null,
+          email || null,
+          contact_person || null,
+          notes || null
+        );
+        imported++;
+        details.push({ company_name, website: normalized, status: "imported" });
+        continue;
+      }
+
+      // Check duplicates
+      let existingLead = db.prepare('SELECT id, company_name, website FROM leads WHERE website = ?').get(normalized);
+      let duplicateType = 'website';
+      if (!existingLead) {
+        existingLead = db.prepare('SELECT id, company_name, website FROM leads WHERE LOWER(company_name) = ?').get(company_name.toLowerCase());
+        duplicateType = 'company_name';
+      }
+
+      if (existingLead) {
+        if (deduplicateMode === 'skip') {
+          skipped++;
+          details.push({ company_name, website: normalized, status: "skipped", reason: `Duplicate ${duplicateType} (ID: ${existingLead.id})` });
+        } else if (deduplicateMode === 'update') {
+          updateStmt.run(
+            company_name || null,
+            city || null,
+            state ? state.toUpperCase() : null,
+            phone || null,
+            email || null,
+            contact_person || null,
+            notes || null,
+            existingLead.id
+          );
+          updated++;
+          details.push({ company_name, website: normalized, status: "updated", id: existingLead.id });
+        } else {
+          // 'error' mode: Skips and logs database warning
+          skipped++;
+          const reason = `Duplicate ${duplicateType} found: '${duplicateType === 'website' ? normalized : company_name}' already exists (ID: ${existingLead.id}, Company: '${existingLead.company_name}').`;
+          db.prepare(`
+            INSERT INTO duplicate_warnings (company_name, website, reason, source)
+            VALUES (?, ?, ?, 'mcp')
+          `).run(company_name, normalized, reason);
+          details.push({ company_name, website: normalized, status: "skipped", reason: `Duplicate warning created (Existing ID: ${existingLead.id})` });
+        }
+      } else {
+        insertStmt.run(
+          company_name,
+          normalized,
+          city || null,
+          state ? state.toUpperCase() : null,
+          phone || null,
+          email || null,
+          contact_person || null,
+          notes || null
+        );
+        imported++;
+        details.push({ company_name, website: normalized, status: "imported" });
+      }
+    }
+  })();
+
+  return { imported, skipped, updated, details };
+}
+
 function handleAddLead(args) {
   const { company_name, website, city, state, phone, email, contact_person, notes } = args;
   if (!company_name || !website) {
@@ -229,7 +404,6 @@ function handleAddLead(args) {
   try {
     const db = new Database(dbPath);
     
-    // Check for duplicate by website
     const existingWebsite = db.prepare('SELECT id, company_name FROM leads WHERE website = ?').get(normalized);
     if (existingWebsite) {
       const reason = `Website '${normalized}' already exists (Company: '${existingWebsite.company_name}').`;
@@ -241,12 +415,11 @@ function handleAddLead(args) {
       return {
         content: [{
           type: "text",
-          text: `Warning: A lead with website '${normalized}' already exists in the database (ID: ${existingWebsite.id}, Company: '${existingWebsite.company_name}'). Duplicate check triggered: skipped adding lead. To update this lead's info (e.g. add new contact details), please call 'leadflow__update_lead' with ID ${existingWebsite.id}.`
+          text: `Warning: A lead with website '${normalized}' already exists (ID: ${existingWebsite.id}). Skipped adding.`
         }]
       };
     }
 
-    // Check for duplicate by company name
     const existingName = db.prepare('SELECT id, website FROM leads WHERE LOWER(company_name) = ?').get(company_name.toLowerCase());
     if (existingName) {
       const reason = `Company name '${company_name}' already exists (Website: '${existingName.website}').`;
@@ -258,12 +431,11 @@ function handleAddLead(args) {
       return {
         content: [{
           type: "text",
-          text: `Warning: A lead with company name '${company_name}' already exists in the database (ID: ${existingName.id}, Website: '${existingName.website}'). Duplicate check triggered: skipped adding lead. To update this lead's info (e.g. add new contact details), please call 'leadflow__update_lead' with ID ${existingName.id}.`
+          text: `Warning: A lead with company name '${company_name}' already exists (ID: ${existingName.id}). Skipped adding.`
         }]
       };
     }
 
-    // Insert lead
     const insert = db.prepare(`
       INSERT INTO leads (company_name, website, city, state, phone, email, contact_person, notes, status)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'not_contacted')
@@ -283,7 +455,7 @@ function handleAddLead(args) {
     return {
       content: [{
         type: "text",
-        text: `Success: Lead '${company_name}' (website: ${normalized}) was successfully added with ID ${result.lastInsertRowid}.`
+        text: `Success: Lead '${company_name}' was successfully added with ID ${result.lastInsertRowid}.`
       }]
     };
   } catch (err) {
@@ -295,7 +467,7 @@ function handleAddLead(args) {
 }
 
 function handleAddLeadsBatch(args) {
-  const { leads } = args;
+  const { leads, deduplicate_mode = 'error' } = args;
   if (!Array.isArray(leads) || leads.length === 0) {
     return {
       isError: true,
@@ -305,72 +477,11 @@ function handleAddLeadsBatch(args) {
 
   try {
     const db = new Database(dbPath);
-    let imported = 0;
-    let skipped = 0;
-    const details = [];
-
-    const insert = db.prepare(`
-      INSERT INTO leads (company_name, website, city, state, phone, email, contact_person, notes, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'not_contacted')
-    `);
-
-    db.transaction(() => {
-      for (const lead of leads) {
-        const { company_name, website, city, state, phone, email, contact_person, notes } = lead;
-        if (!company_name || !website) {
-          skipped++;
-          details.push({ company_name: company_name || "Unknown", website: website || "Unknown", status: "skipped", reason: "Missing required fields" });
-          continue;
-        }
-
-        const normalized = normalizeWebsite(website);
-
-        // Check website duplicate
-        const existingWebsite = db.prepare('SELECT id, company_name FROM leads WHERE website = ?').get(normalized);
-        if (existingWebsite) {
-          skipped++;
-          const reason = `Website '${normalized}' already exists (Company: '${existingWebsite.company_name}').`;
-          db.prepare(`
-            INSERT INTO duplicate_warnings (company_name, website, reason, source)
-            VALUES (?, ?, ?, 'mcp')
-          `).run(company_name, normalized, reason);
-          details.push({ company_name, website: normalized, status: "skipped", reason: `Duplicate website (Existing ID: ${existingWebsite.id}). Call leadflow__update_lead with ID ${existingWebsite.id} to edit.` });
-          continue;
-        }
-
-        // Check company name duplicate
-        const existingName = db.prepare('SELECT id, website FROM leads WHERE LOWER(company_name) = ?').get(company_name.toLowerCase());
-        if (existingName) {
-          skipped++;
-          const reason = `Company name '${company_name}' already exists (Website: '${existingName.website}').`;
-          db.prepare(`
-            INSERT INTO duplicate_warnings (company_name, website, reason, source)
-            VALUES (?, ?, ?, 'mcp')
-          `).run(company_name, normalized, reason);
-          details.push({ company_name, website: normalized, status: "skipped", reason: `Duplicate company name (Existing ID: ${existingName.id}). Call leadflow__update_lead with ID ${existingName.id} to edit.` });
-          continue;
-        }
-
-        // Insert lead
-        insert.run(
-          company_name,
-          normalized,
-          city || null,
-          state ? state.toUpperCase() : null,
-          phone || null,
-          email || null,
-          contact_person || null,
-          notes || null
-        );
-        imported++;
-        details.push({ company_name, website: normalized, status: "imported" });
-      }
-    })();
-
+    const result = importLeadsBatch(db, leads, deduplicate_mode);
     return {
       content: [{
         type: "text",
-        text: `Batch completed: ${imported} leads successfully imported, ${skipped} skipped (duplicates/errors). Detail summary: ${JSON.stringify(details)}`
+        text: `Batch completed: ${result.imported} leads successfully imported, ${result.updated} updated, ${result.skipped} skipped (duplicates/errors).`
       }]
     };
   } catch (err) {
@@ -378,6 +489,120 @@ function handleAddLeadsBatch(args) {
       isError: true,
       content: [{ type: "text", text: `Error processing batch: ${err.message}` }]
     };
+  }
+}
+
+function handleImportCsv(args) {
+  const { csv_content, deduplicate_mode = 'error' } = args;
+  if (!csv_content) {
+    return { isError: true, content: [{ type: "text", text: "Error: csv_content is required." }] };
+  }
+
+  try {
+    const lines = parseCSV(csv_content);
+    if (lines.length < 2) {
+      return { content: [{ type: "text", text: "CSV is empty or contains no data rows." }] };
+    }
+
+    const headers = lines[0].map(h => h.trim().toLowerCase());
+    
+    const headerMapping = {
+      company_name: ['company_name', 'company name', 'company', 'name'],
+      website: ['website', 'url', 'domain', 'site'],
+      city: ['city'],
+      state: ['state'],
+      phone: ['phone', 'tel', 'phone_number', 'telephone'],
+      email: ['email', 'e-mail', 'email_address', 'mail'],
+      contact_person: ['contact_person', 'contact person', 'contact', 'contact_name', 'person'],
+      notes: ['notes', 'note', 'description', 'about']
+    };
+
+    const indices = {};
+    for (const [field, synonyms] of Object.entries(headerMapping)) {
+      indices[field] = headers.findIndex(h => synonyms.includes(h));
+    }
+
+    if (indices.company_name === -1) indices.company_name = 0;
+    if (indices.website === -1) indices.website = 1;
+
+    const leads = [];
+    for (let i = 1; i < lines.length; i++) {
+      const row = lines[i];
+      if (row.length === 0 || (row.length === 1 && row[0] === '')) continue;
+
+      const lead = {
+        company_name: indices.company_name !== -1 ? row[indices.company_name]?.trim() : '',
+        website: indices.website !== -1 ? row[indices.website]?.trim() : '',
+        city: indices.city !== -1 ? row[indices.city]?.trim() : '',
+        state: indices.state !== -1 ? row[indices.state]?.trim() : '',
+        phone: indices.phone !== -1 ? row[indices.phone]?.trim() : '',
+        email: indices.email !== -1 ? row[indices.email]?.trim() : '',
+        contact_person: indices.contact_person !== -1 ? row[indices.contact_person]?.trim() : '',
+        notes: indices.notes !== -1 ? row[indices.notes]?.trim() : ''
+      };
+      if (lead.company_name || lead.website) {
+        leads.push(lead);
+      }
+    }
+
+    const db = new Database(dbPath);
+    const result = importLeadsBatch(db, leads, deduplicate_mode);
+
+    return {
+      content: [{
+        type: "text",
+        text: `CSV Import completed: ${result.imported} leads imported, ${result.updated} leads updated, ${result.skipped} leads skipped.`
+      }]
+    };
+  } catch (err) {
+    return {
+      isError: true,
+      content: [{ type: "text", text: `Error importing CSV: ${err.message}` }]
+    };
+  }
+}
+
+function handleImportFromJson(args) {
+  const { json_content, deduplicate_mode = 'error' } = args;
+  if (!json_content) {
+    return { isError: true, content: [{ type: "text", text: "Error: json_content is required." }] };
+  }
+
+  try {
+    const leads = typeof json_content === 'string' ? JSON.parse(json_content) : json_content;
+    if (!Array.isArray(leads)) {
+      return { isError: true, content: [{ type: "text", text: "Error: JSON must be an array of lead objects." }] };
+    }
+
+    const db = new Database(dbPath);
+    const result = importLeadsBatch(db, leads, deduplicate_mode);
+
+    return {
+      content: [{
+        type: "text",
+        text: `JSON Import completed: ${result.imported} leads imported, ${result.updated} leads updated, ${result.skipped} leads skipped.`
+      }]
+    };
+  } catch (err) {
+    return {
+      isError: true,
+      content: [{ type: "text", text: `Error importing JSON: ${err.message}` }]
+    };
+  }
+}
+
+function handleClearDuplicateWarnings() {
+  try {
+    const db = new Database(dbPath);
+    const result = db.prepare('UPDATE duplicate_warnings SET dismissed = 1 WHERE dismissed = 0').run();
+    return {
+      content: [{
+        type: "text",
+        text: `Success: Dismissed ${result.changes} duplicate warnings.`
+      }]
+    };
+  } catch (err) {
+    return { isError: true, content: [{ type: "text", text: `Error clearing warnings: ${err.message}` }] };
   }
 }
 
@@ -430,7 +655,6 @@ function handleUpdateLead(args) {
     const params = [];
 
     if (company_name !== undefined) {
-      // Check duplicate
       const duplicateName = db.prepare('SELECT id FROM leads WHERE LOWER(company_name) = ? AND id != ?').get(company_name.toLowerCase(), id);
       if (duplicateName) {
         return { content: [{ type: "text", text: `Warning: Update rejected. Company name '${company_name}' already exists in another lead (ID: ${duplicateName.id}).` }] };
@@ -557,7 +781,7 @@ function handleUpdateLeadsBatch(args) {
     return {
       content: [{
         type: "text",
-        text: `Batch update completed: ${updated} leads updated, ${skipped} skipped. Detail summary: ${JSON.stringify(details)}`
+        text: `Batch update completed: ${updated} leads updated, ${skipped} skipped.`
       }]
     };
   } catch (err) {
@@ -713,6 +937,12 @@ function handleRequest(req) {
           return sendResponse(id, handleAddLead(args));
         case 'leadflow__add_leads_batch':
           return sendResponse(id, handleAddLeadsBatch(args));
+        case 'leadflow__import_csv':
+          return sendResponse(id, handleImportCsv(args));
+        case 'leadflow__import_from_json':
+          return sendResponse(id, handleImportFromJson(args));
+        case 'leadflow__clear_duplicate_warnings':
+          return sendResponse(id, handleClearDuplicateWarnings());
         case 'leadflow__list_leads':
           return sendResponse(id, handleListLeads(args));
         case 'leadflow__get_lead':
