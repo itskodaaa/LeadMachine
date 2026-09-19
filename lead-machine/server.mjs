@@ -13,8 +13,37 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3333;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
-function fetchRemote(urlStr, options = {}) {
-  return new Promise((resolve, reject) => {
+async function fetchRemote(urlStr, options = {}) {
+  const timeoutMs = options.timeout || 10000;
+  if (typeof fetch === 'function') {
+    try {
+      const res = await fetch(urlStr, {
+        headers: {
+          'User-Agent': 'LeadMachine-Enterprise-Updater',
+          'Accept': 'application/vnd.github.v3+json',
+          ...options.headers
+        },
+        signal: AbortSignal.timeout(timeoutMs),
+        redirect: 'follow'
+      });
+      return {
+        ok: res.ok,
+        status: res.status,
+        text: () => res.text(),
+        json: () => res.json().catch(() => null)
+      };
+    } catch (_) {
+      return {
+        ok: false,
+        status: 0,
+        text: () => Promise.resolve(''),
+        json: () => Promise.resolve(null)
+      };
+    }
+  }
+
+  // Fallback for older Node environments without fetch
+  return new Promise((resolve) => {
     try {
       const parsed = new URL(urlStr);
       const req = https.get(parsed, {
@@ -23,12 +52,14 @@ function fetchRemote(urlStr, options = {}) {
           'Accept': 'application/vnd.github.v3+json',
           ...options.headers
         },
-        timeout: options.timeout || 12000
+        timeout: timeoutMs
       }, (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          return fetchRemote(res.headers.location, options).then(resolve).catch(reject);
+          res.resume();
+          return fetchRemote(res.headers.location, options).then(resolve);
         }
         if (res.statusCode !== 200) {
+          res.resume();
           return resolve({
             ok: false,
             status: res.statusCode,
@@ -51,13 +82,13 @@ function fetchRemote(urlStr, options = {}) {
           });
         });
       });
-      req.on('error', reject);
+      req.on('error', () => resolve({ ok: false, status: 0, text: () => Promise.resolve(''), json: () => Promise.resolve(null) }));
       req.on('timeout', () => {
         req.destroy();
-        reject(new Error('Request timeout'));
+        resolve({ ok: false, status: 0, text: () => Promise.resolve(''), json: () => Promise.resolve(null) });
       });
-    } catch (err) {
-      reject(err);
+    } catch (_) {
+      resolve({ ok: false, status: 0, text: () => Promise.resolve(''), json: () => Promise.resolve(null) });
     }
   });
 }
