@@ -291,7 +291,7 @@ const server = http.createServer(async (req, res) => {
     try {
       // 1. Query latest commit via GitHub API
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 4000);
+      const timer = setTimeout(() => controller.abort(), 10000);
       const commitRes = await fetch(`https://api.github.com/repos/${repo}/commits/${branch}`, {
         headers: {
           'User-Agent': 'LeadMachine-Enterprise-Updater',
@@ -316,7 +316,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const rawRes = await fetch(`https://raw.githubusercontent.com/${repo}/${branch}/package.json`, {
         headers: { 'User-Agent': 'LeadMachine-Enterprise-Updater' },
-        signal: AbortSignal.timeout(3500)
+        signal: AbortSignal.timeout(10000)
       });
       if (rawRes.ok) {
         const rawData = await rawRes.json();
