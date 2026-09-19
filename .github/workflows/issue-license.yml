@@ -117,10 +117,19 @@ jobs:
           VAULT_PAT: ${{ secrets.VAULT_PAT }}
           HASH: ${{ steps.gen.outputs.hash }}
         run: |
+          EXISTING_SHA=$(curl -s -H "Authorization: token $VAULT_PAT" "https://api.github.com/repos/leadmachine-core/licenses/contents/${HASH}.json" | jq -r '.sha // empty')
           FILE_CONTENT=$(base64 -w 0 licenses/${HASH}.json 2>/dev/null || base64 licenses/${HASH}.json | tr -d '\n')
-          curl -s -X PUT \
-            -H "Authorization: token $VAULT_PAT" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/leadmachine-core/licenses/contents/${HASH}.json" \
-            -d "{\"message\":\"feat: issue license ${HASH}\",\"content\":\"$FILE_CONTENT\",\"branch\":\"main\"}" || true
+          if [ -n "$EXISTING_SHA" ] && [ "$EXISTING_SHA" != "null" ]; then
+            curl -s -X PUT \
+              -H "Authorization: token $VAULT_PAT" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/leadmachine-core/licenses/contents/${HASH}.json" \
+              -d "{\"message\":\"sync: update license ${HASH}\",\"content\":\"$FILE_CONTENT\",\"sha\":\"$EXISTING_SHA\",\"branch\":\"main\"}" || true
+          else
+            curl -s -X PUT \
+              -H "Authorization: token $VAULT_PAT" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/leadmachine-core/licenses/contents/${HASH}.json" \
+              -d "{\"message\":\"sync: issue license ${HASH}\",\"content\":\"$FILE_CONTENT\",\"branch\":\"main\"}" || true
+          fi
 
