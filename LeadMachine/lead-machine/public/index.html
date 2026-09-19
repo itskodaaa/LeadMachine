@@ -3,27 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lead Machine — Enterprise Autonomous Outreach</title>
+  <title>Lead Machine - Autonomous Outreach</title>
   <link rel="stylesheet" href="/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="app-container">
-    <!-- Top Navigation Header -->
+    <!-- Sleek Minimalist Navigation Header -->
     <header class="app-header">
       <div class="brand">
         <div class="brand-logo">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
           </svg>
         </div>
         <div class="brand-info">
-          <div class="brand-title-row">
-            <span class="brand-title">Lead Machine</span>
-            <span class="enterprise-badge">Enterprise</span>
-          </div>
+          <span class="brand-title">Lead Machine</span>
           <span class="brand-status" id="engineStatusDot">
             <span class="dot"></span>
             <span id="engineStatusText">Ready</span>
@@ -33,42 +33,43 @@
 
       <nav class="nav-menu">
         <button type="button" class="nav-tab active" data-tab="tab-outreach">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
           </svg>
           <span>Outreach</span>
         </button>
 
         <button type="button" class="nav-tab" data-tab="tab-hunter">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <circle cx="12" cy="12" r="6"/>
-            <circle cx="12" cy="12" r="2"/>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
           <span>Lead Hunter</span>
         </button>
 
         <button type="button" class="nav-tab" data-tab="tab-leads">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
             <circle cx="9" cy="7" r="4"/>
             <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
             <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
           </svg>
           <span>Leads</span>
-          <span class="tab-badge" id="navLeadCount">0</span>
+          <span class="tab-badge tabular" id="navLeadCount">0</span>
         </button>
 
         <button type="button" class="nav-tab" data-tab="tab-profile">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2"/>
+            <path d="M7 15h10"/>
+            <path d="M7 11h10"/>
+            <path d="M7 7h4"/>
           </svg>
-          <span>Corporate Identity</span>
+          <span>Corporate Profile</span>
         </button>
 
         <button type="button" class="nav-tab" data-tab="tab-settings">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"/>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
           </svg>
@@ -81,60 +82,94 @@
     <main class="main-body">
 
       <!-- ========================================== -->
-      <!-- TAB 1: OUTREACH (Main Flow) -->
+      <!-- TAB 1: OUTREACH (Cockpit & Execution) -->
       <!-- ========================================== -->
       <section id="tab-outreach" class="tab-pane active">
         
-        <!-- Primary Campaign Card -->
-        <div class="card hero-card" id="campaignControlCard">
-          
-          <!-- State: Idle (Setup & Launch) -->
-          <div id="campaignIdleState">
-            <div class="hero-header">
-              <span class="hero-label">Available Qualified Leads</span>
-              <div class="hero-number-wrap">
-                <span class="hero-number tabular" id="heroLeadCount">0</span>
-                <span class="hero-subtext">ready for outreach in database</span>
+        <!-- State: Idle (Setup & Launch) -->
+        <div id="campaignIdleState">
+          <div class="cockpit-grid">
+            
+            <!-- Left: Campaign Launcher Setup -->
+            <div class="card cockpit-setup-card">
+              <div class="card-head">
+                <div>
+                  <h2 class="card-title">Launch Campaign</h2>
+                  <p class="card-subtitle">Select lead volume and target region to dispatch autonomous browser outreach.</p>
+                </div>
+              </div>
+
+              <!-- Target Selection -->
+              <div class="form-group">
+                <label class="group-label">Lead Volume</label>
+                <div class="segmented-control preset-pill-group">
+                  <button type="button" class="preset-pill active" data-qty="10">10 Leads</button>
+                  <button type="button" class="preset-pill" data-qty="25">25 Leads</button>
+                  <button type="button" class="preset-pill" data-qty="50">50 Leads</button>
+                  <button type="button" class="preset-pill" data-qty="max">All Available</button>
+                </div>
+
+                <div class="custom-qty-row">
+                  <span class="custom-qty-label">Or custom quantity:</span>
+                  <input type="number" id="customLeadQty" class="input-num" min="1" max="500" value="10">
+                </div>
+              </div>
+
+              <!-- Region Filter -->
+              <div class="form-group">
+                <label class="group-label" for="regionSelect">Target Region</label>
+                <select id="regionSelect" class="select-dropdown">
+                  <option value="all">All States (Nationwide)</option>
+                </select>
+              </div>
+
+              <!-- Launch Action -->
+              <div class="launch-action-wrap">
+                <button type="button" id="startCampaignBtn" class="btn-primary">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                  </svg>
+                  <span>Start Outreach</span>
+                </button>
               </div>
             </div>
 
-            <!-- Target Selection -->
-            <div class="section-group">
-              <label class="group-label">Select volume for this campaign:</label>
-              <div class="preset-pill-group">
-                <button type="button" class="preset-pill active" data-qty="10">10 Leads</button>
-                <button type="button" class="preset-pill" data-qty="25">25 Leads</button>
-                <button type="button" class="preset-pill" data-qty="50">50 Leads</button>
-                <button type="button" class="preset-pill" data-qty="max">All Available</button>
+            <!-- Right: Pipeline Readiness Summary -->
+            <div class="card cockpit-metrics-card">
+              <div class="card-head">
+                <div>
+                  <h2 class="card-title">Pipeline Status</h2>
+                  <p class="card-subtitle">Verified database queue ready for immediate submission.</p>
+                </div>
               </div>
 
-              <div class="custom-qty-row">
-                <span class="custom-qty-label">Or custom quantity:</span>
-                <input type="number" id="customLeadQty" class="input-inline-num" min="1" max="500" value="10">
+              <div class="hero-metric-box">
+                <span class="hero-metric-val tabular" id="heroLeadCount">0</span>
+                <span class="hero-metric-label">Qualified leads ready in database</span>
+              </div>
+
+              <div class="readiness-breakdown">
+                <div class="readiness-item">
+                  <span class="readiness-label">Submission Protocol</span>
+                  <span class="readiness-val">Direct Browser Automation</span>
+                </div>
+                <div class="readiness-item">
+                  <span class="readiness-label">Sender Persona</span>
+                  <span class="readiness-val" id="cockpitPersonaLabel">Corporate Representative</span>
+                </div>
+                <div class="readiness-item">
+                  <span class="readiness-label">Anti-Spam Safety</span>
+                  <span class="readiness-val text-success">Active Rate-Limits</span>
+                </div>
               </div>
             </div>
 
-            <!-- Region Filter -->
-            <div class="section-group">
-              <label class="group-label" for="regionSelect">Target Region / State:</label>
-              <select id="regionSelect" class="select-dropdown">
-                <option value="all">All States (Nationwide)</option>
-              </select>
-            </div>
-
-            <!-- Launch Button -->
-            <div class="action-launch-row">
-              <button type="button" id="startCampaignBtn" class="btn-primary-launch">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polygon points="5 3 19 12 5 21 5 3"/>
-                </svg>
-                <span>Start Outreach</span>
-              </button>
-            </div>
           </div>
+        </div>
 
-          <!-- State: Active Campaign (Live Wave Running) -->
-          <div id="campaignActiveState" style="display: none;">
+        <!-- State: Active Campaign (Live Wave Running) -->
+        <div id="campaignActiveState" style="display: none;">
+          <div class="card active-campaign-card">
             <div class="active-head">
               <div class="active-status-col">
                 <div class="pulse-indicator">
@@ -146,7 +181,7 @@
                   <span class="active-subtitle" id="campaignStatusSub">Wave 1 in progress</span>
                 </div>
               </div>
-              <div class="timer-badge" id="activeTimer">00:00</div>
+              <div class="timer-badge tabular" id="activeTimer">00:00</div>
             </div>
 
             <!-- Waveform / Progress Bar -->
@@ -164,19 +199,19 @@
             <div class="live-metrics-grid">
               <div class="metric-card">
                 <span class="metric-label">Confirmed Contacted</span>
-                <span class="metric-val tabular success" id="statContacted">0</span>
+                <span class="metric-val tabular text-success" id="statContacted">0</span>
               </div>
               <div class="metric-card">
                 <span class="metric-label">Unable to Reach</span>
-                <span class="metric-val tabular muted" id="statUnable">0</span>
+                <span class="metric-val tabular text-muted" id="statUnable">0</span>
               </div>
               <div class="metric-card">
                 <span class="metric-label">Success Rate</span>
                 <span class="metric-val tabular" id="statRate">0%</span>
               </div>
               <div class="metric-card">
-                <span class="metric-label">Speed (Leads/Min)</span>
-                <span class="metric-val tabular" id="statSpeed">0</span>
+                <span class="metric-label">Speed</span>
+                <span class="metric-val tabular" id="statSpeed">0/min</span>
               </div>
             </div>
 
@@ -186,20 +221,24 @@
               <button type="button" id="stopBtn" class="btn-danger">Stop Campaign</button>
             </div>
           </div>
-
         </div>
 
         <!-- Live Activity Feed -->
         <div class="card feed-card">
-          <div class="card-head-simple">
-            <h3 class="card-title">Activity Feed</h3>
-            <span class="feed-status-pill" id="feedBadge">Idle</span>
+          <div class="card-head">
+            <div>
+              <h3 class="card-title">Live Activity Feed</h3>
+              <p class="card-subtitle">Real-time worker execution logs and submission outcomes.</p>
+            </div>
+            <span class="badge-status" id="feedBadge">Idle</span>
           </div>
 
           <div class="feed-stream" id="feedContainer">
             <div class="feed-empty-state" id="feedEmpty">
-              <span class="empty-sparkle">✨</span>
-              <span class="empty-title">Ready when you are</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="empty-icon">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+              <span class="empty-title">Waiting for campaign launch</span>
               <span class="empty-desc">Click Start Outreach above to begin contacting leads automatically.</span>
             </div>
           </div>
@@ -212,170 +251,168 @@
       <!-- ========================================== -->
       <section id="tab-hunter" class="tab-pane">
         
-        <div class="card hero-card">
-          <div class="hero-header">
-            <span class="hero-label">Autonomous Lead Discovery</span>
-            <div class="hero-number-wrap">
-              <span class="hero-subtext">Automatically find and populate verified business leads from Google Maps</span>
-            </div>
-          </div>
-
-          <div class="hunter-form-grid">
-            <div class="form-field">
-              <label for="hunterCategory">Industry / Business Category</label>
-              <input type="text" id="hunterCategory" class="input-text" placeholder="e.g., Commercial HVAC, Precision Machining, Roofing">
-              <div class="suggestion-chips">
-                <button type="button" class="chip-btn" data-query="Commercial HVAC">Commercial HVAC</button>
-                <button type="button" class="chip-btn" data-query="Precision Machining">Precision Machining</button>
-                <button type="button" class="chip-btn" data-query="Roofing Contractors">Roofing Contractors</button>
-                <button type="button" class="chip-btn" data-query="Plumbing Contractors">Plumbing</button>
-                <button type="button" class="chip-btn" data-query="Commercial Electricians">Electricians</button>
-                <button type="button" class="chip-btn" data-query="Architecture Firms">Architects</button>
+        <div class="hunter-layout-grid">
+          <!-- Discovery Parameters -->
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h2 class="card-title">Autonomous Lead Discovery</h2>
+                <p class="card-subtitle">Search Google Maps by category and location to build your verified lead list.</p>
               </div>
             </div>
 
-            <div class="form-row">
-              <div class="form-field">
-                <label for="hunterState">Target State / Region</label>
-                <select id="hunterState" class="select-dropdown">
-                  <option value="Illinois">Illinois</option>
-                  <option value="California">California</option>
-                  <option value="Texas">Texas</option>
-                  <option value="Florida">Florida</option>
-                  <option value="New York">New York</option>
-                  <option value="Ohio">Ohio</option>
-                  <option value="Michigan">Michigan</option>
-                  <option value="Pennsylvania">Pennsylvania</option>
-                  <option value="Indiana">Indiana</option>
-                  <option value="Wisconsin">Wisconsin</option>
-                  <option value="Georgia">Georgia</option>
-                  <option value="North Carolina">North Carolina</option>
-                  <option value="Washington">Washington</option>
-                  <option value="Arizona">Arizona</option>
-                  <option value="Colorado">Colorado</option>
-                </select>
+            <div class="hunter-form">
+              <div class="form-group">
+                <label for="hunterCategory" class="group-label">Industry or Business Category</label>
+                <input type="text" id="hunterCategory" class="input-text" placeholder="e.g. Commercial HVAC, Precision Machining, Roofing">
+                <div class="suggestion-chips">
+                  <button type="button" class="chip-btn" data-query="Commercial HVAC">Commercial HVAC</button>
+                  <button type="button" class="chip-btn" data-query="Precision Machining">Precision Machining</button>
+                  <button type="button" class="chip-btn" data-query="Roofing Contractors">Roofing Contractors</button>
+                  <button type="button" class="chip-btn" data-query="Plumbing Contractors">Plumbing</button>
+                  <button type="button" class="chip-btn" data-query="Commercial Electricians">Electricians</button>
+                  <button type="button" class="chip-btn" data-query="Architecture Firms">Architects</button>
+                </div>
               </div>
 
-              <div class="form-field">
-                <label for="hunterCity">City (Optional)</label>
-                <input type="text" id="hunterCity" class="input-text" placeholder="Leave empty for statewide">
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label for="hunterState" class="group-label">Target State</label>
+                  <select id="hunterState" class="select-dropdown">
+                    <option value="Illinois">Illinois</option>
+                    <option value="California">California</option>
+                    <option value="Texas">Texas</option>
+                    <option value="Florida">Florida</option>
+                    <option value="New York">New York</option>
+                    <option value="Ohio">Ohio</option>
+                    <option value="Michigan">Michigan</option>
+                    <option value="Pennsylvania">Pennsylvania</option>
+                    <option value="Indiana">Indiana</option>
+                    <option value="Wisconsin">Wisconsin</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="North Carolina">North Carolina</option>
+                    <option value="Washington">Washington</option>
+                    <option value="Arizona">Arizona</option>
+                    <option value="Colorado">Colorado</option>
+                  </select>
+                </div>
+
+                <div class="form-group flex-1">
+                  <label for="hunterCity" class="group-label">City (Optional)</label>
+                  <input type="text" id="hunterCity" class="input-text" placeholder="Statewide">
+                </div>
+
+                <div class="form-group flex-1">
+                  <label for="hunterLimit" class="group-label">Target Leads Count</label>
+                  <select id="hunterLimit" class="select-dropdown">
+                    <option value="10">10 Leads (Quick Test)</option>
+                    <option value="25" selected>25 Leads (Standard)</option>
+                    <option value="50">50 Leads (Deep Search)</option>
+                    <option value="100">100 Leads (Comprehensive)</option>
+                  </select>
+                </div>
               </div>
 
-              <div class="form-field">
-                <label for="hunterLimit">Target Leads Count</label>
-                <select id="hunterLimit" class="select-dropdown">
-                  <option value="10">10 Leads (Quick Test)</option>
-                  <option value="25" selected>25 Leads (Standard)</option>
-                  <option value="50">50 Leads (Deep Search)</option>
-                  <option value="100">100 Leads (Comprehensive)</option>
-                </select>
+              <div class="hunter-action-row">
+                <button type="button" id="startHunterBtn" class="btn-primary">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"/>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                  <span>Start Lead Discovery</span>
+                </button>
+                <button type="button" id="stopHunterBtn" class="btn-danger" style="display:none;">Stop Discovery</button>
               </div>
-            </div>
-
-            <div class="hunter-action-row">
-              <button type="button" id="startHunterBtn" class="btn-primary-launch">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="10"/>
-                  <circle cx="12" cy="12" r="6"/>
-                  <circle cx="12" cy="12" r="2"/>
-                </svg>
-                <span>Start Lead Discovery</span>
-              </button>
-              <button type="button" id="stopHunterBtn" class="btn-danger" style="display:none;">Stop Discovery</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Discovery Telemetry & Results -->
-        <div class="card" id="hunterResultsCard" style="display:none;">
-          <div class="card-head-simple">
-            <h3 class="card-title">Discovery Progress</h3>
-            <span class="badge-status active" id="hunterStatusBadge">Hunting...</span>
-          </div>
-
-          <div class="live-metrics-grid">
-            <div class="metric-card">
-              <span class="metric-label">Discovered</span>
-              <span class="metric-val tabular" id="hunterStatDiscovered">0</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Reachable & Verified</span>
-              <span class="metric-val tabular success" id="hunterStatReachable">0</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Duplicates / Skipped</span>
-              <span class="metric-val tabular muted" id="hunterStatSkipped">0</span>
             </div>
           </div>
 
-          <div class="hunter-stream-box" id="hunterStreamList">
-            <!-- Dynamic stream items -->
+          <!-- Discovery Telemetry & Results -->
+          <div class="card" id="hunterResultsCard" style="display:none;">
+            <div class="card-head">
+              <div>
+                <h3 class="card-title">Discovery Progress</h3>
+                <p class="card-subtitle">Real-time candidate evaluation and domain reachability verification.</p>
+              </div>
+              <span class="badge-status active" id="hunterStatusBadge">Hunting...</span>
+            </div>
+
+            <div class="live-metrics-grid">
+              <div class="metric-card">
+                <span class="metric-label">Discovered</span>
+                <span class="metric-val tabular" id="hunterStatDiscovered">0</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Reachable & Verified</span>
+                <span class="metric-val tabular text-success" id="hunterStatReachable">0</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Duplicates / Skipped</span>
+                <span class="metric-val tabular text-muted" id="hunterStatSkipped">0</span>
+              </div>
+            </div>
+
+            <div class="hunter-stream-box" id="hunterStreamList">
+              <!-- Dynamic stream items -->
+            </div>
           </div>
         </div>
 
       </section>
 
       <!-- ========================================== -->
-      <!-- TAB 3: LEADS (Database & CRM) -->
+      <!-- TAB 3: LEADS (Database & Management) -->
       <!-- ========================================== -->
       <section id="tab-leads" class="tab-pane">
         
         <!-- Lead Database Summary -->
-        <div class="card">
-          <div class="card-head-simple">
-            <div>
-              <h2 class="card-title">Lead Database</h2>
-              <span class="card-subtitle">Stored securely and privately on your machine</span>
+        <div class="leads-stat-grid">
+          <div class="card stat-tile">
+            <span class="stat-label">Ready to Contact</span>
+            <span class="stat-val tabular" id="dbReadyCount">0</span>
+            <span class="stat-sub">Fresh verified leads</span>
+          </div>
+          <div class="card stat-tile">
+            <span class="stat-label">Already Contacted</span>
+            <span class="stat-val tabular text-success" id="dbContactedCount">0</span>
+            <span class="stat-sub">Outreach completed</span>
+          </div>
+          <div class="card stat-tile">
+            <span class="stat-label">Total in Database</span>
+            <span class="stat-val tabular" id="dbTotalCount">0</span>
+            <span class="stat-sub">Local SQLite storage</span>
+          </div>
+        </div>
+
+        <!-- Search & Filter Table -->
+        <div class="card table-card">
+          <div class="table-toolbar">
+            <div class="search-input-wrap">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input type="text" id="leadSearchInput" placeholder="Filter leads by company, domain, or location...">
             </div>
-            <div class="card-head-actions">
-              <button type="button" id="exportCsvBtn" class="btn-action">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            
+            <div class="segmented-control filter-pills">
+              <button type="button" class="filter-pill active" data-filter="all">All</button>
+              <button type="button" class="filter-pill" data-filter="not_contacted">Ready</button>
+              <button type="button" class="filter-pill" data-filter="contacted">Contacted</button>
+              <button type="button" class="filter-pill" data-filter="unable_to_reach">Unable</button>
+            </div>
+
+            <div class="table-actions">
+              <button type="button" id="exportCsvBtn" class="btn-secondary btn-sm">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                   <polyline points="7 10 12 15 17 10"/>
                   <line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
                 <span>Export CSV</span>
               </button>
-              <button type="button" id="verifyReachabilityBtn" class="btn-action">
+              <button type="button" id="verifyReachabilityBtn" class="btn-secondary btn-sm">
                 <span>Verify Domains</span>
               </button>
-            </div>
-          </div>
-
-          <div class="leads-stat-grid">
-            <div class="lead-stat-card primary">
-              <span class="stat-label">Ready to Contact</span>
-              <span class="stat-huge tabular" id="dbReadyCount">0</span>
-              <span class="stat-sub">Fresh verified leads</span>
-            </div>
-            <div class="lead-stat-card">
-              <span class="stat-label">Already Contacted</span>
-              <span class="stat-huge tabular" id="dbContactedCount">0</span>
-              <span class="stat-sub">Outreach completed</span>
-            </div>
-            <div class="lead-stat-card">
-              <span class="stat-label">Total in Database</span>
-              <span class="stat-huge tabular" id="dbTotalCount">0</span>
-              <span class="stat-sub">All active leads</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Search & Filter Table -->
-        <div class="card">
-          <div class="table-toolbar">
-            <div class="search-input-wrap">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"/>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-              <input type="text" id="leadSearchInput" placeholder="Filter leads by company, domain, or location...">
-            </div>
-            <div class="filter-pills">
-              <button type="button" class="filter-pill active" data-filter="all">All</button>
-              <button type="button" class="filter-pill" data-filter="not_contacted">Ready</button>
-              <button type="button" class="filter-pill" data-filter="contacted">Contacted</button>
-              <button type="button" class="filter-pill" data-filter="unable_to_reach">Unable</button>
             </div>
           </div>
 
@@ -383,7 +420,7 @@
             <table class="leads-table" id="leadsTable">
               <thead>
                 <tr>
-                  <th style="width: 50px;">#</th>
+                  <th style="width: 44px;">#</th>
                   <th>Company</th>
                   <th>Website</th>
                   <th>Phone</th>
@@ -408,105 +445,105 @@
         <div class="profile-split-container">
           <!-- Left Column: Form -->
           <div class="card profile-form-card">
-            <div class="card-head-simple">
+            <div class="card-head">
               <div>
-                <h2 class="card-title">Corporate Identity & Sender Profile</h2>
-                <span class="card-subtitle">Information used by autonomous workers to complete web contact forms</span>
+                <h2 class="card-title">Corporate Profile & Sender Persona</h2>
+                <p class="card-subtitle">Information used by autonomous workers to complete web contact forms accurately.</p>
               </div>
             </div>
 
             <form id="profileForm" class="profile-form">
               <!-- Personal Details -->
-              <div class="form-section-title">Personal Representative Details</div>
+              <div class="form-section-title">Representative Information</div>
               
               <div class="form-row">
-                <div class="form-field">
-                  <label for="pFullName">Full Name</label>
+                <div class="form-group flex-1">
+                  <label for="pFullName" class="group-label">Full Name</label>
                   <input type="text" id="pFullName" class="input-text" placeholder="Alexander Wright">
                 </div>
-                <div class="form-field">
-                  <label for="pJobTitle">Job Title / Role</label>
+                <div class="form-group flex-1">
+                  <label for="pJobTitle" class="group-label">Job Title</label>
                   <input type="text" id="pJobTitle" class="input-text" placeholder="Director of Strategic Partnerships">
                 </div>
               </div>
 
               <div class="form-row">
-                <div class="form-field">
-                  <label for="pFirstName">First Name (Auto-synced)</label>
+                <div class="form-group flex-1">
+                  <label for="pFirstName" class="group-label">First Name (Auto-synced)</label>
                   <input type="text" id="pFirstName" class="input-text" placeholder="Alexander">
                 </div>
-                <div class="form-field">
-                  <label for="pLastName">Last Name (Auto-synced)</label>
+                <div class="form-group flex-1">
+                  <label for="pLastName" class="group-label">Last Name (Auto-synced)</label>
                   <input type="text" id="pLastName" class="input-text" placeholder="Wright">
                 </div>
               </div>
 
               <div class="form-row">
-                <div class="form-field">
-                  <label for="pEmail">Corporate Email Address</label>
+                <div class="form-group flex-1">
+                  <label for="pEmail" class="group-label">Corporate Email Address</label>
                   <input type="email" id="pEmail" class="input-text" placeholder="a.wright@apexprecision.com">
                 </div>
-                <div class="form-field">
-                  <label for="pPhone">Phone Number</label>
+                <div class="form-group flex-1">
+                  <label for="pPhone" class="group-label">Phone Number</label>
                   <input type="text" id="pPhone" class="input-text" placeholder="(708) 568-3708">
                 </div>
               </div>
 
               <!-- Organization Details -->
-              <div class="form-section-title">Organization & Headquarters Address</div>
+              <div class="form-section-title">Organization & Address</div>
 
               <div class="form-row">
-                <div class="form-field">
-                  <label for="pCompany">Company / Entity Name</label>
+                <div class="form-group flex-1">
+                  <label for="pCompany" class="group-label">Company Name</label>
                   <input type="text" id="pCompany" class="input-text" placeholder="Apex Precision Engineering">
                 </div>
-                <div class="form-field">
-                  <label for="pWebsite">Company Website</label>
+                <div class="form-group flex-1">
+                  <label for="pWebsite" class="group-label">Company Website</label>
                   <input type="text" id="pWebsite" class="input-text" placeholder="https://apexprecision.com">
                 </div>
               </div>
 
               <div class="form-row">
-                <div class="form-field" style="flex: 2;">
-                  <label for="pAddress">Street Address</label>
+                <div class="form-group flex-2">
+                  <label for="pAddress" class="group-label">Street Address</label>
                   <input type="text" id="pAddress" class="input-text" placeholder="100 Main St">
                 </div>
-                <div class="form-field">
-                  <label for="pSuite">Suite / Unit</label>
+                <div class="form-group flex-1">
+                  <label for="pSuite" class="group-label">Suite or Unit</label>
                   <input type="text" id="pSuite" class="input-text" placeholder="Suite 400">
                 </div>
               </div>
 
               <div class="form-row">
-                <div class="form-field">
-                  <label for="pCity">City</label>
+                <div class="form-group flex-1">
+                  <label for="pCity" class="group-label">City</label>
                   <input type="text" id="pCity" class="input-text" placeholder="Chicago">
                 </div>
-                <div class="form-field">
-                  <label for="pState">State / Province</label>
+                <div class="form-group flex-1">
+                  <label for="pState" class="group-label">State</label>
                   <input type="text" id="pState" class="input-text" placeholder="IL">
                 </div>
-                <div class="form-field">
-                  <label for="pZip">ZIP / Postal Code</label>
+                <div class="form-group flex-1">
+                  <label for="pZip" class="group-label">Postal Code</label>
                   <input type="text" id="pZip" class="input-text" placeholder="60601">
                 </div>
-                <div class="form-field">
-                  <label for="pCountry">Country</label>
+                <div class="form-group flex-1">
+                  <label for="pCountry" class="group-label">Country</label>
                   <input type="text" id="pCountry" class="input-text" placeholder="United States">
                 </div>
               </div>
 
               <!-- Message Template -->
-              <div class="form-section-title">Outreach Message & Pitch Template</div>
+              <div class="form-section-title">Outreach Message Template</div>
 
-              <div class="form-field">
-                <label for="pSubject">Default Subject Line</label>
+              <div class="form-group">
+                <label for="pSubject" class="group-label">Default Subject Line</label>
                 <input type="text" id="pSubject" class="input-text" placeholder="Exploring Collaboration Opportunities">
               </div>
 
-              <div class="form-field">
+              <div class="form-group">
                 <div class="label-with-chips">
-                  <label for="pMessage">Message Body</label>
+                  <label for="pMessage" class="group-label">Message Body</label>
                   <div class="variable-chips">
                     <span class="var-chip" data-var="{company_name}">+ {company_name}</span>
                     <span class="var-chip" data-var="{first_name}">+ {first_name}</span>
@@ -514,13 +551,13 @@
                     <span class="var-chip" data-var="{state}">+ {state}</span>
                   </div>
                 </div>
-                <textarea id="pMessage" class="input-textarea" rows="7" placeholder="Hello,&#10;&#10;I am reaching out to explore collaboration with your team..."></textarea>
+                <textarea id="pMessage" class="input-textarea" rows="6" placeholder="Hello,&#10;&#10;I am reaching out to explore potential collaboration with your team..."></textarea>
               </div>
 
               <div class="form-submit-row">
                 <span class="save-status-msg" id="profileSaveMsg"></span>
-                <button type="button" id="saveProfileBtn" class="btn-primary-action">
-                  <span>Save Corporate Identity</span>
+                <button type="button" id="saveProfileBtn" class="btn-primary">
+                  <span>Save Profile</span>
                 </button>
               </div>
             </form>
@@ -528,11 +565,12 @@
 
           <!-- Right Column: Live Form Preview Card -->
           <div class="card preview-card">
-            <div class="card-head-simple">
-              <h3 class="card-title">Live Autofill Preview</h3>
-              <span class="feed-status-pill">Simulated Form</span>
+            <div class="card-head">
+              <div>
+                <h3 class="card-title">Live Autofill Preview</h3>
+                <p class="card-subtitle">How your credentials appear when filled into target web forms.</p>
+              </div>
             </div>
-            <p class="preview-desc">This is how your enterprise credentials appear when automated workers complete contact forms on target client websites.</p>
             
             <div class="mock-contact-form">
               <div class="mock-field">
@@ -578,22 +616,22 @@
       <!-- ========================================== -->
       <section id="tab-settings" class="tab-pane">
         
-        <!-- Updates & Enterprise License -->
+        <!-- Updates -->
         <div class="card">
-          <div class="card-head-simple">
+          <div class="card-head">
             <div>
               <h2 class="card-title">System Version & Software Updates</h2>
-              <span class="card-subtitle">Keep your local engine up to date with continuous releases</span>
+              <p class="card-subtitle">Keep your local engine updated with the latest releases.</p>
             </div>
-            <span class="badge-status active" id="updateStatusPill">v2.0.0 Enterprise</span>
+            <span class="badge-status" id="updateStatusPill">v2.0.0</span>
           </div>
 
           <div class="update-tile">
             <div class="update-info">
-              <span class="update-title" id="versionTitle">Lead Machine v2.0.0 Enterprise Edition</span>
-              <p class="update-desc" id="versionDesc">Autonomous Google Maps Lead Hunter, Dynamic Variable Templating, Enterprise Corporate Identity, and Real-time Telemetry.</p>
+              <span class="update-title" id="versionTitle">Lead Machine v2.0.0</span>
+              <p class="update-desc" id="versionDesc">Autonomous Google Maps Lead Hunter, Dynamic Variable Templating, Corporate Identity, and Real-time Telemetry.</p>
             </div>
-            <button type="button" id="checkUpdateBtn" class="btn-action">
+            <button type="button" id="checkUpdateBtn" class="btn-secondary btn-sm">
               <span>Check for Updates</span>
             </button>
           </div>
@@ -602,9 +640,11 @@
 
         <!-- Engine Preferences -->
         <div class="card">
-          <div class="card-head-simple">
-            <h2 class="card-title">Engine Performance & Safety</h2>
-            <span class="card-subtitle">Tune speed and resource allocation</span>
+          <div class="card-head">
+            <div>
+              <h2 class="card-title">Engine Performance & Safety</h2>
+              <p class="card-subtitle">Adjust execution concurrency and runtime safety thresholds.</p>
+            </div>
           </div>
 
           <div class="pref-row">
@@ -621,7 +661,7 @@
           <div class="pref-row">
             <div class="pref-info">
               <span class="pref-title">Visual Observation Mode</span>
-              <span class="pref-desc">Display visible browser windows during outreach for visual debugging.</span>
+              <span class="pref-desc">Display visible browser windows during outreach for debugging.</span>
             </div>
             <div class="pref-control">
               <label class="toggle-switch">
@@ -634,7 +674,7 @@
           <div class="pref-row">
             <div class="pref-info">
               <span class="pref-title">Sandbox Simulation Mode</span>
-              <span class="pref-desc">Autofill forms and verify submission paths without triggering live messages.</span>
+              <span class="pref-desc">Autofill forms and verify submission paths without triggering live submissions.</span>
             </div>
             <div class="pref-control">
               <label class="toggle-switch">
@@ -647,8 +687,11 @@
 
         <!-- System Diagnostics -->
         <div class="card">
-          <div class="card-head-simple">
-            <h2 class="card-title">Hardware & Environment Diagnostics</h2>
+          <div class="card-head">
+            <div>
+              <h2 class="card-title">Environment Diagnostics</h2>
+              <p class="card-subtitle">Hardware and browser automation engine details.</p>
+            </div>
           </div>
 
           <div class="diag-grid">

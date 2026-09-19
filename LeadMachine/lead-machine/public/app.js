@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Lead Machine — Enterprise Application Controller
+   Lead Machine - Application Controller
    ========================================================================== */
 
 // Global State
@@ -294,10 +294,10 @@ function handleTelemetryEvent(event) {
     applyCampaignState(event.state);
   } else if (event.type === 'campaign_started') {
     setCampaignRunningUI(true);
-    addFeedItem('🚀', 'Campaign Started', 'Running', 'success');
+    addFeedItem('INIT', 'Campaign Started', 'Running', 'success');
   } else if (event.type === 'lead_result') {
     const isContacted = event.status === 'contacted';
-    const icon = isContacted ? '✓' : '—';
+    const icon = isContacted ? 'SENT' : 'FAIL';
     const tag = isContacted ? `Sent (${event.time}s)` : (event.result || 'No Form');
     const tagClass = isContacted ? 'success' : 'muted';
     addFeedItem(icon, event.company, tag, tagClass);
@@ -313,7 +313,7 @@ function handleTelemetryEvent(event) {
     loadInitialSpecs();
   } else if (event.type === 'campaign_finished') {
     setCampaignRunningUI(false);
-    addFeedItem('🏁', 'Campaign Finished', 'Complete', 'success');
+    addFeedItem('DONE', 'Campaign Finished', 'Complete', 'success');
     fetchStatusUpdate();
     loadInitialSpecs();
   }
@@ -395,14 +395,20 @@ function stopTimer() {
 function addFeedItem(icon, company, tag, tagClass) {
   if (feedEmpty) feedEmpty.style.display = 'none';
 
+  const now = new Date();
+  const timeStr = [
+    String(now.getHours()).padStart(2, '0'),
+    String(now.getMinutes()).padStart(2, '0'),
+    String(now.getSeconds()).padStart(2, '0')
+  ].join(':');
+
   const row = document.createElement('div');
   row.className = 'feed-row';
   row.innerHTML = `
-    <div class="feed-row-left">
-      <span class="feed-icon">${icon}</span>
-      <span class="feed-company">${company}</span>
-    </div>
-    <span class="feed-tag ${tagClass}">${tag}</span>
+    <span class="feed-time tabular">[${timeStr}]</span>
+    <span class="badge-tag ${tagClass}">${icon}</span>
+    <span class="feed-company">${company}</span>
+    <span class="feed-tag ${tagClass}" style="margin-left: auto;">${tag}</span>
   `;
   feedContainer.prepend(row);
 }
@@ -609,11 +615,11 @@ function renderTableRows(leads) {
 
     tr.innerHTML = `
       <td class="tabular" style="color: var(--text-muted);">${lead.id}</td>
-      <td style="font-weight: 600; color: var(--text-primary);">${lead.company_name}</td>
-      <td><a href="${web}" target="_blank" rel="noopener noreferrer">${lead.website || '—'}</a></td>
-      <td class="tabular">${lead.phone || '—'}</td>
-      <td><span class="status-pill ${statusClass}">${statusText}</span></td>
-      <td style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-muted);">${lead.notes || '—'}</td>
+      <td style="font-weight: 500; color: var(--text-primary);">${lead.company_name}</td>
+      <td><a href="${web}" target="_blank" rel="noopener noreferrer">${lead.website || '-'}</a></td>
+      <td class="tabular">${lead.phone || '-'}</td>
+      <td><span class="badge-tag ${statusClass}">${statusText}</span></td>
+      <td style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-muted);">${lead.notes || '-'}</td>
     `;
     leadsTableBody.appendChild(tr);
   });
