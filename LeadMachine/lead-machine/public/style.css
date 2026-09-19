@@ -1083,10 +1083,9 @@ body {
    ========================================================================== */
 .update-tile {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px;
   background: var(--bg-canvas);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -1095,18 +1094,85 @@ body {
 .update-info {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .update-title {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
+  letter-spacing: -0.01em;
 }
 
 .update-desc {
   font-size: 12px;
   color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.update-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.update-meta-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.update-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+}
+
+.update-actions-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.update-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@media (max-width: 680px) {
+  .update-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .update-actions-left,
+  .update-actions-right {
+    width: 100%;
+    justify-content: stretch;
+  }
+  .update-actions-left button,
+  .update-actions-right button {
+    flex: 1;
+  }
 }
 
 .feedback-banner {

@@ -865,10 +865,15 @@ function setupSettingsHandlers() {
     });
   }
 
+  const ICON_REFRESH = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>';
+  const ICON_SPIN = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>';
+  const ICON_DOWNLOAD = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+  const ICON_WRENCH = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>';
+
   if (checkUpdateBtn) {
     checkUpdateBtn.addEventListener('click', async () => {
       checkUpdateBtn.disabled = true;
-      checkUpdateBtn.innerHTML = '<span>Checking...</span>';
+      checkUpdateBtn.innerHTML = `${ICON_SPIN}<span>Checking...</span>`;
       if (installUpdateBtn) installUpdateBtn.style.display = 'none';
       updateFeedback.style.display = 'block';
       updateFeedback.className = 'feedback-banner';
@@ -898,7 +903,7 @@ function setupSettingsHandlers() {
           updateFeedback.innerHTML = `<strong>Update Available:</strong> Remote master build <code>${data.latestCommit}</code> is ready (${data.commitMessage}).`;
           if (installUpdateBtn) {
             installUpdateBtn.style.display = 'inline-flex';
-            installUpdateBtn.innerHTML = `<span>Install Latest Release (${data.latestCommit})</span>`;
+            installUpdateBtn.innerHTML = `${ICON_DOWNLOAD}<span>Install Latest Release (${data.latestCommit})</span>`;
           }
         } else {
           if (updateStatusPill) updateStatusPill.textContent = `v${data.version} · Latest`;
@@ -908,7 +913,7 @@ function setupSettingsHandlers() {
         updateFeedback.textContent = 'Could not reach update server. Operating in offline enterprise mode.';
       } finally {
         checkUpdateBtn.disabled = false;
-        checkUpdateBtn.innerHTML = '<span>Check for Updates</span>';
+        checkUpdateBtn.innerHTML = `${ICON_REFRESH}<span>Check for Updates</span>`;
       }
     });
   }
@@ -918,7 +923,7 @@ function setupSettingsHandlers() {
       installUpdateBtn.disabled = true;
       if (checkUpdateBtn) checkUpdateBtn.disabled = true;
       if (forceSyncBtn) forceSyncBtn.disabled = true;
-      installUpdateBtn.innerHTML = '<span>Installing Latest...</span>';
+      installUpdateBtn.innerHTML = `${ICON_SPIN}<span>Installing Latest...</span>`;
       updateFeedback.style.display = 'block';
       updateFeedback.className = 'feedback-banner';
       updateFeedback.textContent = 'Updating directly to latest master release from GitHub...';
@@ -938,12 +943,14 @@ function setupSettingsHandlers() {
         } else {
           updateFeedback.innerHTML = `✗ Update failed: ${data.error || 'Unknown error'}`;
           installUpdateBtn.disabled = false;
+          installUpdateBtn.innerHTML = `${ICON_DOWNLOAD}<span>Install Latest Release (${latestDetectedCommit || 'master'})</span>`;
           if (checkUpdateBtn) checkUpdateBtn.disabled = false;
           if (forceSyncBtn) forceSyncBtn.disabled = false;
         }
       } catch (err) {
         updateFeedback.innerHTML = `✗ Update failed: ${err.message}`;
         installUpdateBtn.disabled = false;
+        installUpdateBtn.innerHTML = `${ICON_DOWNLOAD}<span>Install Latest Release (${latestDetectedCommit || 'master'})</span>`;
         if (checkUpdateBtn) checkUpdateBtn.disabled = false;
         if (forceSyncBtn) forceSyncBtn.disabled = false;
       }
@@ -953,7 +960,7 @@ function setupSettingsHandlers() {
   if (forceSyncBtn) {
     forceSyncBtn.addEventListener('click', async () => {
       forceSyncBtn.disabled = true;
-      forceSyncBtn.innerHTML = '<span>Repairing...</span>';
+      forceSyncBtn.innerHTML = `${ICON_SPIN}<span>Repairing...</span>`;
       updateFeedback.style.display = 'block';
       updateFeedback.className = 'feedback-banner';
       updateFeedback.textContent = 'Re-downloading and repairing core engine files from GitHub master...';
@@ -977,7 +984,7 @@ function setupSettingsHandlers() {
         updateFeedback.textContent = 'Repair failed. Server unreachable.';
       } finally {
         forceSyncBtn.disabled = false;
-        forceSyncBtn.innerHTML = '<span>Repair / Re-sync</span>';
+        forceSyncBtn.innerHTML = `${ICON_WRENCH}<span>Repair / Re-sync</span>`;
       }
     });
   }
