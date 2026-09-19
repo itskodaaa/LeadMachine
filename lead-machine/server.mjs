@@ -354,6 +354,14 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === '/api/system/update' && req.method === 'POST') {
+    let body = {};
+    try {
+      const buffers = [];
+      for await (const chunk of req) buffers.push(chunk);
+      const raw = Buffer.concat(buffers).toString();
+      if (raw) body = JSON.parse(raw);
+    } catch (_) {}
+
     const repo = 'itskodaaa/LeadMachine';
     const branch = 'master';
     const baseUrl = `https://raw.githubusercontent.com/${repo}/${branch}`;
@@ -373,17 +381,19 @@ const server = http.createServer(async (req, res) => {
     ];
 
     try {
-      let latestCommit = '';
-      try {
-        const cRes = await fetch(`https://api.github.com/repos/${repo}/commits/${branch}`, {
-          headers: { 'User-Agent': 'LeadMachine-Enterprise-Updater' },
-          signal: AbortSignal.timeout(4000)
-        });
-        if (cRes.ok) {
-          const cData = await cRes.json();
-          latestCommit = (cData.sha || '').substring(0, 7);
-        }
-      } catch (_) {}
+      let latestCommit = body.commit || '';
+      if (!latestCommit) {
+        try {
+          const cRes = await fetch(`https://api.github.com/repos/${repo}/commits/${branch}`, {
+            headers: { 'User-Agent': 'LeadMachine-Enterprise-Updater' },
+            signal: AbortSignal.timeout(10000)
+          });
+          if (cRes.ok) {
+            const cData = await cRes.json();
+            latestCommit = (cData.sha || '').substring(0, 7);
+          }
+        } catch (_) {}
+      }
 
       const updatedFiles = [];
       for (const item of filesToSync) {

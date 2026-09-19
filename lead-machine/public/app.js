@@ -778,6 +778,8 @@ function insertAtCursor(textarea, text) {
 // Settings & Updates Controller
 // ==========================================================================
 function setupSettingsHandlers() {
+  let latestDetectedCommit = '';
+
   if (workerSlider) {
     workerSlider.addEventListener('input', () => {
       workerSliderVal.textContent = `${workerSlider.value} Workers`;
@@ -796,6 +798,7 @@ function setupSettingsHandlers() {
       try {
         const res = await fetch('/api/system/version');
         const data = await res.json();
+        latestDetectedCommit = data.latestCommit || '';
 
         if (updateCommitLabel && (data.commit || data.latestCommit)) {
           updateCommitLabel.textContent = `Build: ${data.commit || data.latestCommit}`;
@@ -838,7 +841,11 @@ function setupSettingsHandlers() {
       updateFeedback.textContent = 'Downloading updated core modules from GitHub master...';
 
       try {
-        const res = await fetch('/api/system/update', { method: 'POST' });
+        const res = await fetch('/api/system/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commit: latestDetectedCommit })
+        });
         const data = await res.json();
         if (data.success) {
           updateFeedback.innerHTML = `✓ <strong>Update complete!</strong> ${data.message} Reloading cockpit in 2 seconds...`;
