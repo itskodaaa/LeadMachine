@@ -1,5 +1,5 @@
 ======================================================================
-⚡ LEAD MACHINE ENTERPRISE EDITION (v2.0.0)
+⚡ LEAD MACHINE ENTERPRISE EDITION (v2.1.2)
 Autonomous B2B Lead Discovery, Reachability & Direct Outreach Engine
 ======================================================================
 

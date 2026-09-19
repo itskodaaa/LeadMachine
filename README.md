@@ -2,7 +2,7 @@
 
 > Autonomous B2B Lead Discovery, Reachability Validation, and High-Throughput Form Outreach Engine.
 
-[![Release](https://img.shields.io/badge/release-v2.0.0--enterprise-blue.svg)](https://github.com/itskodaaa/LeadMachine)
+[![Release](https://img.shields.io/badge/release-v2.1.2--enterprise-blue.svg)](https://github.com/itskodaaa/LeadMachine)
 [![License: MIT](https://img.shields.io/badge/License-MIT-10b981.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/node-%3E%3D18.0.0-6366f1.svg)](https://nodejs.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011%20%7C%20Server%20%7C%20macOS-334155.svg)]()
@@ -18,7 +18,7 @@ Unlike cloud SaaS platforms that gate data behind recurring fees and shared scra
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                             LEAD MACHINE v2.0                               │
+│                            LEAD MACHINE v2.1.2                              │
 │                         Enterprise Mission Cockpit                          │
 ├───────────────────────┬─────────────────────────────┬───────────────────────┤
 │    [1] LEAD HUNTER    │     [2] OUTREACH ENGINE     │    [3] CRM & DATA     │
@@ -187,7 +187,7 @@ All system preferences, sender identities, and outreach templates are persisted 
     "message": "Hello,\n\nI am reaching out to explore potential business collaboration..."
   },
   "settings": {
-    "version": "2.0.0",
+    "version": "2.1.2",
     "buildCommit": "301ab6c",
     "concurrency": 8,
     "sandboxMode": false,
