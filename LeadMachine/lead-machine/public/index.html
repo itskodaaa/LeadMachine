@@ -630,10 +630,20 @@
             <div class="update-info">
               <span class="update-title" id="versionTitle">Lead Machine v2.0.0</span>
               <p class="update-desc" id="versionDesc">Autonomous Google Maps Lead Hunter, Dynamic Variable Templating, Corporate Identity, and Real-time Telemetry.</p>
+              <div class="update-meta-row" id="updateMetaRow" style="display: flex; gap: 14px; margin-top: 8px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap;">
+                <span id="updateRepoLabel">Channel: Stable (itskodaaa/LeadMachine:master)</span>
+                <span id="updateCommitLabel">Build: 301ab6c</span>
+                <span id="updateLastChecked">Ready to check</span>
+              </div>
             </div>
-            <button type="button" id="checkUpdateBtn" class="btn-secondary btn-sm">
-              <span>Check for Updates</span>
-            </button>
+            <div class="update-actions" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <button type="button" id="checkUpdateBtn" class="btn-secondary btn-sm">
+                <span>Check for Updates</span>
+              </button>
+              <button type="button" id="installUpdateBtn" class="btn-primary btn-sm" style="display: none;">
+                <span>Install Update</span>
+              </button>
+            </div>
           </div>
           <div id="updateFeedback" class="feedback-banner" style="display:none;"></div>
         </div>

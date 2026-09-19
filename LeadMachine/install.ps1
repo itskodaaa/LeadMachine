@@ -3,7 +3,7 @@
 # Universal One-Line Automated Installer & Updater for Windows
 # ==============================================================================
 # Usage (Remote One-Liner):
-#   irm https://raw.githubusercontent.com/username/leadflow/master/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/itskodaaa/LeadMachine/master/install.ps1 | iex
 #
 # Usage (Local execution):
 #   powershell -ExecutionPolicy Bypass -File install.ps1

@@ -6,13 +6,13 @@ Autonomous B2B Lead Discovery, Reachability & Direct Outreach Engine
 ONE-LINE INSTALLATION (ENTERPRISE WORKSTATIONS):
 --------------------------------------------------
 On any Windows machine, open PowerShell and execute:
-  irm https://raw.githubusercontent.com/leadflow/leadflow/master/install.ps1 | iex
+  irm https://raw.githubusercontent.com/itskodaaa/LeadMachine/master/install.ps1 | iex
 
 Or from this directory:
   powershell -ExecutionPolicy Bypass -File install.ps1
 
 On macOS / Linux:
-  curl -fsSL https://raw.githubusercontent.com/leadflow/leadflow/master/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/itskodaaa/LeadMachine/master/install.sh | bash
 
 MANUAL LAUNCH:
 --------------------------------------------------

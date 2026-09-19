@@ -99,7 +99,12 @@ const prevMessage = document.getElementById('prevMessage');
 
 // Settings DOM
 const checkUpdateBtn = document.getElementById('checkUpdateBtn');
+const installUpdateBtn = document.getElementById('installUpdateBtn');
 const updateFeedback = document.getElementById('updateFeedback');
+const updateStatusPill = document.getElementById('updateStatusPill');
+const updateRepoLabel = document.getElementById('updateRepoLabel');
+const updateCommitLabel = document.getElementById('updateCommitLabel');
+const updateLastChecked = document.getElementById('updateLastChecked');
 const workerSlider = document.getElementById('workerSlider');
 const workerSliderVal = document.getElementById('workerSliderVal');
 const headedToggle = document.getElementById('headedToggle');
@@ -783,18 +788,72 @@ function setupSettingsHandlers() {
     checkUpdateBtn.addEventListener('click', async () => {
       checkUpdateBtn.disabled = true;
       checkUpdateBtn.innerHTML = '<span>Checking...</span>';
+      if (installUpdateBtn) installUpdateBtn.style.display = 'none';
       updateFeedback.style.display = 'block';
-      updateFeedback.textContent = 'Contacting release server...';
+      updateFeedback.className = 'feedback-banner';
+      updateFeedback.textContent = 'Contacting GitHub release server...';
 
       try {
         const res = await fetch('/api/system/version');
         const data = await res.json();
-        updateFeedback.textContent = `✓ System is running the latest enterprise build (${data.version}). All modules verified.`;
+
+        if (updateCommitLabel && (data.commit || data.latestCommit)) {
+          updateCommitLabel.textContent = `Build: ${data.commit || data.latestCommit}`;
+        }
+        if (updateLastChecked) {
+          const now = new Date();
+          updateLastChecked.textContent = `Checked: ${now.toLocaleTimeString()}`;
+        }
+
+        if (data.offline) {
+          updateFeedback.textContent = `Offline Mode: Operating with local build (v${data.version} · ${data.commit || 'current'}). No internet connection detected.`;
+          if (updateStatusPill) updateStatusPill.textContent = `v${data.version} · Offline`;
+        } else if (data.updateAvailable) {
+          if (updateStatusPill) updateStatusPill.textContent = 'Update Available';
+          updateFeedback.innerHTML = `<strong>Update Available:</strong> Remote build <code>${data.latestCommit}</code> is ready (${data.commitMessage}).`;
+          if (installUpdateBtn) {
+            installUpdateBtn.style.display = 'inline-flex';
+            installUpdateBtn.innerHTML = `<span>Install Update (${data.latestCommit})</span>`;
+          }
+        } else {
+          if (updateStatusPill) updateStatusPill.textContent = `v${data.version} · Latest`;
+          updateFeedback.innerHTML = `✓ System is running the latest enterprise build (<strong>v${data.version} · ${data.commit || data.latestCommit}</strong>). Verified with GitHub master.`;
+        }
       } catch (err) {
         updateFeedback.textContent = 'Could not reach update server. Operating in offline enterprise mode.';
       } finally {
         checkUpdateBtn.disabled = false;
         checkUpdateBtn.innerHTML = '<span>Check for Updates</span>';
+      }
+    });
+  }
+
+  if (installUpdateBtn) {
+    installUpdateBtn.addEventListener('click', async () => {
+      installUpdateBtn.disabled = true;
+      if (checkUpdateBtn) checkUpdateBtn.disabled = true;
+      installUpdateBtn.innerHTML = '<span>Installing...</span>';
+      updateFeedback.style.display = 'block';
+      updateFeedback.className = 'feedback-banner';
+      updateFeedback.textContent = 'Downloading updated core modules from GitHub master...';
+
+      try {
+        const res = await fetch('/api/system/update', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          updateFeedback.innerHTML = `✓ <strong>Update complete!</strong> ${data.message} Reloading cockpit in 2 seconds...`;
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        } else {
+          updateFeedback.innerHTML = `✗ Update failed: ${data.error || 'Unknown error'}`;
+          installUpdateBtn.disabled = false;
+          if (checkUpdateBtn) checkUpdateBtn.disabled = false;
+        }
+      } catch (err) {
+        updateFeedback.innerHTML = `✗ Update failed: ${err.message}`;
+        installUpdateBtn.disabled = false;
+        if (checkUpdateBtn) checkUpdateBtn.disabled = false;
       }
     });
   }

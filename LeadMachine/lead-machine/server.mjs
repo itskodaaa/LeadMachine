@@ -276,24 +276,162 @@ const server = http.createServer(async (req, res) => {
       try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
     }
     const currentVer = cfg.settings?.version || '2.0.0';
+    const currentCommit = cfg.settings?.buildCommit || '301ab6c';
+    const repo = 'itskodaaa/LeadMachine';
+    const branch = 'master';
+
+    let remoteCommit = null;
+    let remoteShort = null;
+    let commitMessage = null;
+    let commitDate = null;
+    let remoteVer = currentVer;
+    let updateAvailable = false;
+    let isOffline = false;
+
+    try {
+      // 1. Query latest commit via GitHub API
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 4000);
+      const commitRes = await fetch(`https://api.github.com/repos/${repo}/commits/${branch}`, {
+        headers: {
+          'User-Agent': 'LeadMachine-Enterprise-Updater',
+          'Accept': 'application/vnd.github.v3+json'
+        },
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+
+      if (commitRes.ok) {
+        const commitData = await commitRes.json();
+        remoteCommit = commitData.sha || '';
+        remoteShort = remoteCommit.substring(0, 7);
+        commitMessage = commitData.commit?.message?.split('\n')[0] || '';
+        commitDate = commitData.commit?.author?.date || '';
+      }
+    } catch (_) {
+      // API check timed out or offline
+    }
+
+    // 2. Fetch remote package.json to verify semver
+    try {
+      const rawRes = await fetch(`https://raw.githubusercontent.com/${repo}/${branch}/package.json`, {
+        headers: { 'User-Agent': 'LeadMachine-Enterprise-Updater' },
+        signal: AbortSignal.timeout(3500)
+      });
+      if (rawRes.ok) {
+        const rawData = await rawRes.json();
+        if (rawData.version) remoteVer = rawData.version;
+      }
+    } catch (_) {}
+
+    if (remoteShort) {
+      if (currentCommit && remoteShort && !remoteCommit.startsWith(currentCommit)) {
+        updateAvailable = true;
+      } else if (remoteVer !== currentVer) {
+        updateAvailable = true;
+      }
+    } else {
+      isOffline = true;
+    }
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: true,
-      version: currentVer,
+      repo,
+      branch,
       channel: cfg.settings?.updateChannel || 'stable',
-      updateAvailable: false,
-      latestVersion: currentVer,
-      releaseNotes: 'v2.0.0 Enterprise Edition: Autonomous Lead Hunter, dynamic template variables, complete enterprise sender profile, and high-precision telemetry.'
+      version: currentVer,
+      commit: currentCommit,
+      latestVersion: remoteVer,
+      latestCommit: remoteShort || currentCommit,
+      commitMessage: commitMessage || 'Latest enterprise build verified.',
+      commitDate,
+      updateAvailable,
+      offline: isOffline,
+      checkedAt: new Date().toISOString()
     }));
     return;
   }
 
   if (pathname === '/api/system/update' && req.method === 'POST') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      success: true,
-      message: 'System is running the latest enterprise build v2.0.0. All core modules verified and up to date.'
-    }));
+    const repo = 'itskodaaa/LeadMachine';
+    const branch = 'master';
+    const baseUrl = `https://raw.githubusercontent.com/${repo}/${branch}`;
+
+    const filesToSync = [
+      { remote: `${baseUrl}/lead-machine/server.mjs`, local: path.join(__dirname, 'server.mjs') },
+      { remote: `${baseUrl}/lead-machine/hunter.mjs`, local: path.join(__dirname, 'hunter.mjs') },
+      { remote: `${baseUrl}/lead-machine/orchestrator.mjs`, local: path.join(__dirname, 'orchestrator.mjs') },
+      { remote: `${baseUrl}/lead-machine/worker.mjs`, local: path.join(__dirname, 'worker.mjs') },
+      { remote: `${baseUrl}/lead-machine/extractor_sync.mjs`, local: path.join(__dirname, 'extractor_sync.mjs') },
+      { remote: `${baseUrl}/lead-machine/reachability.mjs`, local: path.join(__dirname, 'reachability.mjs') },
+      { remote: `${baseUrl}/lead-machine/public/index.html`, local: path.join(__dirname, 'public', 'index.html') },
+      { remote: `${baseUrl}/lead-machine/public/style.css`, local: path.join(__dirname, 'public', 'style.css') },
+      { remote: `${baseUrl}/lead-machine/public/app.js`, local: path.join(__dirname, 'public', 'app.js') },
+      { remote: `${baseUrl}/install.ps1`, local: path.join(__dirname, '..', 'install.ps1') },
+      { remote: `${baseUrl}/Launch_LeadMachine.bat`, local: path.join(__dirname, '..', 'Launch_LeadMachine.bat') }
+    ];
+
+    try {
+      let latestCommit = '';
+      try {
+        const cRes = await fetch(`https://api.github.com/repos/${repo}/commits/${branch}`, {
+          headers: { 'User-Agent': 'LeadMachine-Enterprise-Updater' },
+          signal: AbortSignal.timeout(4000)
+        });
+        if (cRes.ok) {
+          const cData = await cRes.json();
+          latestCommit = (cData.sha || '').substring(0, 7);
+        }
+      } catch (_) {}
+
+      const updatedFiles = [];
+      for (const item of filesToSync) {
+        try {
+          const fileRes = await fetch(item.remote, {
+            headers: { 'User-Agent': 'LeadMachine-Enterprise-Updater' },
+            signal: AbortSignal.timeout(8000)
+          });
+          if (fileRes.ok) {
+            const content = await fileRes.text();
+            if (content && content.length > 50) {
+              const dir = path.dirname(item.local);
+              if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+              }
+              fs.writeFileSync(item.local, content, 'utf8');
+              updatedFiles.push(path.basename(item.local));
+            }
+          }
+        } catch (fileErr) {
+          console.error(`[Updater] Failed to sync ${item.remote}:`, fileErr.message);
+        }
+      }
+
+      // Update config.json build metadata while preserving user profile & database
+      const cfgPath = path.join(__dirname, 'config.json');
+      if (fs.existsSync(cfgPath)) {
+        try {
+          const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+          if (!cfg.settings) cfg.settings = {};
+          if (latestCommit) cfg.settings.buildCommit = latestCommit;
+          cfg.settings.lastUpdated = new Date().toISOString();
+          fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), 'utf8');
+        } catch (_) {}
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        updatedCount: updatedFiles.length,
+        updatedFiles,
+        commit: latestCommit,
+        message: `Successfully synchronized ${updatedFiles.length} core application files from master branch (${latestCommit || 'latest'}).`
+      }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
     return;
   }
 
