@@ -176,13 +176,19 @@ function initDomTamperGuard() {
     // If client is unauthenticated, tampering with the modal locks everything down
     if (!currentAuthData.authenticated) {
       const isDetached = !document.body.contains(overlay);
-      const computed = window.getComputedStyle(overlay);
-      const isHidden = isDetached ||
-                       overlay.style.display === 'none' ||
-                       computed.display === 'none' ||
-                       computed.visibility === 'hidden' ||
-                       parseFloat(computed.opacity || '1') < 0.1 ||
-                       overlay.hidden;
+      let isHidden = isDetached;
+      if (!isHidden) {
+        try {
+          const computed = window.getComputedStyle(overlay);
+          isHidden = overlay.style.display === 'none' ||
+                     computed.display === 'none' ||
+                     computed.visibility === 'hidden' ||
+                     parseFloat(computed.opacity || '1') < 0.1 ||
+                     overlay.hidden;
+        } catch (_) {
+          isHidden = true;
+        }
+      }
 
       if (isHidden) {
         console.error('[Security] Tamper violation detected on license gate overlay.');
