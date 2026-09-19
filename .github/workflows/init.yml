@@ -1,7 +1,0 @@
-name: Init Actions
-on: workflow_dispatch
-jobs:
-  init:
-    runs-on: ubuntu-latest
-    steps: 
-      - run: echo "Actions activated!"
