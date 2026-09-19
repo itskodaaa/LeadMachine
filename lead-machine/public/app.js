@@ -879,10 +879,10 @@ function setupSettingsHandlers() {
           if (updateStatusPill) updateStatusPill.textContent = `v${data.version} · Offline`;
         } else if (data.updateAvailable) {
           if (updateStatusPill) updateStatusPill.textContent = 'Update Available';
-          updateFeedback.innerHTML = `<strong>Update Available:</strong> Remote build <code>${data.latestCommit}</code> is ready (${data.commitMessage}).`;
+          updateFeedback.innerHTML = `<strong>Update Available:</strong> Remote master build <code>${data.latestCommit}</code> is ready (${data.commitMessage}).`;
           if (installUpdateBtn) {
             installUpdateBtn.style.display = 'inline-flex';
-            installUpdateBtn.innerHTML = `<span>Install Update (${data.latestCommit})</span>`;
+            installUpdateBtn.innerHTML = `<span>Install Latest Release (${data.latestCommit})</span>`;
           }
         } else {
           if (updateStatusPill) updateStatusPill.textContent = `v${data.version} · Latest`;
@@ -901,16 +901,17 @@ function setupSettingsHandlers() {
     installUpdateBtn.addEventListener('click', async () => {
       installUpdateBtn.disabled = true;
       if (checkUpdateBtn) checkUpdateBtn.disabled = true;
-      installUpdateBtn.innerHTML = '<span>Installing...</span>';
+      if (forceSyncBtn) forceSyncBtn.disabled = true;
+      installUpdateBtn.innerHTML = '<span>Installing Latest...</span>';
       updateFeedback.style.display = 'block';
       updateFeedback.className = 'feedback-banner';
-      updateFeedback.textContent = 'Downloading updated core modules from GitHub master...';
+      updateFeedback.textContent = 'Updating directly to latest master release from GitHub...';
 
       try {
         const res = await fetch('/api/system/update', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ commit: latestDetectedCommit })
+          body: JSON.stringify({ forceLatest: true })
         });
         const data = await res.json();
         if (data.success) {
@@ -922,11 +923,13 @@ function setupSettingsHandlers() {
           updateFeedback.innerHTML = `✗ Update failed: ${data.error || 'Unknown error'}`;
           installUpdateBtn.disabled = false;
           if (checkUpdateBtn) checkUpdateBtn.disabled = false;
+          if (forceSyncBtn) forceSyncBtn.disabled = false;
         }
       } catch (err) {
         updateFeedback.innerHTML = `✗ Update failed: ${err.message}`;
         installUpdateBtn.disabled = false;
         if (checkUpdateBtn) checkUpdateBtn.disabled = false;
+        if (forceSyncBtn) forceSyncBtn.disabled = false;
       }
     });
   }
@@ -934,31 +937,31 @@ function setupSettingsHandlers() {
   if (forceSyncBtn) {
     forceSyncBtn.addEventListener('click', async () => {
       forceSyncBtn.disabled = true;
-      forceSyncBtn.innerHTML = '<span>Syncing...</span>';
+      forceSyncBtn.innerHTML = '<span>Repairing...</span>';
       updateFeedback.style.display = 'block';
       updateFeedback.className = 'feedback-banner';
-      updateFeedback.textContent = 'Force re-syncing core engine files from GitHub master...';
+      updateFeedback.textContent = 'Re-downloading and repairing core engine files from GitHub master...';
 
       try {
         const res = await fetch('/api/system/update', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ force: true })
+          body: JSON.stringify({ force: true, forceLatest: true })
         });
         const data = await res.json();
         if (data.success) {
-          updateFeedback.innerHTML = `✓ <strong>Sync complete!</strong> ${data.message} Reloading in 2 seconds...`;
+          updateFeedback.innerHTML = `✓ <strong>Repair complete!</strong> ${data.message} Reloading in 2 seconds...`;
           setTimeout(() => {
             window.location.reload();
           }, 2000);
         } else {
-          updateFeedback.textContent = `Sync failed: ${data.error || 'Server error'}`;
+          updateFeedback.textContent = `Repair failed: ${data.error || 'Server error'}`;
         }
       } catch (err) {
-        updateFeedback.textContent = 'Sync failed. Server unreachable.';
+        updateFeedback.textContent = 'Repair failed. Server unreachable.';
       } finally {
         forceSyncBtn.disabled = false;
-        forceSyncBtn.innerHTML = '<span>Force Re-sync</span>';
+        forceSyncBtn.innerHTML = '<span>Repair / Re-sync</span>';
       }
     });
   }

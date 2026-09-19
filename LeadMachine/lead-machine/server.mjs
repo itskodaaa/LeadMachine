@@ -387,7 +387,7 @@ const server = http.createServer(async (req, res) => {
       try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
     }
     const currentVer = cfg.settings?.version || '2.1.0';
-    const currentCommit = cfg.settings?.buildCommit || '301ab6c';
+    const currentCommit = cfg.settings?.buildCommit || 'master';
     const repo = 'itskodaaa/LeadMachine';
     const branch = 'master';
 
@@ -400,25 +400,48 @@ const server = http.createServer(async (req, res) => {
     let isOffline = false;
     let internetVerified = false;
 
-    // 1. Primary: Fetch remote config.json via raw GitHub (Fast, Zero Rate Limits, No Auth Needed)
+    // 1. Primary: Atom feed (Instant real-time HEAD of master branch, ZERO rate limits, always points directly to latest HEAD)
     try {
-      const rawCfgRes = await fetchRemote(`https://raw.githubusercontent.com/${repo}/${branch}/lead-machine/config.json`, { timeout: 8000 });
-      if (rawCfgRes.ok) {
+      const atomRes = await fetchRemote(`https://github.com/${repo}/commits/${branch}.atom?_t=${Date.now()}`, { timeout: 6000 });
+      if (atomRes.ok) {
         internetVerified = true;
-        const rawCfg = await rawCfgRes.json();
-        if (rawCfg?.settings?.buildCommit) {
-          remoteCommit = rawCfg.settings.buildCommit;
+        const atomText = await atomRes.text();
+        const m = atomText.match(/Commit\/([0-9a-f]{40})/);
+        if (m) {
+          remoteCommit = m[1];
           remoteShort = remoteCommit.substring(0, 7);
         }
-        if (rawCfg?.settings?.version) {
-          remoteVer = rawCfg.settings.version;
-        }
+        const titles = [...atomText.matchAll(/<title>([\s\S]*?)<\/title>/g)].map(x => x[1].trim());
+        if (titles[1]) commitMessage = titles[1];
+        const dates = [...atomText.matchAll(/<updated>([\s\S]*?)<\/updated>/g)].map(x => x[1].trim());
+        if (dates[0]) commitDate = dates[0];
       }
     } catch (_) {}
 
-    // 2. Fetch remote package.json to verify semver
+    // 2. Secondary: GitHub API commits
+    if (!remoteShort) {
+      try {
+        const commitRes = await fetchRemote(`https://api.github.com/repos/${repo}/commits/${branch}`, { timeout: 6000 });
+        if (commitRes.ok) {
+          internetVerified = true;
+          const commitData = await commitRes.json();
+          if (commitData?.sha) {
+            remoteCommit = commitData.sha;
+            remoteShort = remoteCommit.substring(0, 7);
+          }
+          if (!commitMessage && commitData?.commit?.message) {
+            commitMessage = commitData.commit.message.split('\n')[0];
+          }
+          if (!commitDate && commitData?.commit?.author?.date) {
+            commitDate = commitData.commit.author.date;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. Fetch remote package.json / config.json for semver (with cache buster)
     try {
-      const rawRes = await fetchRemote(`https://raw.githubusercontent.com/${repo}/${branch}/package.json`, { timeout: 8000 });
+      const rawRes = await fetchRemote(`https://raw.githubusercontent.com/${repo}/${remoteCommit || branch}/package.json?_t=${Date.now()}`, { timeout: 6000 });
       if (rawRes.ok) {
         internetVerified = true;
         const rawData = await rawRes.json();
@@ -426,20 +449,20 @@ const server = http.createServer(async (req, res) => {
       }
     } catch (_) {}
 
-    // 3. Query latest commit metadata via GitHub API (optional enrichment)
-    try {
-      const commitRes = await fetchRemote(`https://api.github.com/repos/${repo}/commits/${branch}`, { timeout: 8000 });
-      if (commitRes.ok) {
-        internetVerified = true;
-        const commitData = await commitRes.json();
-        if (commitData?.sha) {
-          remoteCommit = commitData.sha;
-          remoteShort = remoteCommit.substring(0, 7);
+    if (!remoteShort) {
+      try {
+        const rawCfgRes = await fetchRemote(`https://raw.githubusercontent.com/${repo}/${branch}/lead-machine/config.json?_t=${Date.now()}`, { timeout: 6000 });
+        if (rawCfgRes.ok) {
+          internetVerified = true;
+          const rawCfg = await rawCfgRes.json();
+          if (rawCfg?.settings?.buildCommit) {
+            remoteCommit = rawCfg.settings.buildCommit;
+            remoteShort = remoteCommit.substring(0, 7);
+          }
+          if (rawCfg?.settings?.version) remoteVer = rawCfg.settings.version;
         }
-        commitMessage = commitData?.commit?.message?.split('\n')[0] || '';
-        commitDate = commitData?.commit?.author?.date || '';
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
 
     // 4. Fallback connectivity probe
     if (!internetVerified) {
@@ -456,7 +479,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (remoteShort) {
-      if (currentCommit && remoteShort && !remoteCommit.startsWith(currentCommit)) {
+      if (currentCommit && remoteShort && !remoteCommit.startsWith(currentCommit) && !currentCommit.startsWith(remoteShort)) {
         updateAvailable = true;
       } else if (remoteVer !== currentVer) {
         updateAvailable = true;
@@ -495,43 +518,58 @@ const server = http.createServer(async (req, res) => {
 
     const repo = 'itskodaaa/LeadMachine';
     const branch = 'master';
-    const baseUrl = `https://raw.githubusercontent.com/${repo}/${branch}`;
-
-    const filesToSync = [
-      { remote: `${baseUrl}/lead-machine/server.mjs`, local: path.join(__dirname, 'server.mjs') },
-      { remote: `${baseUrl}/lead-machine/hunter.mjs`, local: path.join(__dirname, 'hunter.mjs') },
-      { remote: `${baseUrl}/lead-machine/orchestrator.mjs`, local: path.join(__dirname, 'orchestrator.mjs') },
-      { remote: `${baseUrl}/lead-machine/worker.mjs`, local: path.join(__dirname, 'worker.mjs') },
-      { remote: `${baseUrl}/lead-machine/extractor_sync.mjs`, local: path.join(__dirname, 'extractor_sync.mjs') },
-      { remote: `${baseUrl}/lead-machine/reachability.mjs`, local: path.join(__dirname, 'reachability.mjs') },
-      { remote: `${baseUrl}/lead-machine/public/index.html`, local: path.join(__dirname, 'public', 'index.html') },
-      { remote: `${baseUrl}/lead-machine/public/style.css`, local: path.join(__dirname, 'public', 'style.css') },
-      { remote: `${baseUrl}/lead-machine/public/app.js`, local: path.join(__dirname, 'public', 'app.js') },
-      { remote: `${baseUrl}/install.ps1`, local: path.join(__dirname, '..', 'install.ps1') },
-      { remote: `${baseUrl}/Launch_LeadMachine.bat`, local: path.join(__dirname, '..', 'Launch_LeadMachine.bat') }
-    ];
 
     try {
-      let latestCommit = body.commit || '';
+      let latestCommit = '';
       let remoteVer = '2.1.0';
+
+      // 1. Resolve absolute latest HEAD of master branch (bypasses any intermediate commit)
       try {
-        const cfgRes = await fetchRemote(`https://raw.githubusercontent.com/${repo}/${branch}/lead-machine/config.json`, { timeout: 8000 });
-        if (cfgRes.ok) {
-          const cJson = await cfgRes.json();
-          if (!latestCommit) latestCommit = cJson?.settings?.buildCommit || '';
-          if (cJson?.settings?.version) remoteVer = cJson.settings.version;
+        const atomRes = await fetchRemote(`https://github.com/${repo}/commits/${branch}.atom?_t=${Date.now()}`, { timeout: 6000 });
+        if (atomRes.ok) {
+          const atomText = await atomRes.text();
+          const m = atomText.match(/Commit\/([0-9a-f]{40})/);
+          if (m) latestCommit = m[1];
         }
       } catch (_) {}
 
       if (!latestCommit) {
         try {
-          const cRes = await fetchRemote(`https://api.github.com/repos/${repo}/commits/${branch}`, { timeout: 8000 });
+          const cRes = await fetchRemote(`https://api.github.com/repos/${repo}/commits/${branch}`, { timeout: 6000 });
           if (cRes.ok) {
             const cData = await cRes.json();
-            latestCommit = (cData?.sha || '').substring(0, 7);
+            if (cData?.sha) latestCommit = cData.sha;
           }
         } catch (_) {}
       }
+
+      // Check remote package.json for semver
+      try {
+        const pkgRes = await fetchRemote(`https://raw.githubusercontent.com/${repo}/${latestCommit || branch}/package.json?_t=${Date.now()}`, { timeout: 6000 });
+        if (pkgRes.ok) {
+          const pData = await pkgRes.json();
+          if (pData?.version) remoteVer = pData.version;
+        }
+      } catch (_) {}
+
+      const syncRef = latestCommit || branch;
+      const shortCommit = latestCommit ? latestCommit.substring(0, 7) : branch;
+      const baseUrl = `https://raw.githubusercontent.com/${repo}/${syncRef}`;
+      const cacheBust = `?_nocache=${Date.now()}`;
+
+      const filesToSync = [
+        { remote: `${baseUrl}/lead-machine/server.mjs${cacheBust}`, local: path.join(__dirname, 'server.mjs') },
+        { remote: `${baseUrl}/lead-machine/hunter.mjs${cacheBust}`, local: path.join(__dirname, 'hunter.mjs') },
+        { remote: `${baseUrl}/lead-machine/orchestrator.mjs${cacheBust}`, local: path.join(__dirname, 'orchestrator.mjs') },
+        { remote: `${baseUrl}/lead-machine/worker.mjs${cacheBust}`, local: path.join(__dirname, 'worker.mjs') },
+        { remote: `${baseUrl}/lead-machine/extractor_sync.mjs${cacheBust}`, local: path.join(__dirname, 'extractor_sync.mjs') },
+        { remote: `${baseUrl}/lead-machine/reachability.mjs${cacheBust}`, local: path.join(__dirname, 'reachability.mjs') },
+        { remote: `${baseUrl}/lead-machine/public/index.html${cacheBust}`, local: path.join(__dirname, 'public', 'index.html') },
+        { remote: `${baseUrl}/lead-machine/public/style.css${cacheBust}`, local: path.join(__dirname, 'public', 'style.css') },
+        { remote: `${baseUrl}/lead-machine/public/app.js${cacheBust}`, local: path.join(__dirname, 'public', 'app.js') },
+        { remote: `${baseUrl}/install.ps1${cacheBust}`, local: path.join(__dirname, '..', 'install.ps1') },
+        { remote: `${baseUrl}/Launch_LeadMachine.bat${cacheBust}`, local: path.join(__dirname, '..', 'Launch_LeadMachine.bat') }
+      ];
 
       const updatedFiles = [];
       for (const item of filesToSync) {
@@ -559,7 +597,7 @@ const server = http.createServer(async (req, res) => {
         try {
           const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
           if (!cfg.settings) cfg.settings = {};
-          if (latestCommit) cfg.settings.buildCommit = latestCommit;
+          if (shortCommit) cfg.settings.buildCommit = shortCommit;
           if (remoteVer) cfg.settings.version = remoteVer;
           cfg.settings.lastUpdated = new Date().toISOString();
           fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), 'utf8');
@@ -571,8 +609,8 @@ const server = http.createServer(async (req, res) => {
         success: true,
         updatedCount: updatedFiles.length,
         updatedFiles,
-        commit: latestCommit,
-        message: `Successfully synchronized ${updatedFiles.length} core application files from master branch (${latestCommit || 'latest'}).`
+        commit: shortCommit,
+        message: `Successfully updated directly to latest master release (${shortCommit}).`
       }));
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
