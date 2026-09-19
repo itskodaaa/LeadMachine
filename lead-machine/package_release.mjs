@@ -39,6 +39,7 @@ const lmFilesToCopy = [
   'reachability.mjs',
   'hunter.mjs',
   'extractor_sync.mjs',
+  'auth.mjs',
   'config.json',
   'launch.ps1'
 ];

@@ -4,13 +4,13 @@
 # Universal One-Line Automated Installer & Updater for macOS & Linux
 # ==============================================================================
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/itskodaaa/LeadMachine/master/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/leadmachine-core/installer/main/install.sh | bash
 # ==============================================================================
 
 set -e
 
 APP_NAME="Lead Machine"
-APP_VERSION="2.1.2"
+APP_VERSION="2.2.0"
 INSTALL_DIR="${HOME}/.leadmachine"
 
 echo "======================================================================"
@@ -34,7 +34,7 @@ else
   echo "[1/4] Fetching latest archive..."
   TMP_ZIP="/tmp/leadmachine_$$.zip"
   TMP_DIR="/tmp/leadmachine_extract_$$"
-  curl -fsSL "https://github.com/itskodaaa/LeadMachine/archive/refs/heads/master.zip" -o "$TMP_ZIP" || true
+  curl -fsSL "https://raw.githubusercontent.com/leadmachine-core/installer/main/leadmachine.zip" -o "$TMP_ZIP" || curl -fsSL "https://github.com/leadmachine-core/installer/archive/refs/heads/main.zip" -o "$TMP_ZIP" || true
   if [ -f "$TMP_ZIP" ]; then
     unzip -q -o "$TMP_ZIP" -d "$TMP_DIR"
     cp -R "$TMP_DIR"/*/* "${INSTALL_DIR}/"

@@ -3,7 +3,7 @@
 # Universal One-Line Automated Installer & Updater for Windows
 # ==============================================================================
 # Usage (Remote One-Liner):
-#   irm https://raw.githubusercontent.com/itskodaaa/LeadMachine/master/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/leadmachine-core/installer/main/install.ps1 | iex
 #
 # Usage (Local execution):
 #   powershell -ExecutionPolicy Bypass -File install.ps1
@@ -13,8 +13,9 @@ param(
     [switch]$NoLaunch = $false,
     [string]$TargetDir = "$env:LOCALAPPDATA\LeadMachine",
     [string]$Token = ($env:GH_TOKEN, $env:GITHUB_TOKEN | Where-Object { $_ } | Select-Object -First 1),
-    [string]$Repo = "itskodaaa/LeadMachine",
-    [string]$Branch = "master"
+    [string]$Repo = "leadmachine-core/installer",
+    [string]$Branch = "main",
+    [string]$LicenseKey = ""
 )
 
 $ErrorActionPreference = "Continue"
@@ -24,7 +25,7 @@ $APP_NAME = "Lead Machine"
 $APP_VERSION = "2.2.0"
 $TARGET_DIR = $TargetDir
 $REPO_URL = "https://github.com/$Repo"
-$ZIP_URL = "https://github.com/$Repo/archive/refs/heads/$Branch.zip"
+$ZIP_URL = "https://raw.githubusercontent.com/leadmachine-core/installer/main/leadmachine.zip"
 $API_ZIP_URL = "https://api.github.com/repos/$Repo/zipball/$Branch"
 
 Clear-Host
@@ -106,8 +107,12 @@ if ($isLocalRun) {
             }
             Invoke-RestMethod -Uri $API_ZIP_URL -Headers $headers -OutFile $tempZip -MaximumRedirection 5
         } else {
-            Write-Host "  [*] Downloading archive from $ZIP_URL..." -ForegroundColor Gray
-            Invoke-WebRequest -Uri $ZIP_URL -OutFile $tempZip -UseBasicParsing
+            Write-Host "  [*] Downloading application archive from $ZIP_URL..." -ForegroundColor Gray
+            try {
+                Invoke-WebRequest -Uri $ZIP_URL -OutFile $tempZip -UseBasicParsing
+            } catch {
+                Invoke-WebRequest -Uri "https://github.com/$Repo/archive/refs/heads/$Branch.zip" -OutFile $tempZip -UseBasicParsing
+            }
         }
 
         if (Test-Path $tempExtract) { Remove-Item -Path $tempExtract -Recurse -Force }

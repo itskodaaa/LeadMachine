@@ -6,9 +6,9 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const configPath = path.resolve(__dirname, 'config.json');
 
-// Default GitHub Pages license vault URL
-// Can be customized via config.json -> settings.licenseVaultUrl
-const DEFAULT_VAULT_URL = 'https://raw.githubusercontent.com/itskodaaa/LeadMachine/master/licenses';
+// Official GitHub license vault URL (leadmachine-core/licenses)
+// Can be overridden via config.json -> settings.licenseVaultUrl
+const DEFAULT_VAULT_URL = 'https://raw.githubusercontent.com/leadmachine-core/licenses/main';
 
 export function hashKey(rawKey) {
   if (!rawKey || typeof rawKey !== 'string') return '';

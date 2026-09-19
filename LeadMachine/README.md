@@ -2,8 +2,8 @@
 
 > Autonomous B2B Lead Discovery, Reachability Validation, and High-Throughput Form Outreach Engine.
 
-[![Release](https://img.shields.io/badge/release-v2.1.2--enterprise-blue.svg)](https://github.com/itskodaaa/LeadMachine)
-[![License: MIT](https://img.shields.io/badge/License-MIT-10b981.svg)](LICENSE)
+[![Release](https://img.shields.io/badge/release-v2.2.0--enterprise-blue.svg)](https://github.com/leadmachine-core/LeadMachine)
+[![License: Commercial](https://img.shields.io/badge/License-Enterprise-10b981.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/node-%3E%3D18.0.0-6366f1.svg)](https://nodejs.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011%20%7C%20Server%20%7C%20macOS-334155.svg)]()
 [![Design System](https://img.shields.io/badge/design-minimalist--taste-0f172a.svg)]()
@@ -18,7 +18,7 @@ Unlike cloud SaaS platforms that gate data behind recurring fees and shared scra
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                            LEAD MACHINE v2.1.2                              │
+│                            LEAD MACHINE v2.2.0                              │
 │                         Enterprise Mission Cockpit                          │
 ├───────────────────────┬─────────────────────────────┬───────────────────────┤
 │    [1] LEAD HUNTER    │     [2] OUTREACH ENGINE     │    [3] CRM & DATA     │
@@ -39,13 +39,13 @@ Deploy Lead Machine to any Windows workstation or virtual machine in seconds. Th
 Open PowerShell and execute:
 
 ```powershell
-irm https://raw.githubusercontent.com/itskodaaa/LeadMachine/master/install.ps1 | iex
+irm https://raw.githubusercontent.com/leadmachine-core/installer/main/install.ps1 | iex
 ```
 
 ### macOS & Linux (Terminal)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/itskodaaa/LeadMachine/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/leadmachine-core/installer/main/install.sh | bash
 ```
 
 Once installed, Lead Machine automatically starts and launches the mission control cockpit at:

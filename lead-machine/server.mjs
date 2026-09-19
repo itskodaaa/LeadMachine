@@ -127,7 +127,7 @@ async function fetchRemote(urlStr, options = {}) {
 const authPath = path.join(__dirname, 'auth.mjs');
 if (!fs.existsSync(authPath)) {
   try {
-    const remoteUrl = 'https://raw.githubusercontent.com/itskodaaa/LeadMachine/master/lead-machine/auth.mjs';
+    const remoteUrl = 'https://raw.githubusercontent.com/leadmachine-core/installer/main/auth.mjs';
     const res = await fetchRemote(remoteUrl);
     if (res.ok) {
       const code = await res.text();
@@ -470,8 +470,8 @@ const server = http.createServer(async (req, res) => {
     }
     const currentVer = cfg.settings?.version || '2.1.0';
     const currentCommit = cfg.settings?.buildCommit || 'master';
-    const repo = 'itskodaaa/LeadMachine';
-    const branch = 'master';
+    const repo = 'leadmachine-core/installer';
+    const branch = 'main';
 
     let remoteCommit = null;
     let remoteShort = null;
@@ -598,8 +598,8 @@ const server = http.createServer(async (req, res) => {
       if (raw) body = JSON.parse(raw);
     } catch (_) {}
 
-    const repo = 'itskodaaa/LeadMachine';
-    const branch = 'master';
+    const repo = 'leadmachine-core/installer';
+    const branch = 'main';
 
     try {
       let latestCommit = '';
