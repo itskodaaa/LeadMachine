@@ -1,0 +1,214 @@
+# ==============================================================================
+# Lead Machine - Windows Autonomous Launcher (PowerShell)
+# ==============================================================================
+
+$ErrorActionPreference = "Continue"
+
+# Resolve script directory and project root
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+if (-not $scriptDir) { $scriptDir = (Get-Location).Path }
+$appRoot = Split-Path -Parent $scriptDir
+if (-not (Test-Path (Join-Path $appRoot "lead-machine\server.mjs"))) {
+    $appRoot = $scriptDir
+}
+Set-Location -Path $appRoot
+
+Write-Host "======================================================================" -ForegroundColor Cyan
+Write-Host "          WELCOME TO LEAD MACHINE - AUTONOMOUS OUTREACH              " -ForegroundColor Cyan
+Write-Host "======================================================================" -ForegroundColor Cyan
+Write-Host ""
+
+# 1. Check if running inside unextracted ZIP
+if (-not (Test-Path (Join-Path $appRoot "lead-machine\server.mjs"))) {
+    Write-Host "[ERROR] YOU ARE RUNNING DIRECTLY INSIDE THE ZIP FILE!" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Windows opened this file from a temporary preview without extracting." -ForegroundColor Yellow
+    Write-Host "The application files cannot be found." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "HOW TO FIX THIS (takes 10 seconds):" -ForegroundColor White
+    Write-Host "1. Close this window."
+    Write-Host "2. Right-click the downloaded zip file."
+    Write-Host "3. Click 'Extract All...' and then click 'Extract'."
+    Write-Host "4. Open the extracted folder and double-click Launch_LeadMachine.bat."
+    Write-Host ""
+    Write-Host "Press Enter to exit..." -ForegroundColor Gray
+    Read-Host
+    exit 1
+}
+
+# 2. Check / Locate Node.js
+Write-Host "[1/4] Checking Node.js runtime..." -ForegroundColor Yellow
+
+$nodeExe = $null
+$npmCmd = $null
+$npxCmd = $null
+
+# Check system PATH
+$systemNode = Get-Command node -ErrorAction SilentlyContinue
+if ($systemNode) {
+    try {
+        $testVer = & node -v 2>$null
+        if ($testVer -match "^v\d+") {
+            $nodeExe = "node"
+            $npmCmd = "npm"
+            $npxCmd = "npx"
+        }
+    } catch {}
+}
+
+# Check common install paths if not in PATH
+if (-not $nodeExe) {
+    $candidates = @(
+        "$env:ProgramFiles\nodejs\node.exe",
+        "${env:ProgramFiles(x86)}\nodejs\node.exe",
+        "$env:LOCALAPPDATA\Programs\nodejs\node.exe",
+        (Join-Path $appRoot "bin\node\node.exe")
+    )
+    foreach ($cand in $candidates) {
+        if (Test-Path $cand) {
+            $nodeExe = $cand
+            $dir = Split-Path -Parent $cand
+            $npmCmd = Join-Path $dir "npm.cmd"
+            $npxCmd = Join-Path $dir "npx.cmd"
+            $env:PATH = "$dir;$($env:PATH)"
+            break
+        }
+    }
+}
+
+# If still not found, download portable Node.js v22 LTS (Zero Admin, Zero UAC needed!)
+if (-not $nodeExe) {
+    Write-Host ""
+    Write-Host "======================================================================" -ForegroundColor Green
+    Write-Host "  [*] Node.js runtime not found on your system." -ForegroundColor Green
+    Write-Host "  [*] Automatically downloading portable Node.js (one-time setup)..." -ForegroundColor Green
+    Write-Host "      (No administrator password or installer needed!)" -ForegroundColor Green
+    Write-Host "======================================================================" -ForegroundColor Green
+    Write-Host ""
+
+    $binDir = Join-Path $appRoot "bin"
+    $nodeDir = Join-Path $binDir "node"
+    if (-not (Test-Path $nodeDir)) {
+        New-Item -ItemType Directory -Force -Path $nodeDir | Out-Null
+    }
+
+    $zipUrl = "https://nodejs.org/dist/v22.14.0/node-v22.14.0-win-x64.zip"
+    $tempZip = Join-Path $env:TEMP "node_portable.zip"
+
+    try {
+        Write-Host "Downloading portable Node.js LTS (~33MB) from nodejs.org..." -ForegroundColor Gray
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $wc = New-Object System.Net.WebClient
+        $wc.DownloadFile($zipUrl, $tempZip)
+
+        Write-Host "Extracting portable runtime..." -ForegroundColor Gray
+        Expand-Archive -Path $tempZip -DestinationPath $binDir -Force
+        $extractedFolder = Get-ChildItem -Path $binDir -Directory -Filter "node-v*" | Select-Object -First 1
+        if ($extractedFolder) {
+            Get-ChildItem -Path $extractedFolder.FullName | Copy-Item -Destination $nodeDir -Recurse -Force
+            Remove-Item -Path $extractedFolder.FullName -Recurse -Force
+        }
+        Remove-Item -Path $tempZip -Force
+
+        $cand = Join-Path $nodeDir "node.exe"
+        if (Test-Path $cand) {
+            $nodeExe = $cand
+            $npmCmd = Join-Path $nodeDir "npm.cmd"
+            $npxCmd = Join-Path $nodeDir "npx.cmd"
+            $env:PATH = "$nodeDir;$($env:PATH)"
+        }
+    } catch {
+        Write-Host "Auto-download encountered an issue: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+
+    if (-not $nodeExe) {
+        Write-Host "[ERROR] Could not set up Node.js automatically." -ForegroundColor Red
+        Write-Host "Opening official Node.js installer in your browser..." -ForegroundColor Yellow
+        Start-Process "https://nodejs.org/en/download"
+        Write-Host "Please run the installer, then press Enter here to continue..." -ForegroundColor White
+        Read-Host
+        $systemNode = Get-Command node -ErrorAction SilentlyContinue
+        if ($systemNode) {
+            $nodeExe = "node"
+            $npmCmd = "npm"
+            $npxCmd = "npx"
+        } else {
+            Write-Host "[ERROR] Node.js still not detected. Please restart this file after installing." -ForegroundColor Red
+            Read-Host
+            exit 1
+        }
+    }
+}
+
+$nodeVersion = & $nodeExe -v
+Write-Host "[OK] Node.js ready: $nodeVersion" -ForegroundColor Green
+Write-Host ""
+
+# 3. Check / Auto-Install Project Dependencies
+Write-Host "[2/4] Checking project dependencies..." -ForegroundColor Yellow
+$puppeteerDir = Join-Path $appRoot "node_modules\puppeteer"
+$sqliteDir = Join-Path $appRoot "node_modules\better-sqlite3"
+if ((-not (Test-Path $puppeteerDir)) -or (-not (Test-Path $sqliteDir))) {
+    Write-Host "Packages missing or incomplete. Installing automatically..." -ForegroundColor Gray
+    Write-Host "(This runs once and takes ~15-30 seconds)" -ForegroundColor Gray
+    & $npmCmd install --no-audit --no-fund
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Retrying npm install..." -ForegroundColor Yellow
+        & $npmCmd install --force
+    }
+}
+Write-Host "[OK] All dependencies ready." -ForegroundColor Green
+Write-Host ""
+
+# 4. Check Browser Automation Engine (Chrome / Edge)
+Write-Host "[3/4] Ensuring browser automation engine is ready..." -ForegroundColor Yellow
+$browserFound = $false
+$browserCandidates = @(
+    "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe",
+    "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
+    "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
+    "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
+    "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe",
+    "$env:LOCALAPPDATA\Microsoft\Edge\Application\msedge.exe"
+)
+foreach ($bp in $browserCandidates) {
+    if (Test-Path $bp) {
+        $browserFound = $true
+        Write-Host "[OK] Detected browser engine: $bp" -ForegroundColor Green
+        break
+    }
+}
+if (-not $browserFound) {
+    Write-Host "Installing Chrome automation engine via Puppeteer..." -ForegroundColor Gray
+    & $npxCmd puppeteer browsers install chrome | Out-Null
+    Write-Host "[OK] Chrome automation engine ready." -ForegroundColor Green
+}
+Write-Host ""
+
+# 5. Ensure Data Directory Exists
+$dataDir = Join-Path $appRoot "data"
+if (-not (Test-Path $dataDir)) {
+    New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+}
+
+# 6. Launch Web Dashboard & Auto-Open Browser
+Write-Host "[4/4] Starting Web Dashboard on http://localhost:3333..." -ForegroundColor Yellow
+Write-Host ""
+Write-Host "======================================================================" -ForegroundColor Cyan
+Write-Host "  Dashboard will open in your browser automatically." -ForegroundColor Cyan
+Write-Host "  Keep this window open while the Lead Machine is active." -ForegroundColor Cyan
+Write-Host "======================================================================" -ForegroundColor Cyan
+Write-Host ""
+
+Start-Process "http://localhost:3333"
+
+# Start Node server
+$serverScript = Join-Path $appRoot "lead-machine\server.mjs"
+& $nodeExe $serverScript
+
+Write-Host ""
+Write-Host "======================================================================" -ForegroundColor Yellow
+Write-Host "  Lead Machine has stopped." -ForegroundColor Yellow
+Write-Host "  Press Enter to exit this window..." -ForegroundColor White
+Write-Host "======================================================================" -ForegroundColor Yellow
+Read-Host

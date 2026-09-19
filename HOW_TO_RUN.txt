@@ -1,0 +1,48 @@
+======================================================================
+⚡ LEAD MACHINE ENTERPRISE EDITION (v2.0.0)
+Autonomous B2B Lead Discovery, Reachability & Direct Outreach Engine
+======================================================================
+
+ONE-LINE INSTALLATION (ENTERPRISE WORKSTATIONS):
+--------------------------------------------------
+On any Windows machine, open PowerShell and execute:
+  irm https://raw.githubusercontent.com/leadflow/leadflow/master/install.ps1 | iex
+
+Or from this directory:
+  powershell -ExecutionPolicy Bypass -File install.ps1
+
+On macOS / Linux:
+  curl -fsSL https://raw.githubusercontent.com/leadflow/leadflow/master/install.sh | bash
+
+MANUAL LAUNCH:
+--------------------------------------------------
+Windows: Double-click "Launch_LeadMachine.bat"
+macOS:   Double-click "Launch_LeadMachine.command"
+Linux:   Run "./start_lead_machine.sh"
+
+Dashboard opens automatically in your browser at:
+  http://localhost:3333
+
+KEY ENTERPRISE CAPABILITIES:
+--------------------------------------------------
+1. Autonomous Lead Hunter (Zero Manual Scraping):
+   - Navigate to the "Lead Hunter" workspace.
+   - Select your Target State (e.g., California, Illinois, Texas) and Target Industry / Category (e.g. HVAC, Roofing, Dental, Logistics).
+   - Click "Launch Autonomous Discovery". The system automatically searches Google Maps, parses real-time business profiles, performs pre-flight reachability checks, and inserts verified leads directly into your database.
+
+2. Full Corporate Identity Suite:
+   - Configure your complete corporate profile: First Name, Last Name, Job Title, Company Name, Official Website, Full Street Address, Suite/Unit, City, State, ZIP, and Country.
+   - Dynamic templates support rich message personalization variables:
+     {company_name}, {first_name}, {city}, {state}, {full_name}, {job_title}, {company_sender}
+   - Real-time Live Form Preview verifies what business contact forms will see before you send.
+
+3. Enterprise Telemetry & Sandbox Mode:
+   - Real-time SSE streaming of live outreach events, DOM interactions, and response metrics.
+   - Sandbox Mode allows running test outreach campaigns without submitting forms.
+
+4. CRM & Data Export:
+   - Full lead search, filtering by status, bulk operations, and 1-click CSV export for Salesforce, HubSpot, or Excel.
+
+5. In-Place Updates:
+   - Built-in update engine allows instant software version verification and in-place updates.
+======================================================================

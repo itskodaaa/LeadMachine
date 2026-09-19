@@ -1,0 +1,24 @@
+======================================================================
+⚡ LEAD MACHINE — AUTONOMOUS OUTREACH SYSTEM
+======================================================================
+
+QUICK START:
+1. Extract all files from this ZIP to a folder on your computer.
+2. Double-click "Launch_LeadMachine.bat" (on Windows) or "Launch_LeadMachine.command" (on Mac).
+3. The dashboard will automatically open in your browser at:
+   http://localhost:3333
+
+HOW TO GET YOUR LEADS:
+Your database starts completely clean (0 leads). To add leads:
+
+Option A: Google Maps Extractor (Scrape thousands of local businesses)
+1. Download free Google Maps Extractor:
+   https://www.omkar.cloud/l/win
+2. Run any search (e.g. "Roofing Dallas", "Machine shops Chicago", "Dentists Miami")
+3. In Lead Machine, click "Sync Extractor" — all your leads will automatically verify and load!
+
+Option B: Import CSV / Spreadsheets
+- In the dashboard, click "Import CSV" and paste your company names and websites.
+
+Reachability Protection:
+Lead Machine automatically verifies websites and filters out dead domains or 404 links so you only reach active businesses.

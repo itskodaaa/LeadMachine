@@ -1,4 +1,7 @@
 node_modules
+.env
+.env.*
+!.env.example
 .svelte-kit
 build
 dist
@@ -6,4 +9,11 @@ data/
 *.db
 *.db-journal
 *.db-wal
+*.zip
+lead-machine-friend-release/
+scratch_*.mjs
+output/
+screenshots/
+.vscode/
 .DS_Store
+
