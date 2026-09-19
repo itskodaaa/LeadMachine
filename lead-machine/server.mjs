@@ -1,13 +1,20 @@
 import http from 'http';
 import https from 'https';
+import dns from 'dns';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { orchestrator } from './orchestrator.mjs';
 import { checkExtractorStatus, syncExtractorLeads } from './extractor_sync.mjs';
 import { batchCheckWebsites } from './reachability.mjs';
 import { leadHunter } from './hunter.mjs';
+
+// Prioritize IPv4 on virtualized / VM networks (fixes UTM/QEMU/Hyper-V IPv6 timeout)
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch (_) {}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3333;
@@ -43,7 +50,7 @@ async function fetchRemote(urlStr, options = {}) {
   }
 
   // Fallback for older Node environments without fetch
-  return new Promise((resolve) => {
+  const resFromHttps = await new Promise((resolve) => {
     try {
       const parsed = new URL(urlStr);
       const req = https.get(parsed, {
@@ -91,6 +98,29 @@ async function fetchRemote(urlStr, options = {}) {
       resolve({ ok: false, status: 0, text: () => Promise.resolve(''), json: () => Promise.resolve(null) });
     }
   });
+
+  if (resFromHttps && resFromHttps.ok) return resFromHttps;
+
+  // OS curl fallback if Node network sockets were restricted by VM / NAT virtualization
+  try {
+    const cmd = process.platform === 'win32'
+      ? `curl.exe -s -L --max-time 8 -A "LeadMachine-Enterprise-Updater" "${urlStr}"`
+      : `curl -s -L --max-time 8 -A "LeadMachine-Enterprise-Updater" "${urlStr}"`;
+    const out = execSync(cmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+    if (out && out.length > 0) {
+      return {
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(out),
+        json: () => {
+          try { return Promise.resolve(JSON.parse(out)); }
+          catch (_) { return Promise.resolve(null); }
+        }
+      };
+    }
+  } catch (_) {}
+
+  return resFromHttps;
 }
 
 function getSystemSpecs() {
