@@ -452,24 +452,24 @@ const server = http.createServer(async (req, res) => {
 
     try {
       let latestCommit = body.commit || '';
+      let remoteVer = '2.1.0';
+      try {
+        const cfgRes = await fetchRemote(`https://raw.githubusercontent.com/${repo}/${branch}/lead-machine/config.json`, { timeout: 8000 });
+        if (cfgRes.ok) {
+          const cJson = await cfgRes.json();
+          if (!latestCommit) latestCommit = cJson?.settings?.buildCommit || '';
+          if (cJson?.settings?.version) remoteVer = cJson.settings.version;
+        }
+      } catch (_) {}
+
       if (!latestCommit) {
         try {
-          const cfgRes = await fetchRemote(`https://raw.githubusercontent.com/${repo}/${branch}/lead-machine/config.json`, { timeout: 8000 });
-          if (cfgRes.ok) {
-            const cJson = await cfgRes.json();
-            latestCommit = cJson?.settings?.buildCommit || '';
+          const cRes = await fetchRemote(`https://api.github.com/repos/${repo}/commits/${branch}`, { timeout: 8000 });
+          if (cRes.ok) {
+            const cData = await cRes.json();
+            latestCommit = (cData?.sha || '').substring(0, 7);
           }
         } catch (_) {}
-
-        if (!latestCommit) {
-          try {
-            const cRes = await fetchRemote(`https://api.github.com/repos/${repo}/commits/${branch}`, { timeout: 8000 });
-            if (cRes.ok) {
-              const cData = await cRes.json();
-              latestCommit = (cData?.sha || '').substring(0, 7);
-            }
-          } catch (_) {}
-        }
       }
 
       const updatedFiles = [];
@@ -499,6 +499,7 @@ const server = http.createServer(async (req, res) => {
           const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
           if (!cfg.settings) cfg.settings = {};
           if (latestCommit) cfg.settings.buildCommit = latestCommit;
+          if (remoteVer) cfg.settings.version = remoteVer;
           cfg.settings.lastUpdated = new Date().toISOString();
           fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), 'utf8');
         } catch (_) {}
