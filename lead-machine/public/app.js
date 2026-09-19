@@ -108,6 +108,7 @@ const forceSyncBtn = document.getElementById('forceSyncBtn');
 const installUpdateBtn = document.getElementById('installUpdateBtn');
 const updateFeedback = document.getElementById('updateFeedback');
 const updateStatusPill = document.getElementById('updateStatusPill');
+const versionTitle = document.getElementById('versionTitle');
 const updateRepoLabel = document.getElementById('updateRepoLabel');
 const updateCommitLabel = document.getElementById('updateCommitLabel');
 const updateLastChecked = document.getElementById('updateLastChecked');
@@ -846,6 +847,18 @@ function insertAtCursor(textarea, text) {
 function setupSettingsHandlers() {
   let latestDetectedCommit = '';
 
+  // Populate active version and commit on load
+  fetch('/api/system/version')
+    .then(r => r.json())
+    .then(data => {
+      if (versionTitle && data.version) versionTitle.textContent = `Lead Machine v${data.version}`;
+      if (updateStatusPill && data.version) updateStatusPill.textContent = `v${data.version}`;
+      if (updateCommitLabel && (data.commit || data.latestCommit)) {
+        updateCommitLabel.textContent = `Build: ${data.commit || data.latestCommit}`;
+      }
+    })
+    .catch(() => {});
+
   if (workerSlider) {
     workerSlider.addEventListener('input', () => {
       workerSliderVal.textContent = `${workerSlider.value} Workers`;
@@ -866,6 +879,9 @@ function setupSettingsHandlers() {
         const data = await res.json();
         latestDetectedCommit = data.latestCommit || '';
 
+        if (versionTitle && data.version) {
+          versionTitle.textContent = `Lead Machine v${data.version}`;
+        }
         if (updateCommitLabel && (data.commit || data.latestCommit)) {
           updateCommitLabel.textContent = `Build: ${data.commit || data.latestCommit}`;
         }
