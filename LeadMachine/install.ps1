@@ -241,7 +241,7 @@ $sqliteDir = Join-Path $nodeModulesDir "better-sqlite3"
 
 if ((-not (Test-Path $puppeteerDir)) -or (-not (Test-Path $sqliteDir))) {
     Write-Host "  [*] Installing required production packages..." -ForegroundColor Gray
-    & npm install --omit=dev --no-audit --no-fund
+    & cmd.exe /c npm install --omit=dev --no-audit --no-fund
 }
 
 Write-Host "[OK] Engine dependencies verified." -ForegroundColor Green
