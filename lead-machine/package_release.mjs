@@ -9,6 +9,7 @@ const rootDir = path.resolve(__dirname, '..');
 const exportDir = path.resolve(rootDir, 'LeadMachine');
 const zipFile = path.resolve(rootDir, 'LeadMachine.zip');
 const altZipFile = path.resolve(rootDir, 'lead-machine.zip');
+const installerZipFile = path.resolve(rootDir, 'leadmachine.zip');
 
 console.log('======================================================================');
 console.log('📦 PACKAGING LEAD MACHINE — PRODUCTION STANDALONE RELEASE');
@@ -171,6 +172,7 @@ fs.writeFileSync(path.join(exportDir, 'HOW_TO_RUN.txt'), readmeText, 'utf8');
 try {
   execSync(`cd "${exportDir}" && zip -r "${zipFile}" . > /dev/null 2>&1`);
   fs.copyFileSync(zipFile, altZipFile);
+  fs.copyFileSync(zipFile, installerZipFile);
 } catch (err) {
   console.error('Error creating ZIP:', err.message);
 }

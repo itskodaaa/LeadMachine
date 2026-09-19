@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="app-container">
+  <div class="app-container" id="appContainer">
     <!-- Sleek Minimalist Navigation Header -->
     <header class="app-header">
       <div class="brand">
@@ -700,6 +700,36 @@
             </div>
             <div class="pref-control">
               <span class="tabular" id="settingsKeyMask" style="font-family: var(--font-mono); font-size: 13px; color: var(--text-muted);">LM-****-****</span>
+            </div>
+          </div>
+
+          <div class="pref-row">
+            <div class="pref-info">
+              <span class="pref-title">License Tier</span>
+              <span class="pref-desc" id="settingsTierDesc">Enterprise Outbound Automation</span>
+            </div>
+            <div class="pref-control">
+              <span class="badge-status active" id="settingsTierBadge" style="font-weight: 600;">Enterprise</span>
+            </div>
+          </div>
+
+          <div class="pref-row">
+            <div class="pref-info">
+              <span class="pref-title">Validity & Expiration</span>
+              <span class="pref-desc" id="settingsExpiryDesc">Cryptographic lease re-checked periodically</span>
+            </div>
+            <div class="pref-control">
+              <span class="tabular" id="settingsExpiryVal" style="font-size: 13px; color: var(--text-secondary);">Continuous / Lifetime</span>
+            </div>
+          </div>
+
+          <div class="pref-row">
+            <div class="pref-info">
+              <span class="pref-title">Tier Quotas & Speed</span>
+              <span class="pref-desc" id="settingsQuotasDesc">Maximum limits unlocked for this installation</span>
+            </div>
+            <div class="pref-control">
+              <span class="tabular" id="settingsQuotasVal" style="font-size: 12px; color: var(--text-muted);">100k leads/search • 6 workers</span>
             </div>
           </div>
 

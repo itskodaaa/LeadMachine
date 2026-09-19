@@ -138,10 +138,12 @@ if (!fs.existsSync(authPath)) {
   } catch (_) {}
 }
 
-let getAuthStatus = () => ({ authenticated: false, clientName: null, keyMask: null, status: 'unactivated', error: null });
+let getAuthStatus = () => ({ authenticated: false, clientName: null, keyMask: null, status: 'unactivated', error: null, limits: null });
 let activateLicense = async () => ({ success: false, error: 'Auth module initializing' });
 let deactivateLicense = () => ({ success: true });
 let startLicenseHeartbeat = () => {};
+let getTierLimits = () => ({ maxHunterLeads: 100000, maxWorkers: 6, canExportCsv: true, label: 'Enterprise' });
+let TIER_LIMITS = {};
 
 try {
   const authMod = await import('./auth.mjs');
@@ -149,6 +151,8 @@ try {
   activateLicense = authMod.activateLicense;
   deactivateLicense = authMod.deactivateLicense;
   startLicenseHeartbeat = authMod.startLicenseHeartbeat;
+  if (authMod.getTierLimits) getTierLimits = authMod.getTierLimits;
+  if (authMod.TIER_LIMITS) TIER_LIMITS = authMod.TIER_LIMITS;
 } catch (e) {
   console.warn('[Server] Auth module import deferred:', e.message);
 }
@@ -247,20 +251,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // SSE Stream
-  if (pathname === '/api/stream') {
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive'
-    });
-    res.write(`data: ${JSON.stringify({ type: 'initial_state', state: orchestrator.getStatus() })}\n\n`);
-    sseClients.add(res);
-    req.on('close', () => sseClients.delete(res));
-    return;
-  }
-
-  // Authentication & Licensing Endpoints
+  // 1. Authentication & Licensing Endpoints (Public)
   if (pathname === '/api/auth/status' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(getAuthStatus()));
@@ -275,7 +266,7 @@ const server = http.createServer(async (req, res) => {
         const payload = JSON.parse(body || '{}');
         const result = await activateLicense(payload.key);
         if (result.success) {
-          broadcastSSE({ type: 'auth_activated', clientName: result.clientName });
+          broadcastSSE({ type: 'auth_activated', clientName: result.clientName, tier: result.tier });
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(result));
         } else {
@@ -298,7 +289,38 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // API Endpoints
+  // 2. ZERO-TRUST GLOBAL AUTH GUARD FOR ALL OTHER API ROUTES & SSE STREAMS
+  // (Permits /api/system/version so unauthenticated or expired instances can check/apply updates)
+  const isPublicApi = pathname === '/api/system/version';
+  if ((pathname.startsWith('/api/') || pathname === '/api/stream' || pathname === '/events') && !isPublicApi) {
+    const auth = getAuthStatus();
+    if (!auth.authenticated) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: false,
+        authenticated: false,
+        status: auth.status || 'unactivated',
+        error: auth.error || 'Enterprise license activation required. Access blocked.',
+        tier: auth.tier || null
+      }));
+      return;
+    }
+  }
+
+  // SSE Stream (Guaranteed authenticated now)
+  if (pathname === '/api/stream') {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    });
+    res.write(`data: ${JSON.stringify({ type: 'initial_state', state: orchestrator.getStatus() })}\n\n`);
+    sseClients.add(res);
+    req.on('close', () => sseClients.delete(res));
+    return;
+  }
+
+  // API Endpoints (All protected by global auth guard)
   if (pathname === '/api/system-specs' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(getSystemSpecs()));
@@ -313,11 +335,7 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname === '/api/start' && req.method === 'POST') {
     const auth = getAuthStatus();
-    if (!auth.authenticated) {
-      res.writeHead(403, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: 'License activation required. Please enter your license key to activate.' }));
-      return;
-    }
+    const limits = getTierLimits(auth.tier);
 
     let body = '';
     req.on('data', chunk => body += chunk);
@@ -415,22 +433,29 @@ const server = http.createServer(async (req, res) => {
   // Lead Hunter Endpoints
   if (pathname === '/api/hunter/start' && req.method === 'POST') {
     const auth = getAuthStatus();
-    if (!auth.authenticated) {
-      res.writeHead(403, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: 'License activation required. Please enter your license key to activate.' }));
-      return;
-    }
+    const limits = getTierLimits(auth.tier);
 
     let body = '';
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
       try {
         const payload = JSON.parse(body || '{}');
+        const requestedLimit = Number(payload.limit) || 20;
+
+        if (requestedLimit > limits.maxHunterLeads) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            success: false,
+            error: `Your current ${limits.label} license is limited to a maximum of ${limits.maxHunterLeads.toLocaleString()} leads per search. Please upgrade your license to unlock higher volumes.`
+          }));
+          return;
+        }
+
         leadHunter.startHunting({
           query: payload.query || 'Manufacturing',
           state: payload.state || 'Illinois',
           city: payload.city || '',
-          limit: payload.limit || 20,
+          limit: requestedLimit,
           onEvent: (evt) => {
             broadcastSSE(evt);
           }
@@ -719,6 +744,17 @@ const server = http.createServer(async (req, res) => {
 
   // Leads CSV Export
   if (pathname === '/api/leads/export' && req.method === 'GET') {
+    const auth = getAuthStatus();
+    const limits = getTierLimits(auth.tier);
+    if (limits.canExportCsv === false) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: false,
+        error: `CSV database export is not permitted on ${limits.label} tier. Please upgrade to Pro or Enterprise.`
+      }));
+      return;
+    }
+
     try {
       const db = orchestrator.getDb();
       const rows = db.prepare("SELECT id, company_name, website, phone, status, notes, created_at FROM leads ORDER BY id ASC").all();

@@ -43,6 +43,18 @@ function writeConfig(cfg) {
   }
 }
 
+export const TIER_LIMITS = {
+  Trial: { maxHunterLeads: 100, maxWorkers: 1, canExportCsv: false, label: 'Trial Evaluation' },
+  Pro: { maxHunterLeads: 3000, maxWorkers: 3, canExportCsv: true, label: 'Professional' },
+  Enterprise: { maxHunterLeads: 100000, maxWorkers: 6, canExportCsv: true, label: 'Enterprise' }
+};
+
+export function getTierLimits(tier) {
+  if (!tier || typeof tier !== 'string') return TIER_LIMITS.Enterprise;
+  const normalized = tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase();
+  return TIER_LIMITS[normalized] || TIER_LIMITS.Enterprise;
+}
+
 export function getAuthStatus() {
   const cfg = readConfig();
   const lic = cfg.license;
@@ -52,17 +64,73 @@ export function getAuthStatus() {
       authenticated: false,
       clientName: null,
       keyMask: null,
+      tier: null,
       status: 'unactivated',
-      error: null
+      error: null,
+      limits: null
     };
   }
 
+  // 1. Clock rollback detection (anti-tamper)
+  if (lic.lastVerified) {
+    const lastVerTime = new Date(lic.lastVerified).getTime();
+    // If current system clock is older than lastVerified by more than 5 minutes
+    if (!isNaN(lastVerTime) && Date.now() < lastVerTime - 5 * 60 * 1000) {
+      return {
+        authenticated: false,
+        clientName: lic.clientName,
+        keyMask: lic.keyMask,
+        tier: lic.tier || 'Enterprise',
+        status: 'clock_tampered',
+        error: 'System clock tampering detected. Your computer clock appears to have been set backwards.',
+        limits: null
+      };
+    }
+  }
+
+  // 2. Expiration Date check
+  if (lic.expires) {
+    const expTime = new Date(lic.expires).getTime();
+    if (!isNaN(expTime) && Date.now() > expTime) {
+      return {
+        authenticated: false,
+        clientName: lic.clientName,
+        keyMask: lic.keyMask,
+        tier: lic.tier || 'Enterprise',
+        status: 'expired',
+        error: `License expired on ${new Date(lic.expires).toLocaleDateString()}. Please contact your administrator to renew.`,
+        limits: null
+      };
+    }
+  }
+
+  // 3. Offline Lease / Maximum Offline TTL check (48 hours)
+  if (lic.lastVerified) {
+    const lastVerTime = new Date(lic.lastVerified).getTime();
+    const maxOfflineMs = 48 * 60 * 60 * 1000; // 48h lease
+    if (!isNaN(lastVerTime) && Date.now() - lastVerTime > maxOfflineMs) {
+      return {
+        authenticated: false,
+        clientName: lic.clientName,
+        keyMask: lic.keyMask,
+        tier: lic.tier || 'Enterprise',
+        status: 'lease_expired',
+        error: 'Offline license lease expired (48h max). Please connect to the internet to re-validate your license.',
+        limits: null
+      };
+    }
+  }
+
+  const tier = lic.tier || 'Enterprise';
   return {
     authenticated: true,
     clientName: lic.clientName || 'Licensed Enterprise User',
     keyMask: lic.keyMask || maskKey(lic.key),
+    tier,
+    expires: lic.expires || null,
     status: 'active',
-    lastVerified: lic.lastVerified || null
+    lastVerified: lic.lastVerified || null,
+    limits: getTierLimits(tier)
   };
 }
 
@@ -206,10 +274,15 @@ export async function activateLicense(rawKey) {
   const cleanKey = rawKey.trim().toUpperCase();
   const cfg = readConfig();
 
+  const tier = result.payload?.tier || 'Enterprise';
+  const expires = result.payload?.expires || null;
+
   cfg.license = {
     key: cleanKey,
     keyMask: maskKey(cleanKey),
     clientName: result.clientName,
+    tier,
+    expires,
     active: true,
     lastVerified: new Date().toISOString(),
     vaultHash: hashKey(cleanKey)
@@ -219,7 +292,10 @@ export async function activateLicense(rawKey) {
   return {
     success: true,
     clientName: result.clientName,
-    keyMask: maskKey(cleanKey)
+    keyMask: maskKey(cleanKey),
+    tier,
+    expires,
+    limits: getTierLimits(tier)
   };
 }
 
@@ -232,8 +308,8 @@ export function deactivateLicense() {
   return { success: true };
 }
 
-// Background Heartbeat: periodically verify license status
-export function startLicenseHeartbeat(onRevoked = null, intervalMs = 4 * 60 * 60 * 1000) {
+// Background Heartbeat: periodically verify license status (default every 30 minutes)
+export function startLicenseHeartbeat(onRevoked = null, intervalMs = 30 * 60 * 1000) {
   setInterval(async () => {
     const cfg = readConfig();
     if (!cfg.license || !cfg.license.key || !cfg.license.active) return;
@@ -248,6 +324,8 @@ export function startLicenseHeartbeat(onRevoked = null, intervalMs = 4 * 60 * 60
         if (onRevoked) onRevoked(res.error);
       } else if (res.valid && !res.offlineGrace) {
         cfg.license.lastVerified = new Date().toISOString();
+        if (res.payload?.expires) cfg.license.expires = res.payload.expires;
+        if (res.payload?.tier) cfg.license.tier = res.payload.tier;
         writeConfig(cfg);
       }
     } catch (_) {}

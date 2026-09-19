@@ -64,7 +64,7 @@ const hunterStatReachable = document.getElementById('hunterStatReachable');
 const hunterStatSkipped = document.getElementById('hunterStatSkipped');
 const hunterStreamList = document.getElementById('hunterStreamList');
 
-// Auth Gate DOM
+// Auth Gate DOM & State
 const authGateOverlay = document.getElementById('authGateOverlay');
 const authGateForm = document.getElementById('authGateForm');
 const licenseKeyInput = document.getElementById('licenseKeyInput');
@@ -72,6 +72,18 @@ const authFeedback = document.getElementById('authFeedback');
 const activateLicenseBtn = document.getElementById('activateLicenseBtn');
 const licenseStatusBadge = document.getElementById('licenseStatusBadge');
 const licenseStatusText = document.getElementById('licenseStatusText');
+
+let currentAuthData = {
+  authenticated: false,
+  clientName: null,
+  keyMask: null,
+  tier: null,
+  expires: null,
+  status: 'unactivated',
+  error: null,
+  limits: null
+};
+let isAppInitialized = false;
 
 // Leads DOM
 const dbReadyCount = document.getElementById('dbReadyCount');
@@ -142,12 +154,88 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupLeadsHandlers();
   setupProfileHandlers();
   setupSettingsHandlers();
+  initDomTamperGuard();
   
   await checkAuthStatus();
+});
+
+async function initializeAuthenticatedSession() {
+  if (isAppInitialized) return;
+  isAppInitialized = true;
   await loadInitialSpecs();
   connectSSE();
   await loadLeadsTable();
-});
+}
+
+function initDomTamperGuard() {
+  const overlay = document.getElementById('authGateOverlay');
+  const appContainer = document.getElementById('appContainer');
+  if (!overlay) return;
+
+  const observer = new MutationObserver(() => {
+    // If client is unauthenticated, tampering with the modal locks everything down
+    if (!currentAuthData.authenticated) {
+      const isDetached = !document.body.contains(overlay);
+      const computed = window.getComputedStyle(overlay);
+      const isHidden = isDetached ||
+                       overlay.style.display === 'none' ||
+                       computed.display === 'none' ||
+                       computed.visibility === 'hidden' ||
+                       parseFloat(computed.opacity || '1') < 0.1 ||
+                       overlay.hidden;
+
+      if (isHidden) {
+        console.error('[Security] Tamper violation detected on license gate overlay.');
+        if (appContainer) appContainer.innerHTML = '';
+        document.body.innerHTML = `
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#06080d;color:#f87171;font-family:system-ui,sans-serif;text-align:center;padding:24px;">
+            <div style="font-size:48px;margin-bottom:16px;">🛡️</div>
+            <h1 style="font-size:24px;font-weight:700;margin-bottom:8px;color:#fff;">Security Violation Detected</h1>
+            <p style="color:#94a3b8;max-width:480px;line-height:1.6;margin-bottom:24px;">
+              Direct modification or removal of the licensing layer is strictly prohibited. An official active license key is required to access Lead Machine.
+            </p>
+            <button onclick="window.location.reload()" style="background:#2563eb;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer;">
+              Reload & Enter License Key
+            </button>
+          </div>
+        `;
+      }
+    }
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['style', 'class', 'hidden']
+  });
+}
+
+function applyTierLimitsToHunter(limits) {
+  const hunterLimitSelect = document.getElementById('hunterLimit');
+  if (!hunterLimitSelect || !limits) return;
+
+  if (limits.maxHunterLeads < 1000) {
+    // Trial tier: add 100 leads option and disable larger presets
+    let trialOpt = hunterLimitSelect.querySelector('option[value="100"]');
+    if (!trialOpt) {
+      trialOpt = document.createElement('option');
+      trialOpt.value = '100';
+      trialOpt.textContent = '100 Leads (Trial Maximum)';
+      hunterLimitSelect.insertBefore(trialOpt, hunterLimitSelect.firstChild);
+    }
+    hunterLimitSelect.value = '100';
+
+    Array.from(hunterLimitSelect.options).forEach(opt => {
+      if (Number(opt.value) > limits.maxHunterLeads || opt.value === 'custom') {
+        opt.disabled = true;
+        if (!opt.textContent.includes('Requires Pro')) {
+          opt.textContent += ' — (Requires Pro/Enterprise)';
+        }
+      }
+    });
+  }
+}
 
 // ==========================================================================
 // License Authentication Gate Controller
@@ -160,7 +248,7 @@ function setupAuthHandlers() {
 
   if (changeLicenseBtn) {
     changeLicenseBtn.addEventListener('click', () => {
-      showAuthGate();
+      showAuthGate(currentAuthData.keyMask);
       if (licenseKeyInput) licenseKeyInput.focus();
     });
   }
@@ -170,6 +258,7 @@ function setupAuthHandlers() {
       if (confirm('Are you sure you want to deactivate your license on this machine?')) {
         try {
           await fetch('/api/auth/deactivate', { method: 'POST' });
+          currentAuthData.authenticated = false;
           await checkAuthStatus();
         } catch (_) {}
       }
@@ -197,29 +286,13 @@ function setupAuthHandlers() {
       if (data.success) {
         if (authFeedback) {
           authFeedback.className = 'auth-feedback success';
-          authFeedback.textContent = `✓ License activated for ${data.clientName || 'Enterprise User'}! Unlocking cockpit...`;
+          authFeedback.textContent = `✓ License activated for ${data.clientName || 'Enterprise User'} (${data.tier || 'Enterprise'})! Unlocking cockpit...`;
           authFeedback.style.display = 'block';
         }
 
-        if (licenseStatusBadge) {
-          licenseStatusBadge.style.display = 'inline-flex';
-          if (licenseStatusText) licenseStatusText.textContent = data.clientName || 'Licensed';
-        }
-        const settingsLicenseBadge = document.getElementById('settingsLicenseBadge');
-        const settingsLicensedClient = document.getElementById('settingsLicensedClient');
-        const settingsKeyMask = document.getElementById('settingsKeyMask');
-        if (settingsLicenseBadge) {
-          settingsLicenseBadge.textContent = 'Active';
-          settingsLicenseBadge.className = 'badge-status active';
-        }
-        if (settingsLicensedClient) settingsLicensedClient.textContent = data.clientName || 'Enterprise User';
-        if (settingsKeyMask) settingsKeyMask.textContent = data.keyMask || '—';
-
-        setTimeout(() => {
-          hideAuthGate();
-          loadInitialSpecs();
-          loadLeadsTable();
-        }, 600);
+        setTimeout(async () => {
+          await checkAuthStatus();
+        }, 500);
       } else {
         if (authFeedback) {
           authFeedback.className = 'auth-feedback error';
@@ -246,52 +319,114 @@ async function checkAuthStatus() {
   try {
     const res = await fetch('/api/auth/status');
     const data = await res.json();
+    currentAuthData = data;
 
     const settingsLicenseBadge = document.getElementById('settingsLicenseBadge');
     const settingsLicensedClient = document.getElementById('settingsLicensedClient');
     const settingsKeyMask = document.getElementById('settingsKeyMask');
+    const settingsTierBadge = document.getElementById('settingsTierBadge');
+    const settingsExpiryVal = document.getElementById('settingsExpiryVal');
+    const settingsQuotasVal = document.getElementById('settingsQuotasVal');
 
     if (data.authenticated) {
       hideAuthGate();
       if (licenseStatusBadge) {
         licenseStatusBadge.style.display = 'inline-flex';
         if (licenseStatusText) {
-          licenseStatusText.textContent = data.clientName || 'Licensed';
+          licenseStatusText.textContent = `${data.clientName || 'Licensed'} • ${data.tier || 'Enterprise'}`;
         }
       }
       if (settingsLicenseBadge) {
-        settingsLicenseBadge.textContent = 'Active';
+        settingsLicenseBadge.textContent = `Active (${data.tier || 'Enterprise'})`;
         settingsLicenseBadge.className = 'badge-status active';
       }
       if (settingsLicensedClient) settingsLicensedClient.textContent = data.clientName || 'Enterprise User';
       if (settingsKeyMask) settingsKeyMask.textContent = data.keyMask || '—';
+      if (settingsTierBadge) {
+        settingsTierBadge.textContent = data.tier || 'Enterprise';
+        settingsTierBadge.className = data.tier === 'Trial' ? 'badge-status warning' : 'badge-status active';
+      }
+      if (settingsExpiryVal) {
+        settingsExpiryVal.textContent = data.expires ? new Date(data.expires).toLocaleDateString() : 'Continuous / Lifetime';
+      }
+      if (settingsQuotasVal) {
+        const lim = data.limits;
+        settingsQuotasVal.textContent = lim ? `${lim.maxHunterLeads.toLocaleString()} leads/search • ${lim.maxWorkers} workers` : '100k leads/search • 6 workers';
+      }
+
+      applyTierLimitsToHunter(data.limits);
+      await initializeAuthenticatedSession();
     } else {
-      showAuthGate(data.keyMask);
+      showAuthGate(data.keyMask, data.error, data.status);
       if (licenseStatusBadge) licenseStatusBadge.style.display = 'none';
       if (settingsLicenseBadge) {
-        settingsLicenseBadge.textContent = 'Unactivated';
-        settingsLicenseBadge.className = 'badge-status';
+        settingsLicenseBadge.textContent = data.status === 'expired' ? 'Expired' : (data.status === 'clock_tampered' ? 'Tamper Alert' : (data.status === 'lease_expired' ? 'Lease Expired' : 'Unactivated'));
+        settingsLicenseBadge.className = 'badge-status revoked';
       }
       if (settingsLicensedClient) settingsLicensedClient.textContent = 'No Active License';
       if (settingsKeyMask) settingsKeyMask.textContent = data.keyMask || 'Not Configured';
+      if (settingsTierBadge) settingsTierBadge.textContent = data.tier || 'Locked';
+      if (settingsExpiryVal) settingsExpiryVal.textContent = data.status === 'expired' ? (data.error || 'Expired') : 'Locked';
     }
   } catch (err) {
     console.warn('[Auth] Status check error:', err);
   }
 }
 
-function showAuthGate(keyMask) {
+function showAuthGate(keyMask, error = null, status = 'unactivated') {
   if (!authGateOverlay) return;
   authGateOverlay.style.display = 'flex';
+  const appContainer = document.getElementById('appContainer');
+  if (appContainer) {
+    appContainer.style.filter = 'blur(10px)';
+    appContainer.style.pointerEvents = 'none';
+  }
   if (licenseStatusBadge) licenseStatusBadge.style.display = 'none';
   if (keyMask && licenseKeyInput && !licenseKeyInput.value) {
     licenseKeyInput.placeholder = keyMask;
+  }
+
+  const authGateTitle = document.getElementById('authGateTitle');
+  const authGateSubtitle = document.getElementById('authGateSubtitle');
+
+  if (status === 'expired') {
+    if (authGateTitle) authGateTitle.textContent = 'License Expired';
+    if (authGateSubtitle) authGateSubtitle.textContent = error || 'Your license period has ended. Enter a renewed key to continue.';
+    if (authFeedback) {
+      authFeedback.className = 'auth-feedback error';
+      authFeedback.textContent = error || 'This license key has expired.';
+      authFeedback.style.display = 'block';
+    }
+  } else if (status === 'clock_tampered') {
+    if (authGateTitle) authGateTitle.textContent = 'System Clock Alert';
+    if (authGateSubtitle) authGateSubtitle.textContent = 'System clock rollback detected. Correct your computer date & time.';
+    if (authFeedback) {
+      authFeedback.className = 'auth-feedback error';
+      authFeedback.textContent = error || 'System clock tampering detected.';
+      authFeedback.style.display = 'block';
+    }
+  } else if (status === 'lease_expired') {
+    if (authGateTitle) authGateTitle.textContent = 'Offline Lease Expired';
+    if (authGateSubtitle) authGateSubtitle.textContent = '48-hour offline limit reached. Connect to the internet to re-verify your license.';
+    if (authFeedback) {
+      authFeedback.className = 'auth-feedback error';
+      authFeedback.textContent = error || 'Offline validation lease expired.';
+      authFeedback.style.display = 'block';
+    }
+  } else {
+    if (authGateTitle) authGateTitle.textContent = 'Lead Machine Enterprise';
+    if (authGateSubtitle) authGateSubtitle.textContent = 'Official license key required. Enter your key to activate your outbound cockpit on this machine.';
   }
 }
 
 function hideAuthGate() {
   if (!authGateOverlay) return;
   authGateOverlay.style.display = 'none';
+  const appContainer = document.getElementById('appContainer');
+  if (appContainer) {
+    appContainer.style.filter = 'none';
+    appContainer.style.pointerEvents = 'auto';
+  }
   if (authFeedback) authFeedback.style.display = 'none';
 }
 
