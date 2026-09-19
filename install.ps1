@@ -118,8 +118,13 @@ if ($isLocalRun) {
         if (Test-Path $tempExtract) { Remove-Item -Path $tempExtract -Recurse -Force }
         Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force
         
-        $innerFolder = Get-ChildItem -Path $tempExtract -Directory | Select-Object -First 1
-        $sourcePath = if ($innerFolder) { $innerFolder.FullName } else { $tempExtract }
+        # Detect whether zip extracted directly or inside a wrapper folder
+        if ((Test-Path (Join-Path $tempExtract "lead-machine")) -or (Test-Path (Join-Path $tempExtract "package.json"))) {
+            $sourcePath = $tempExtract
+        } else {
+            $innerFolder = Get-ChildItem -Path $tempExtract -Directory | Select-Object -First 1
+            $sourcePath = if ($innerFolder) { $innerFolder.FullName } else { $tempExtract }
+        }
         
         # If the zip has a LeadMachine subfolder, use it
         if (Test-Path (Join-Path $sourcePath "LeadMachine")) {
@@ -259,7 +264,13 @@ Pop-Location
 Write-Host "[5/6] Creating user interface shortcuts..." -ForegroundColor Yellow
 
 $desktopPath = [System.Environment]::GetFolderPath("Desktop")
+if (-not $desktopPath -or -not (Test-Path $desktopPath)) {
+    $desktopPath = if (Test-Path "$env:USERPROFILE\Desktop") { "$env:USERPROFILE\Desktop" } else { "C:\Users\Public\Desktop" }
+}
 $programsPath = [System.Environment]::GetFolderPath("Programs")
+if (-not $programsPath -or -not (Test-Path $programsPath)) {
+    $programsPath = if (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs") { "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" } else { "C:\ProgramData\Microsoft\Windows\Start Menu\Programs" }
+}
 $shortcutTarget = Join-Path $TARGET_DIR "Launch_LeadMachine.bat"
 
 # Create helper VBScript launcher to run silently/cleanly if preferred
