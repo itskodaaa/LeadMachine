@@ -193,6 +193,17 @@ if (-not (Test-Path $dataDir)) {
 
 # 6. Launch Web Dashboard & Auto-Open Browser
 Write-Host "[4/4] Starting Web Dashboard on http://localhost:3333..." -ForegroundColor Yellow
+
+$alreadyRunning = Get-NetTCPConnection -LocalPort 3333 -ErrorAction SilentlyContinue
+if ($alreadyRunning) {
+    Write-Host ""
+    Write-Host "[*] Lead Machine server is already online and running on port 3333." -ForegroundColor Green
+    Write-Host "[*] Launching dashboard in your browser..." -ForegroundColor Cyan
+    Start-Process "http://localhost:3333"
+    Start-Sleep -Seconds 2
+    exit 0
+}
+
 Write-Host ""
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host "  Dashboard will open in your browser automatically." -ForegroundColor Cyan
