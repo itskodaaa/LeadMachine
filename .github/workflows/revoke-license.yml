@@ -67,3 +67,4 @@ jobs:
           git add licenses/
           git commit -m "security(licenses): revoke license ${{ github.event.inputs.license_key_or_hash }}"
           git push origin HEAD
+
