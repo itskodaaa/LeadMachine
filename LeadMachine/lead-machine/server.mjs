@@ -10,7 +10,6 @@ import { orchestrator } from './orchestrator.mjs';
 import { checkExtractorStatus, syncExtractorLeads } from './extractor_sync.mjs';
 import { batchCheckWebsites } from './reachability.mjs';
 import { leadHunter } from './hunter.mjs';
-import { getAuthStatus, activateLicense, deactivateLicense, startLicenseHeartbeat } from './auth.mjs';
 
 // Prioritize IPv4 on virtualized / VM networks (fixes UTM/QEMU/Hyper-V IPv6 timeout)
 try {
@@ -122,6 +121,36 @@ async function fetchRemote(urlStr, options = {}) {
   } catch (_) {}
 
   return resFromHttps;
+}
+
+// Ensure auth.mjs exists (self-healing for installations updating from v2.1.x)
+const authPath = path.join(__dirname, 'auth.mjs');
+if (!fs.existsSync(authPath)) {
+  try {
+    const remoteUrl = 'https://raw.githubusercontent.com/itskodaaa/LeadMachine/master/lead-machine/auth.mjs';
+    const res = await fetchRemote(remoteUrl);
+    if (res.ok) {
+      const code = await res.text();
+      if (code && code.length > 100) {
+        fs.writeFileSync(authPath, code, 'utf8');
+      }
+    }
+  } catch (_) {}
+}
+
+let getAuthStatus = () => ({ authenticated: false, clientName: null, keyMask: null, status: 'unactivated', error: null });
+let activateLicense = async () => ({ success: false, error: 'Auth module initializing' });
+let deactivateLicense = () => ({ success: true });
+let startLicenseHeartbeat = () => {};
+
+try {
+  const authMod = await import('./auth.mjs');
+  getAuthStatus = authMod.getAuthStatus;
+  activateLicense = authMod.activateLicense;
+  deactivateLicense = authMod.deactivateLicense;
+  startLicenseHeartbeat = authMod.startLicenseHeartbeat;
+} catch (e) {
+  console.warn('[Server] Auth module import deferred:', e.message);
 }
 
 function getSystemSpecs() {
