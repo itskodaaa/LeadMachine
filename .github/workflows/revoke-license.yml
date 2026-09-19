@@ -1,0 +1,69 @@
+name: "Super Admin: Revoke License"
+
+on:
+  workflow_dispatch:
+    inputs:
+      license_key_or_hash:
+        description: "License Key (e.g. LM-ALEX-9021) or SHA-256 Hash"
+        required: true
+      reason:
+        description: "Revocation Reason"
+        required: false
+        default: "Suspended by Administrator"
+
+jobs:
+  revoke-license:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Revoke License Entry
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const crypto = require('crypto');
+            const fs = require('fs');
+            const path = require('path');
+
+            const input = context.payload.inputs.license_key_or_hash.trim();
+            const reason = context.payload.inputs.reason.trim();
+
+            let hash = input.toLowerCase();
+            if (input.toUpperCase().startsWith('LM-')) {
+              hash = crypto.createHash('sha256').update(input.toUpperCase()).digest('hex');
+            }
+
+            const targetFile = path.join(process.env.GITHUB_WORKSPACE, 'licenses', `${hash}.json`);
+            if (!fs.existsSync(targetFile)) {
+              core.setFailed(`License file not found for hash: ${hash}`);
+              return;
+            }
+
+            const data = JSON.parse(fs.readFileSync(targetFile, 'utf8'));
+            data.active = false;
+            data.revokedAt = new Date().toISOString();
+            data.reason = reason;
+
+            fs.writeFileSync(targetFile, JSON.stringify(data, null, 2), 'utf8');
+
+            await core.summary
+              .addHeading('🔴 License Successfully Revoked!')
+              .addTable([
+                [{ data: 'Field', header: true }, { data: 'Value', header: true }],
+                ['Client Name', data.name || 'Unknown'],
+                ['Hash', `\`${hash}\``],
+                ['Status', '🔴 REVOKED'],
+                ['Reason', reason]
+              ])
+              .write();
+
+      - name: Commit & Push Revocation
+        run: |
+          git config --global user.name "Lead Machine License Bot"
+          git config --global user.email "license-bot@leadmachine.internal"
+          git add licenses/
+          git commit -m "security(licenses): revoke license ${{ github.event.inputs.license_key_or_hash }}"
+          git push origin HEAD

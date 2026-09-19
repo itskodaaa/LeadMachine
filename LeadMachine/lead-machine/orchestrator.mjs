@@ -198,7 +198,7 @@ export class CampaignOrchestrator extends EventEmitter {
       if (deficit > 0 && autoScrape !== false) {
         const huntTargetState = stateFilter && stateFilter !== 'all' ? stateFilter : 'United States';
         const huntQuery = category || 'Manufacturing';
-        const huntLimit = Math.min(100, Math.max(deficit, 15));
+        const huntLimit = Math.min(100000, Math.max(deficit, 15));
 
         this.recordEvent({
           type: 'autohunt_triggered',

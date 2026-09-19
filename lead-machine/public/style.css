@@ -1368,3 +1368,153 @@ body {
   color: var(--text-secondary);
   line-height: 1.45;
 }
+
+/* ==========================================================================
+   License Activation Gate Modal & Auth Styles
+   ========================================================================== */
+.license-badge {
+  background: rgba(34, 197, 94, 0.08) !important;
+  border: 1px solid rgba(34, 197, 94, 0.25) !important;
+  color: #86efac !important;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.auth-gate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(10, 12, 16, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.auth-gate-modal {
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 32px 28px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  animation: authFadeIn 0.25s ease-out;
+}
+
+@keyframes authFadeIn {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.auth-gate-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+}
+
+.auth-gate-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.auth-gate-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.auth-gate-subtitle {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.45;
+  max-width: 340px;
+}
+
+.auth-gate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-key-input {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 12px;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  width: 100%;
+}
+
+.auth-key-input:focus {
+  border-color: #ffffff;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15);
+}
+
+.auth-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 5px;
+  display: block;
+}
+
+.auth-feedback {
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.auth-feedback.error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.auth-feedback.success {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #86efac;
+}
+
+.auth-submit-btn {
+  width: 100%;
+  padding: 11px;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.auth-gate-footer {
+  text-align: center;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}

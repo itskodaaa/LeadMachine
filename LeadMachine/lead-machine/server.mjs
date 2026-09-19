@@ -10,6 +10,7 @@ import { orchestrator } from './orchestrator.mjs';
 import { checkExtractorStatus, syncExtractorLeads } from './extractor_sync.mjs';
 import { batchCheckWebsites } from './reachability.mjs';
 import { leadHunter } from './hunter.mjs';
+import { getAuthStatus, activateLicense, deactivateLicense, startLicenseHeartbeat } from './auth.mjs';
 
 // Prioritize IPv4 on virtualized / VM networks (fixes UTM/QEMU/Hyper-V IPv6 timeout)
 try {
@@ -230,6 +231,44 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Authentication & Licensing Endpoints
+  if (pathname === '/api/auth/status' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(getAuthStatus()));
+    return;
+  }
+
+  if (pathname === '/api/auth/activate' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const result = await activateLicense(payload.key);
+        if (result.success) {
+          broadcastSSE({ type: 'auth_activated', clientName: result.clientName });
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(result));
+        } else {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(result));
+        }
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  if (pathname === '/api/auth/deactivate' && req.method === 'POST') {
+    deactivateLicense();
+    broadcastSSE({ type: 'auth_revoked', reason: 'User logged out' });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true }));
+    return;
+  }
+
   // API Endpoints
   if (pathname === '/api/system-specs' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -244,6 +283,13 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === '/api/start' && req.method === 'POST') {
+    const auth = getAuthStatus();
+    if (!auth.authenticated) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'License activation required. Please enter your license key to activate.' }));
+      return;
+    }
+
     let body = '';
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
@@ -339,6 +385,13 @@ const server = http.createServer(async (req, res) => {
 
   // Lead Hunter Endpoints
   if (pathname === '/api/hunter/start' && req.method === 'POST') {
+    const auth = getAuthStatus();
+    if (!auth.authenticated) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'License activation required. Please enter your license key to activate.' }));
+      return;
+    }
+
     let body = '';
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
@@ -559,6 +612,7 @@ const server = http.createServer(async (req, res) => {
 
       const filesToSync = [
         { remote: `${baseUrl}/lead-machine/server.mjs${cacheBust}`, local: path.join(__dirname, 'server.mjs') },
+        { remote: `${baseUrl}/lead-machine/auth.mjs${cacheBust}`, local: path.join(__dirname, 'auth.mjs') },
         { remote: `${baseUrl}/lead-machine/hunter.mjs${cacheBust}`, local: path.join(__dirname, 'hunter.mjs') },
         { remote: `${baseUrl}/lead-machine/orchestrator.mjs${cacheBust}`, local: path.join(__dirname, 'orchestrator.mjs') },
         { remote: `${baseUrl}/lead-machine/worker.mjs${cacheBust}`, local: path.join(__dirname, 'worker.mjs') },
@@ -845,6 +899,13 @@ const server = http.createServer(async (req, res) => {
     }
   });
 });
+
+// Start background license heartbeat check
+try {
+  startLicenseHeartbeat((reason) => {
+    broadcastSSE({ type: 'auth_revoked', reason: reason || 'License suspended by administrator' });
+  });
+} catch (_) {}
 
 server.listen(PORT, () => {
   console.log(`======================================================`);

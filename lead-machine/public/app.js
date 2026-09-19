@@ -53,6 +53,8 @@ const hunterCategory = document.getElementById('hunterCategory');
 const hunterState = document.getElementById('hunterState');
 const hunterCity = document.getElementById('hunterCity');
 const hunterLimit = document.getElementById('hunterLimit');
+const hunterCustomQtyWrap = document.getElementById('hunterCustomQtyWrap');
+const hunterCustomQty = document.getElementById('hunterCustomQty');
 const startHunterBtn = document.getElementById('startHunterBtn');
 const stopHunterBtn = document.getElementById('stopHunterBtn');
 const hunterResultsCard = document.getElementById('hunterResultsCard');
@@ -61,6 +63,15 @@ const hunterStatDiscovered = document.getElementById('hunterStatDiscovered');
 const hunterStatReachable = document.getElementById('hunterStatReachable');
 const hunterStatSkipped = document.getElementById('hunterStatSkipped');
 const hunterStreamList = document.getElementById('hunterStreamList');
+
+// Auth Gate DOM
+const authGateOverlay = document.getElementById('authGateOverlay');
+const authGateForm = document.getElementById('authGateForm');
+const licenseKeyInput = document.getElementById('licenseKeyInput');
+const authFeedback = document.getElementById('authFeedback');
+const activateLicenseBtn = document.getElementById('activateLicenseBtn');
+const licenseStatusBadge = document.getElementById('licenseStatusBadge');
+const licenseStatusText = document.getElementById('licenseStatusText');
 
 // Leads DOM
 const dbReadyCount = document.getElementById('dbReadyCount');
@@ -125,16 +136,164 @@ const diagOs = document.getElementById('diagOs');
 // ==========================================================================
 document.addEventListener('DOMContentLoaded', async () => {
   setupNavigation();
+  setupAuthHandlers();
   setupOutreachHandlers();
   setupHunterHandlers();
   setupLeadsHandlers();
   setupProfileHandlers();
   setupSettingsHandlers();
   
+  await checkAuthStatus();
   await loadInitialSpecs();
   connectSSE();
   await loadLeadsTable();
 });
+
+// ==========================================================================
+// License Authentication Gate Controller
+// ==========================================================================
+function setupAuthHandlers() {
+  if (!authGateForm) return;
+
+  const changeLicenseBtn = document.getElementById('changeLicenseBtn');
+  const deactivateLicenseBtn = document.getElementById('deactivateLicenseBtn');
+
+  if (changeLicenseBtn) {
+    changeLicenseBtn.addEventListener('click', () => {
+      showAuthGate();
+      if (licenseKeyInput) licenseKeyInput.focus();
+    });
+  }
+
+  if (deactivateLicenseBtn) {
+    deactivateLicenseBtn.addEventListener('click', async () => {
+      if (confirm('Are you sure you want to deactivate your license on this machine?')) {
+        try {
+          await fetch('/api/auth/deactivate', { method: 'POST' });
+          await checkAuthStatus();
+        } catch (_) {}
+      }
+    });
+  }
+
+  authGateForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const key = (licenseKeyInput?.value || '').trim().toUpperCase();
+    if (!key) return;
+
+    if (activateLicenseBtn) {
+      activateLicenseBtn.disabled = true;
+      activateLicenseBtn.innerHTML = '<span class="spin">⟳</span><span>Verifying...</span>';
+    }
+    if (authFeedback) authFeedback.style.display = 'none';
+
+    try {
+      const res = await fetch('/api/auth/activate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key })
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (authFeedback) {
+          authFeedback.className = 'auth-feedback success';
+          authFeedback.textContent = `✓ License activated for ${data.clientName || 'Enterprise User'}! Unlocking cockpit...`;
+          authFeedback.style.display = 'block';
+        }
+
+        if (licenseStatusBadge) {
+          licenseStatusBadge.style.display = 'inline-flex';
+          if (licenseStatusText) licenseStatusText.textContent = data.clientName || 'Licensed';
+        }
+        const settingsLicenseBadge = document.getElementById('settingsLicenseBadge');
+        const settingsLicensedClient = document.getElementById('settingsLicensedClient');
+        const settingsKeyMask = document.getElementById('settingsKeyMask');
+        if (settingsLicenseBadge) {
+          settingsLicenseBadge.textContent = 'Active';
+          settingsLicenseBadge.className = 'badge-status active';
+        }
+        if (settingsLicensedClient) settingsLicensedClient.textContent = data.clientName || 'Enterprise User';
+        if (settingsKeyMask) settingsKeyMask.textContent = data.keyMask || '—';
+
+        setTimeout(() => {
+          hideAuthGate();
+          loadInitialSpecs();
+          loadLeadsTable();
+        }, 600);
+      } else {
+        if (authFeedback) {
+          authFeedback.className = 'auth-feedback error';
+          authFeedback.textContent = data.error || 'Invalid or revoked license key.';
+          authFeedback.style.display = 'block';
+        }
+      }
+    } catch (err) {
+      if (authFeedback) {
+        authFeedback.className = 'auth-feedback error';
+        authFeedback.textContent = 'Connection error: ' + err.message;
+        authFeedback.style.display = 'block';
+      }
+    } finally {
+      if (activateLicenseBtn) {
+        activateLicenseBtn.disabled = false;
+        activateLicenseBtn.innerHTML = '<span>Activate License</span>';
+      }
+    }
+  });
+}
+
+async function checkAuthStatus() {
+  try {
+    const res = await fetch('/api/auth/status');
+    const data = await res.json();
+
+    const settingsLicenseBadge = document.getElementById('settingsLicenseBadge');
+    const settingsLicensedClient = document.getElementById('settingsLicensedClient');
+    const settingsKeyMask = document.getElementById('settingsKeyMask');
+
+    if (data.authenticated) {
+      hideAuthGate();
+      if (licenseStatusBadge) {
+        licenseStatusBadge.style.display = 'inline-flex';
+        if (licenseStatusText) {
+          licenseStatusText.textContent = data.clientName || 'Licensed';
+        }
+      }
+      if (settingsLicenseBadge) {
+        settingsLicenseBadge.textContent = 'Active';
+        settingsLicenseBadge.className = 'badge-status active';
+      }
+      if (settingsLicensedClient) settingsLicensedClient.textContent = data.clientName || 'Enterprise User';
+      if (settingsKeyMask) settingsKeyMask.textContent = data.keyMask || '—';
+    } else {
+      showAuthGate(data.keyMask);
+      if (licenseStatusBadge) licenseStatusBadge.style.display = 'none';
+      if (settingsLicenseBadge) {
+        settingsLicenseBadge.textContent = 'Unactivated';
+        settingsLicenseBadge.className = 'badge-status';
+      }
+      if (settingsLicensedClient) settingsLicensedClient.textContent = 'No Active License';
+      if (settingsKeyMask) settingsKeyMask.textContent = data.keyMask || 'Not Configured';
+    }
+  } catch (err) {
+    console.warn('[Auth] Status check error:', err);
+  }
+}
+
+function showAuthGate(keyMask) {
+  if (!authGateOverlay) return;
+  authGateOverlay.style.display = 'flex';
+  if (licenseStatusBadge) licenseStatusBadge.style.display = 'none';
+  if (keyMask && licenseKeyInput && !licenseKeyInput.value) {
+    licenseKeyInput.placeholder = keyMask;
+  }
+}
+
+function hideAuthGate() {
+  if (!authGateOverlay) return;
+  authGateOverlay.style.display = 'none';
+  if (authFeedback) authFeedback.style.display = 'none';
+}
 
 // Navigation Handling
 function setupNavigation() {
@@ -150,6 +309,8 @@ function setupNavigation() {
 
       if (targetId === 'tab-leads') {
         loadLeadsTable();
+      } else if (targetId === 'tab-settings') {
+        checkAuthStatus();
       }
     });
   });
@@ -315,6 +476,9 @@ function setupOutreachHandlers() {
       });
       const data = await res.json();
       if (!data.success) {
+        if (data.error && data.error.toLowerCase().includes('license')) {
+          showAuthGate();
+        }
         alert('Could not start campaign: ' + data.error);
         startCampaignBtn.disabled = false;
       }
@@ -362,7 +526,22 @@ function connectSSE() {
 }
 
 function handleTelemetryEvent(event) {
-  if (event.type === 'initial_state') {
+  if (event.type === 'auth_revoked') {
+    showAuthGate();
+    if (authFeedback) {
+      authFeedback.className = 'auth-feedback error';
+      authFeedback.textContent = event.reason || 'License suspended or revoked by administrator.';
+      authFeedback.style.display = 'block';
+    }
+  } else if (event.type === 'auth_activated') {
+    hideAuthGate();
+    if (licenseStatusBadge) {
+      licenseStatusBadge.style.display = 'inline-flex';
+      if (licenseStatusText) {
+        licenseStatusText.textContent = event.clientName || 'Licensed';
+      }
+    }
+  } else if (event.type === 'initial_state') {
     applyCampaignState(event.state);
   } else if (event.type === 'campaign_started') {
     setCampaignRunningUI(true);
@@ -496,6 +675,18 @@ function setupHunterHandlers() {
     });
   });
 
+  // Dynamic Custom Quantity Toggle
+  if (hunterLimit && hunterCustomQtyWrap) {
+    hunterLimit.addEventListener('change', () => {
+      if (hunterLimit.value === 'custom') {
+        hunterCustomQtyWrap.style.display = 'flex';
+        if (hunterCustomQty) hunterCustomQty.focus();
+      } else {
+        hunterCustomQtyWrap.style.display = 'none';
+      }
+    });
+  }
+
   startHunterBtn.addEventListener('click', async () => {
     const query = hunterCategory.value.trim();
     if (!query) {
@@ -506,7 +697,15 @@ function setupHunterHandlers() {
 
     const state = hunterState.value;
     const city = hunterCity.value.trim();
-    const limit = parseInt(hunterLimit.value, 10) || 25;
+    
+    let limit = 1000;
+    if (hunterLimit && hunterLimit.value === 'custom') {
+      limit = parseInt(hunterCustomQty?.value, 10) || 1000;
+      if (limit < 1) limit = 1;
+      if (limit > 100000) limit = 100000;
+    } else if (hunterLimit) {
+      limit = parseInt(hunterLimit.value, 10) || 1000;
+    }
 
     startHunterBtn.style.display = 'none';
     stopHunterBtn.style.display = 'inline-flex';
@@ -526,6 +725,9 @@ function setupHunterHandlers() {
       });
       const data = await res.json();
       if (!data.success) {
+        if (data.error && data.error.toLowerCase().includes('license')) {
+          showAuthGate();
+        }
         alert('Could not start Lead Hunter: ' + data.error);
         resetHunterUI();
       } else {

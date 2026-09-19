@@ -1,0 +1,111 @@
+name: "Super Admin: Issue License Key"
+
+on:
+  workflow_dispatch:
+    inputs:
+      client_name:
+        description: "Client or Business Full Name"
+        required: true
+        default: "John Doe"
+      tier:
+        description: "License Tier"
+        required: true
+        default: "Enterprise"
+        type: choice
+        options:
+          - "Enterprise"
+          - "Pro"
+          - "Trial"
+      expiry_days:
+        description: "License Validity in Days (0 for lifetime)"
+        required: false
+        default: "365"
+
+jobs:
+  issue-license:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Generate & Commit License
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const crypto = require('crypto');
+            const fs = require('fs');
+            const path = require('path');
+
+            const name = context.payload.inputs.client_name.trim();
+            const tier = context.payload.inputs.tier;
+            const expiryDays = parseInt(context.payload.inputs.expiry_days, 10) || 365;
+
+            const nameSlug = name.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'CLIENT';
+            const randomCode = crypto.randomBytes(3).toString('hex').toUpperCase();
+            const licenseKey = `LM-${nameSlug}-${randomCode}`;
+
+            const hash = crypto.createHash('sha256').update(licenseKey).digest('hex');
+
+            const now = new Date();
+            let expires = null;
+            if (expiryDays > 0) {
+              const expDate = new Date(now.getTime() + expiryDays * 24 * 60 * 60 * 1000);
+              expires = expDate.toISOString().split('T')[0];
+            }
+
+            const licenseData = {
+              name: name,
+              tier: tier,
+              active: true,
+              created: now.toISOString().split('T')[0],
+              expires: expires
+            };
+
+            const licensesDir = path.join(process.env.GITHUB_WORKSPACE, 'licenses');
+            if (!fs.existsSync(licensesDir)) {
+              fs.mkdirSync(licensesDir, { recursive: true });
+            }
+
+            const targetFile = path.join(licensesDir, `${hash}.json`);
+            fs.writeFileSync(targetFile, JSON.stringify(licenseData, null, 2), 'utf8');
+
+            core.setOutput('license_key', licenseKey);
+            core.setOutput('hash', hash);
+            core.setOutput('name', name);
+            core.setOutput('expires', expires || 'Lifetime');
+
+            // Format WhatsApp output in summary
+            const waMessage = `🚀 *Lead Machine Enterprise License Activation*\n\n` +
+              `Hi ${name},\n` +
+              `Here is your official license key for Lead Machine Enterprise:\n\n` +
+              `🔑 *License Key:* \`${licenseKey}\`\n` +
+              `⭐ *Tier:* ${tier}\n` +
+              `📅 *Valid Until:* ${expires || 'Lifetime'}\n\n` +
+              `*How to Activate:*\n` +
+              `1. Open Lead Machine on your machine (http://localhost:3333)\n` +
+              `2. Paste your License Key into the activation box and click *Activate*.\n\n` +
+              `Enjoy high-velocity outreach! 🎯`;
+
+            await core.summary
+              .addHeading('🎉 License Successfully Issued!')
+              .addTable([
+                [{ data: 'Field', header: true }, { data: 'Value', header: true }],
+                ['Client Name', name],
+                ['License Key', `\`${licenseKey}\``],
+                ['SHA-256 Vault Hash', `\`${hash}\``],
+                ['Tier', tier],
+                ['Expiration', expires || 'Lifetime']
+              ])
+              .addHeading('📱 Ready-to-Send WhatsApp Message')
+              .addCodeBlock(waMessage, 'text')
+              .write();
+
+      - name: Commit & Push to Repository
+        run: |
+          git config --global user.name "Lead Machine License Bot"
+          git config --global user.email "license-bot@leadmachine.internal"
+          git add licenses/
+          git commit -m "feat(licenses): issue license for ${{ github.event.inputs.client_name }}"
+          git push origin HEAD
