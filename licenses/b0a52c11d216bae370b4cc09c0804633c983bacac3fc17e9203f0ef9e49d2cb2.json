@@ -4,6 +4,6 @@
   "active": false,
   "created": "2026-09-19",
   "expires": "2027-03-18",
-  "revokedAt": "2026-09-19T16:41:17.446Z",
-  "reason": "Payment Dispute Test"
+  "revokedAt": "2026-09-19T16:42:45.055Z",
+  "reason": "Payment Chargeback"
 }
