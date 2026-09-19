@@ -120,8 +120,8 @@ export class LeadHunter {
 
       const checkExistingStmt = db.prepare("SELECT id FROM leads WHERE website LIKE ? OR company_name LIKE ? LIMIT 1");
       const insertLeadStmt = db.prepare(`
-        INSERT INTO leads (company_name, website, phone, email, notes, contact_person, status)
-        VALUES (?, ?, ?, ?, ?, ?, 'not_contacted')
+        INSERT INTO leads (company_name, website, city, state, phone, email, notes, contact_person, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'not_contacted')
       `);
 
       let totalFound = 0;
@@ -214,7 +214,7 @@ export class LeadHunter {
           // Insert verified lead
           try {
             const notes = `Discovered via Lead Hunter: ${query} in ${state}${item.address ? ` | ${item.address}` : ''}`;
-            insertLeadStmt.run(item.name, finalUrl, item.phone || null, null, notes, null);
+            insertLeadStmt.run(item.name, finalUrl, city || null, state || null, item.phone || null, null, notes, null);
             this.reachableCount++;
 
             const leadObj = {

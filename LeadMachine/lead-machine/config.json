@@ -3,7 +3,7 @@
     "fullName": "Alexander Wright",
     "firstName": "Alexander",
     "lastName": "Wright",
-    "jobTitle": "Director of Strategic Partnerships",
+    "jobTitle": "VP of Corporate Development",
     "email": "a.wright@apexprecision.com",
     "phone": "708-568-3708",
     "company": "Apex Precision Engineering",
@@ -18,12 +18,13 @@
     "message": "Hello,\n\nI am reaching out to express our interest in your services and explore potential business collaboration with your team. Kindly arrange for a representative to contact us at your earliest convenience to discuss details, capabilities, and possible cooperation on upcoming projects.\n\nWe look forward to connecting.\n\nSincerely,\nAlexander Wright\nDirector of Strategic Partnerships\nApex Precision Engineering"
   },
   "settings": {
-    "version": "2.0.0",
-    "buildCommit": "301ab6c",
+    "version": "2.1.0",
+    "buildCommit": "52a4334",
     "defaultSpeedMode": "recommended",
     "sandboxMode": false,
     "concurrency": 8,
     "autoUpdate": true,
-    "updateChannel": "stable"
+    "updateChannel": "stable",
+    "lastUpdated": "2026-09-19T10:49:44.703Z"
   }
 }

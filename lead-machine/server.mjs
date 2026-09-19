@@ -325,7 +325,7 @@ const server = http.createServer(async (req, res) => {
     if (fs.existsSync(cfgPath)) {
       try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
     }
-    const currentVer = cfg.settings?.version || '2.0.0';
+    const currentVer = cfg.settings?.version || '2.1.0';
     const currentCommit = cfg.settings?.buildCommit || '301ab6c';
     const repo = 'itskodaaa/LeadMachine';
     const branch = 'master';
@@ -337,29 +337,62 @@ const server = http.createServer(async (req, res) => {
     let remoteVer = currentVer;
     let updateAvailable = false;
     let isOffline = false;
+    let internetVerified = false;
 
+    // 1. Primary: Fetch remote config.json via raw GitHub (Fast, Zero Rate Limits, No Auth Needed)
     try {
-      // 1. Query latest commit via GitHub API
-      const commitRes = await fetchRemote(`https://api.github.com/repos/${repo}/commits/${branch}`);
-      if (commitRes.ok) {
-        const commitData = await commitRes.json();
-        remoteCommit = commitData?.sha || '';
-        remoteShort = remoteCommit ? remoteCommit.substring(0, 7) : '';
-        commitMessage = commitData?.commit?.message?.split('\n')[0] || '';
-        commitDate = commitData?.commit?.author?.date || '';
+      const rawCfgRes = await fetchRemote(`https://raw.githubusercontent.com/${repo}/${branch}/lead-machine/config.json`, { timeout: 8000 });
+      if (rawCfgRes.ok) {
+        internetVerified = true;
+        const rawCfg = await rawCfgRes.json();
+        if (rawCfg?.settings?.buildCommit) {
+          remoteCommit = rawCfg.settings.buildCommit;
+          remoteShort = remoteCommit.substring(0, 7);
+        }
+        if (rawCfg?.settings?.version) {
+          remoteVer = rawCfg.settings.version;
+        }
       }
-    } catch (_) {
-      // API check timed out or offline
-    }
+    } catch (_) {}
 
     // 2. Fetch remote package.json to verify semver
     try {
-      const rawRes = await fetchRemote(`https://raw.githubusercontent.com/${repo}/${branch}/package.json`);
+      const rawRes = await fetchRemote(`https://raw.githubusercontent.com/${repo}/${branch}/package.json`, { timeout: 8000 });
       if (rawRes.ok) {
+        internetVerified = true;
         const rawData = await rawRes.json();
         if (rawData?.version) remoteVer = rawData.version;
       }
     } catch (_) {}
+
+    // 3. Query latest commit metadata via GitHub API (optional enrichment)
+    try {
+      const commitRes = await fetchRemote(`https://api.github.com/repos/${repo}/commits/${branch}`, { timeout: 8000 });
+      if (commitRes.ok) {
+        internetVerified = true;
+        const commitData = await commitRes.json();
+        if (commitData?.sha) {
+          remoteCommit = commitData.sha;
+          remoteShort = remoteCommit.substring(0, 7);
+        }
+        commitMessage = commitData?.commit?.message?.split('\n')[0] || '';
+        commitDate = commitData?.commit?.author?.date || '';
+      }
+    } catch (_) {}
+
+    // 4. Fallback connectivity probe
+    if (!internetVerified) {
+      try {
+        const probeRes = await fetchRemote('https://dns.google/resolve?name=github.com', { timeout: 4000 });
+        if (probeRes.ok) {
+          internetVerified = true;
+        } else {
+          isOffline = true;
+        }
+      } catch (_) {
+        isOffline = true;
+      }
+    }
 
     if (remoteShort) {
       if (currentCommit && remoteShort && !remoteCommit.startsWith(currentCommit)) {
@@ -367,8 +400,8 @@ const server = http.createServer(async (req, res) => {
       } else if (remoteVer !== currentVer) {
         updateAvailable = true;
       }
-    } else {
-      isOffline = true;
+    } else if (remoteVer && remoteVer !== currentVer) {
+      updateAvailable = true;
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -381,7 +414,7 @@ const server = http.createServer(async (req, res) => {
       commit: currentCommit,
       latestVersion: remoteVer,
       latestCommit: remoteShort || currentCommit,
-      commitMessage: commitMessage || 'Latest enterprise build verified.',
+      commitMessage: commitMessage || 'Latest enterprise build verified with GitHub master.',
       commitDate,
       updateAvailable,
       offline: isOffline,
@@ -421,12 +454,22 @@ const server = http.createServer(async (req, res) => {
       let latestCommit = body.commit || '';
       if (!latestCommit) {
         try {
-          const cRes = await fetchRemote(`https://api.github.com/repos/${repo}/commits/${branch}`);
-          if (cRes.ok) {
-            const cData = await cRes.json();
-            latestCommit = (cData?.sha || '').substring(0, 7);
+          const cfgRes = await fetchRemote(`https://raw.githubusercontent.com/${repo}/${branch}/lead-machine/config.json`, { timeout: 8000 });
+          if (cfgRes.ok) {
+            const cJson = await cfgRes.json();
+            latestCommit = cJson?.settings?.buildCommit || '';
           }
         } catch (_) {}
+
+        if (!latestCommit) {
+          try {
+            const cRes = await fetchRemote(`https://api.github.com/repos/${repo}/commits/${branch}`, { timeout: 8000 });
+            if (cRes.ok) {
+              const cData = await cRes.json();
+              latestCommit = (cData?.sha || '').substring(0, 7);
+            }
+          } catch (_) {}
+        }
       }
 
       const updatedFiles = [];

@@ -24,6 +24,11 @@ const heroLeadCount = document.getElementById('heroLeadCount');
 const presetPills = document.querySelectorAll('.preset-pill');
 const customLeadQty = document.getElementById('customLeadQty');
 const regionSelect = document.getElementById('regionSelect');
+const campaignCategory = document.getElementById('campaignCategory');
+const autoHuntBanner = document.getElementById('autoHuntBanner');
+const autoHuntDot = document.getElementById('autoHuntDot');
+const autoHuntTitle = document.getElementById('autoHuntTitle');
+const autoHuntDesc = document.getElementById('autoHuntDesc');
 const startCampaignBtn = document.getElementById('startCampaignBtn');
 const campaignIdleState = document.getElementById('campaignIdleState');
 const campaignActiveState = document.getElementById('campaignActiveState');
@@ -99,6 +104,7 @@ const prevMessage = document.getElementById('prevMessage');
 
 // Settings DOM
 const checkUpdateBtn = document.getElementById('checkUpdateBtn');
+const forceSyncBtn = document.getElementById('forceSyncBtn');
 const installUpdateBtn = document.getElementById('installUpdateBtn');
 const updateFeedback = document.getElementById('updateFeedback');
 const updateStatusPill = document.getElementById('updateStatusPill');
@@ -210,6 +216,40 @@ function updateLeadCounts(stats) {
   if (dbReadyCount) dbReadyCount.textContent = ready;
   if (dbContactedCount) dbContactedCount.textContent = contacted;
   if (dbTotalCount) dbTotalCount.textContent = total;
+
+  updateAutoHuntEstimate();
+}
+
+function updateAutoHuntEstimate() {
+  if (!autoHuntBanner) return;
+  const qty = parseInt(customLeadQty?.value, 10) || 10;
+  const state = regionSelect?.value || 'all';
+  const category = campaignCategory?.value?.trim() || 'Manufacturing';
+
+  let available = 0;
+  if (state === 'all') {
+    available = systemSpecs?.dbStats?.notContacted || 0;
+  } else {
+    const stObj = systemSpecs?.dbStats?.topStates?.find(s => s.state === state);
+    available = stObj?.count || 0;
+  }
+
+  const deficit = qty - available;
+  if (deficit > 0) {
+    autoHuntBanner.classList.add('has-deficit');
+    if (autoHuntTitle) autoHuntTitle.textContent = `⚡ Auto-Harvest Engaged (${deficit} Lead Deficit)`;
+    if (autoHuntDesc) {
+      const regionName = state === 'all' ? 'nationwide' : state;
+      autoHuntDesc.textContent = `Campaign target is ${qty} leads, but only ${available} are ready in ${regionName}. Lead Machine will autonomously scrape and verify ${deficit} fresh "${category}" leads in the background during outreach.`;
+    }
+  } else {
+    autoHuntBanner.classList.remove('has-deficit');
+    if (autoHuntTitle) autoHuntTitle.textContent = `✓ Database Coverage Verified (${available} Ready)`;
+    if (autoHuntDesc) {
+      const regionName = state === 'all' ? 'nationwide' : state;
+      autoHuntDesc.textContent = `${available} verified leads are immediately ready in ${regionName}. Outreach will proceed instantly without background scraper delay.`;
+    }
+  }
 }
 
 // ==========================================================================
@@ -226,12 +266,28 @@ function setupOutreachHandlers() {
       } else {
         customLeadQty.value = qty;
       }
+      updateAutoHuntEstimate();
     });
   });
 
-  customLeadQty.addEventListener('input', () => {
-    presetPills.forEach(p => p.classList.remove('active'));
-  });
+  if (customLeadQty) {
+    customLeadQty.addEventListener('input', () => {
+      presetPills.forEach(p => p.classList.remove('active'));
+      updateAutoHuntEstimate();
+    });
+  }
+
+  if (regionSelect) {
+    regionSelect.addEventListener('change', () => {
+      updateAutoHuntEstimate();
+    });
+  }
+
+  if (campaignCategory) {
+    campaignCategory.addEventListener('input', () => {
+      updateAutoHuntEstimate();
+    });
+  }
 
   startCampaignBtn.addEventListener('click', async () => {
     startCampaignBtn.disabled = true;
@@ -240,6 +296,7 @@ function setupOutreachHandlers() {
     const isSandbox = sandboxToggle ? sandboxToggle.checked : false;
     const isHeaded = headedToggle ? headedToggle.checked : false;
     const workers = workerSlider ? parseInt(workerSlider.value, 10) : 8;
+    const category = campaignCategory ? campaignCategory.value.trim() : 'Manufacturing';
 
     try {
       const res = await fetch('/api/start', {
@@ -250,7 +307,9 @@ function setupOutreachHandlers() {
           numWorkers: workers,
           isSandbox,
           isHeaded,
-          stateFilter
+          stateFilter,
+          category,
+          autoScrape: true
         })
       });
       const data = await res.json();
@@ -868,6 +927,38 @@ function setupSettingsHandlers() {
         updateFeedback.innerHTML = `✗ Update failed: ${err.message}`;
         installUpdateBtn.disabled = false;
         if (checkUpdateBtn) checkUpdateBtn.disabled = false;
+      }
+    });
+  }
+
+  if (forceSyncBtn) {
+    forceSyncBtn.addEventListener('click', async () => {
+      forceSyncBtn.disabled = true;
+      forceSyncBtn.innerHTML = '<span>Syncing...</span>';
+      updateFeedback.style.display = 'block';
+      updateFeedback.className = 'feedback-banner';
+      updateFeedback.textContent = 'Force re-syncing core engine files from GitHub master...';
+
+      try {
+        const res = await fetch('/api/system/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ force: true })
+        });
+        const data = await res.json();
+        if (data.success) {
+          updateFeedback.innerHTML = `✓ <strong>Sync complete!</strong> ${data.message} Reloading in 2 seconds...`;
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        } else {
+          updateFeedback.textContent = `Sync failed: ${data.error || 'Server error'}`;
+        }
+      } catch (err) {
+        updateFeedback.textContent = 'Sync failed. Server unreachable.';
+      } finally {
+        forceSyncBtn.disabled = false;
+        forceSyncBtn.innerHTML = '<span>Force Re-sync</span>';
       }
     });
   }

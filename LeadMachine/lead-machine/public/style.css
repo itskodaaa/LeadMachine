@@ -1245,3 +1245,60 @@ body {
   font-weight: 500;
   color: var(--text-secondary);
 }
+
+/* ==========================================================================
+   Autonomous Lead Hunting Fallback Banner
+   ========================================================================== */
+.autohunt-banner {
+  padding: 12px 14px;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  margin-top: 4px;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.autohunt-banner.has-deficit {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.autohunt-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.autohunt-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.autohunt-banner.has-deficit .autohunt-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+  animation: pulse-amber 2s infinite ease-in-out;
+}
+
+@keyframes pulse-amber {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.2); }
+}
+
+.autohunt-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.autohunt-desc {
+  margin: 4px 0 0 16px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}

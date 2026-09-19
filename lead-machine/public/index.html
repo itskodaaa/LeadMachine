@@ -123,6 +123,21 @@
                 </select>
               </div>
 
+              <!-- Industry / Search Keyword -->
+              <div class="form-group">
+                <label class="group-label" for="campaignCategory">Target Industry / Keyword</label>
+                <input type="text" id="campaignCategory" class="input-text" placeholder="e.g. Roofing Contractors, Manufacturing, Legal" value="Manufacturing">
+              </div>
+
+              <!-- Autonomous Lead Hunting Fallback Banner -->
+              <div class="autohunt-banner" id="autoHuntBanner">
+                <div class="autohunt-header">
+                  <span class="autohunt-dot" id="autoHuntDot"></span>
+                  <span class="autohunt-title" id="autoHuntTitle">Autonomous Lead Scraping Active</span>
+                </div>
+                <p class="autohunt-desc" id="autoHuntDesc">Calculating lead database coverage...</p>
+              </div>
+
               <!-- Launch Action -->
               <div class="launch-action-wrap">
                 <button type="button" id="startCampaignBtn" class="btn-primary">
@@ -639,6 +654,9 @@
             <div class="update-actions" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
               <button type="button" id="checkUpdateBtn" class="btn-secondary btn-sm">
                 <span>Check for Updates</span>
+              </button>
+              <button type="button" id="forceSyncBtn" class="btn-secondary btn-sm" title="Re-download latest enterprise files from master">
+                <span>Force Re-sync</span>
               </button>
               <button type="button" id="installUpdateBtn" class="btn-primary btn-sm" style="display: none;">
                 <span>Install Update</span>

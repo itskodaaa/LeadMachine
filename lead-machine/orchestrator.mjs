@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
+import { leadHunter } from './hunter.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dbPath = path.resolve(__dirname, '../data/leads.db');
@@ -141,7 +142,9 @@ export class CampaignOrchestrator extends EventEmitter {
       isSandbox = false,
       isHeaded = false,
       stateFilter = null,
-      profile = null
+      profile = null,
+      category = 'Manufacturing',
+      autoScrape = true
     } = options;
 
     if (isHeaded && targetLeads > 10) {
@@ -180,8 +183,52 @@ export class CampaignOrchestrator extends EventEmitter {
       message: `Campaign started for ${this.targetTotal} leads with ${this.numWorkers} workers (sandbox=${this.isSandbox}, headed=${this.isHeaded})`
     });
 
+    // Check available uncontacted leads vs target volume
+    try {
+      const dbCheck = this.getDb();
+      let uncontactedCount = 0;
+      if (stateFilter && stateFilter !== 'all') {
+        uncontactedCount = dbCheck.prepare("SELECT count(*) as c FROM leads WHERE status = 'not_contacted' AND state = ?").get(stateFilter)?.c || 0;
+      } else {
+        uncontactedCount = dbCheck.prepare("SELECT count(*) as c FROM leads WHERE status = 'not_contacted'").get()?.c || 0;
+      }
+      dbCheck.close();
+
+      const deficit = this.targetTotal - uncontactedCount;
+      if (deficit > 0 && autoScrape !== false) {
+        const huntTargetState = stateFilter && stateFilter !== 'all' ? stateFilter : 'United States';
+        const huntQuery = category || 'Manufacturing';
+        const huntLimit = Math.min(100, Math.max(deficit, 15));
+
+        this.recordEvent({
+          type: 'autohunt_triggered',
+          message: `⚡ Deficit detected: Database has ${uncontactedCount} uncontacted leads (${deficit} short of ${this.targetTotal}). Autonomous Lead Hunter engaged in background for ${huntLimit} fresh leads (${huntQuery} in ${huntTargetState}).`
+        });
+
+        if (leadHunter.getStatus().status !== 'running') {
+          leadHunter.startHunting({
+            query: huntQuery,
+            state: huntTargetState,
+            limit: huntLimit,
+            onEvent: (evt) => {
+              if (evt.type === 'lead_verified') {
+                this.recordEvent({
+                  type: 'autohunt_lead',
+                  message: `⚡ Auto-Scraped Lead: ${evt.lead?.company || 'Verified Company'} (${evt.lead?.website || ''})`
+                });
+              }
+            }
+          }).catch(err => {
+            console.error('[Orchestrator] Autonomous Lead Hunter background error:', err.message);
+          });
+        }
+      }
+    } catch (checkErr) {
+      console.error('[Orchestrator] Lead deficit check error:', checkErr.message);
+    }
+
     // Run in background loop
-    this.runLoop(stateFilter).catch(err => {
+    this.runLoop(stateFilter, category).catch(err => {
       console.error('Campaign Loop Fatal Error:', err);
       this.status = 'stopped';
       this.recordEvent({ type: 'campaign_error', message: err.message });
@@ -190,7 +237,7 @@ export class CampaignOrchestrator extends EventEmitter {
     return this.getStatus();
   }
 
-  async runLoop(stateFilter) {
+  async runLoop(stateFilter, category) {
     const BATCH_PER_WORKER = 10;
     const WAVE_SIZE = this.numWorkers * BATCH_PER_WORKER;
 
@@ -214,15 +261,47 @@ export class CampaignOrchestrator extends EventEmitter {
       query += " ORDER BY id ASC LIMIT ?";
       params.push(fetchLimit);
 
-      const leads = db.prepare(query).all(...params);
+      let leads = db.prepare(query).all(...params);
       db.close();
 
       if (leads.length === 0) {
-        this.recordEvent({
-          type: 'notice',
-          message: 'No more uncontacted leads available matching criteria in database.'
-        });
-        break;
+        // If leads in DB are temporarily exhausted, check if leadHunter is running
+        if (leadHunter.getStatus().status === 'running') {
+          this.recordEvent({
+            type: 'autohunt_waiting',
+            message: `⚡ Database leads exhausted for current wave. Waiting for background Lead Hunter to discover more leads... (${this.processedTotal}/${this.targetTotal} contacted)`
+          });
+
+          let waitCycles = 0;
+          let foundFresh = false;
+          while (leadHunter.getStatus().status === 'running' && waitCycles < 25 && !this.shouldStop) {
+            await new Promise(r => setTimeout(r, 2000));
+            waitCycles++;
+            const dbPoll = this.getDb();
+            const countCheck = stateFilter && stateFilter !== 'all'
+              ? (dbPoll.prepare("SELECT count(*) as c FROM leads WHERE status = 'not_contacted' AND state = ?").get(stateFilter)?.c || 0)
+              : (dbPoll.prepare("SELECT count(*) as c FROM leads WHERE status = 'not_contacted'").get()?.c || 0);
+            dbPoll.close();
+            if (countCheck > 0) {
+              foundFresh = true;
+              break;
+            }
+          }
+
+          if (foundFresh && !this.shouldStop) {
+            const dbRefetch = this.getDb();
+            leads = dbRefetch.prepare(query).all(...params);
+            dbRefetch.close();
+          }
+        }
+
+        if (leads.length === 0) {
+          this.recordEvent({
+            type: 'notice',
+            message: 'No more uncontacted leads available matching criteria in database.'
+          });
+          break;
+        }
       }
 
       this.recordEvent({

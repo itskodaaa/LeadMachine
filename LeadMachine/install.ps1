@@ -21,7 +21,7 @@ $ErrorActionPreference = "Continue"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $APP_NAME = "Lead Machine"
-$APP_VERSION = "2.0.0"
+$APP_VERSION = "2.1.0"
 $TARGET_DIR = $TargetDir
 $REPO_URL = "https://github.com/$Repo"
 $ZIP_URL = "https://github.com/$Repo/archive/refs/heads/$Branch.zip"
