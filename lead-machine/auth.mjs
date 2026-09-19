@@ -6,9 +6,11 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const configPath = path.resolve(__dirname, 'config.json');
 
-// Default GitHub Pages license vault URL
-// Can be customized via config.json -> settings.licenseVaultUrl
-const DEFAULT_VAULT_URL = 'https://raw.githubusercontent.com/itskodaaa/LeadMachine/master/licenses';
+// Primary GitHub license vault URL (leadmachine-core/licenses)
+// Fallback GitHub license vault URL (legacy itskodaaa/LeadMachine during migration)
+// Can be overridden via config.json -> settings.licenseVaultUrl
+const DEFAULT_VAULT_URL = 'https://raw.githubusercontent.com/leadmachine-core/licenses/main';
+const LEGACY_VAULT_URL = 'https://raw.githubusercontent.com/itskodaaa/LeadMachine/master/licenses';
 
 export function hashKey(rawKey) {
   if (!rawKey || typeof rawKey !== 'string') return '';
@@ -99,7 +101,24 @@ export async function verifyRemoteKey(rawKey, customVaultUrl = null) {
     });
     clearTimeout(timeoutId);
 
-    if (res.status === 404) {
+    let response = res;
+    if (response.status === 404 && vaultBase === DEFAULT_VAULT_URL) {
+      try {
+        const fbUrl = `${LEGACY_VAULT_URL.replace(/\/$/, '')}/${hash}.json?_nocache=${Date.now()}`;
+        const fbController = new AbortController();
+        const fbTimeout = setTimeout(() => fbController.abort(), 6000);
+        const fbRes = await fetch(fbUrl, {
+          signal: fbController.signal,
+          headers: { 'Accept': 'application/json', 'User-Agent': 'LeadMachine-LicenseAuth/2.2' }
+        });
+        clearTimeout(fbTimeout);
+        if (fbRes.ok) {
+          response = fbRes;
+        }
+      } catch (_) {}
+    }
+
+    if (response.status === 404) {
       // Check local licenses folder if running locally before push
       const localVaultPath = path.resolve(__dirname, '..', 'licenses', `${hash}.json`);
       if (fs.existsSync(localVaultPath)) {
@@ -125,14 +144,14 @@ export async function verifyRemoteKey(rawKey, customVaultUrl = null) {
       };
     }
 
-    if (!res.ok) {
+    if (!response.ok) {
       return {
         valid: false,
-        error: `License server responded with status ${res.status}.`
+        error: `License server responded with status ${response.status}.`
       };
     }
 
-    const data = await res.json();
+    const data = await response.json();
     if (data.active !== true) {
       return {
         valid: false,
