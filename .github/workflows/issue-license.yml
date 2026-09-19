@@ -109,3 +109,4 @@ jobs:
           git add licenses/
           git commit -m "feat(licenses): issue license for ${{ github.event.inputs.client_name }}"
           git push origin HEAD
+
