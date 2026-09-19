@@ -1,4 +1,5 @@
 import http from 'http';
+import https from 'https';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -11,6 +12,55 @@ import { leadHunter } from './hunter.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3333;
 const PUBLIC_DIR = path.join(__dirname, 'public');
+
+function fetchRemote(urlStr, options = {}) {
+  return new Promise((resolve, reject) => {
+    try {
+      const parsed = new URL(urlStr);
+      const req = https.get(parsed, {
+        headers: {
+          'User-Agent': 'LeadMachine-Enterprise-Updater',
+          'Accept': 'application/vnd.github.v3+json',
+          ...options.headers
+        },
+        timeout: options.timeout || 12000
+      }, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          return fetchRemote(res.headers.location, options).then(resolve).catch(reject);
+        }
+        if (res.statusCode !== 200) {
+          return resolve({
+            ok: false,
+            status: res.statusCode,
+            text: () => Promise.resolve(''),
+            json: () => Promise.resolve(null)
+          });
+        }
+        const chunks = [];
+        res.on('data', chunk => chunks.push(chunk));
+        res.on('end', () => {
+          const body = Buffer.concat(chunks).toString('utf8');
+          resolve({
+            ok: true,
+            status: 200,
+            text: () => Promise.resolve(body),
+            json: () => {
+              try { return Promise.resolve(JSON.parse(body)); }
+              catch (_) { return Promise.resolve(null); }
+            }
+          });
+        });
+      });
+      req.on('error', reject);
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Request timeout'));
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
 
 function getSystemSpecs() {
   const cpus = os.cpus() || [];
@@ -290,23 +340,13 @@ const server = http.createServer(async (req, res) => {
 
     try {
       // 1. Query latest commit via GitHub API
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 10000);
-      const commitRes = await fetch(`https://api.github.com/repos/${repo}/commits/${branch}`, {
-        headers: {
-          'User-Agent': 'LeadMachine-Enterprise-Updater',
-          'Accept': 'application/vnd.github.v3+json'
-        },
-        signal: controller.signal
-      });
-      clearTimeout(timer);
-
+      const commitRes = await fetchRemote(`https://api.github.com/repos/${repo}/commits/${branch}`);
       if (commitRes.ok) {
         const commitData = await commitRes.json();
-        remoteCommit = commitData.sha || '';
-        remoteShort = remoteCommit.substring(0, 7);
-        commitMessage = commitData.commit?.message?.split('\n')[0] || '';
-        commitDate = commitData.commit?.author?.date || '';
+        remoteCommit = commitData?.sha || '';
+        remoteShort = remoteCommit ? remoteCommit.substring(0, 7) : '';
+        commitMessage = commitData?.commit?.message?.split('\n')[0] || '';
+        commitDate = commitData?.commit?.author?.date || '';
       }
     } catch (_) {
       // API check timed out or offline
@@ -314,13 +354,10 @@ const server = http.createServer(async (req, res) => {
 
     // 2. Fetch remote package.json to verify semver
     try {
-      const rawRes = await fetch(`https://raw.githubusercontent.com/${repo}/${branch}/package.json`, {
-        headers: { 'User-Agent': 'LeadMachine-Enterprise-Updater' },
-        signal: AbortSignal.timeout(10000)
-      });
+      const rawRes = await fetchRemote(`https://raw.githubusercontent.com/${repo}/${branch}/package.json`);
       if (rawRes.ok) {
         const rawData = await rawRes.json();
-        if (rawData.version) remoteVer = rawData.version;
+        if (rawData?.version) remoteVer = rawData.version;
       }
     } catch (_) {}
 
@@ -384,13 +421,10 @@ const server = http.createServer(async (req, res) => {
       let latestCommit = body.commit || '';
       if (!latestCommit) {
         try {
-          const cRes = await fetch(`https://api.github.com/repos/${repo}/commits/${branch}`, {
-            headers: { 'User-Agent': 'LeadMachine-Enterprise-Updater' },
-            signal: AbortSignal.timeout(10000)
-          });
+          const cRes = await fetchRemote(`https://api.github.com/repos/${repo}/commits/${branch}`);
           if (cRes.ok) {
             const cData = await cRes.json();
-            latestCommit = (cData.sha || '').substring(0, 7);
+            latestCommit = (cData?.sha || '').substring(0, 7);
           }
         } catch (_) {}
       }
@@ -398,10 +432,7 @@ const server = http.createServer(async (req, res) => {
       const updatedFiles = [];
       for (const item of filesToSync) {
         try {
-          const fileRes = await fetch(item.remote, {
-            headers: { 'User-Agent': 'LeadMachine-Enterprise-Updater' },
-            signal: AbortSignal.timeout(8000)
-          });
+          const fileRes = await fetchRemote(item.remote);
           if (fileRes.ok) {
             const content = await fileRes.text();
             if (content && content.length > 50) {

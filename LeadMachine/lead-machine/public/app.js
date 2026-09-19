@@ -146,6 +146,13 @@ function setupNavigation() {
       }
     });
   });
+
+  // Support URL hash routing (e.g. #settings, #hunter, #leads)
+  const initialHash = window.location.hash ? window.location.hash.replace('#', '') : '';
+  if (initialHash) {
+    const targetTab = Array.from(navTabs).find(t => t.dataset.tab === `tab-${initialHash}` || t.dataset.tab === initialHash);
+    if (targetTab) targetTab.click();
+  }
 }
 
 // Initial System Specs & Profile
