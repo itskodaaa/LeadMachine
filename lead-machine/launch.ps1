@@ -213,9 +213,9 @@ Write-Host ""
 
 Start-Process "http://localhost:3333"
 
-# Start Node server
+# Start Node server with IPv4 priority
 $serverScript = Join-Path $appRoot "lead-machine\server.mjs"
-& $nodeExe $serverScript
+& $nodeExe --dns-result-order=ipv4first $serverScript
 
 Write-Host ""
 Write-Host "======================================================================" -ForegroundColor Yellow
