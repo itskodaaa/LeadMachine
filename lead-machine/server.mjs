@@ -290,8 +290,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   // 2. ZERO-TRUST GLOBAL AUTH GUARD FOR ALL OTHER API ROUTES & SSE STREAMS
-  // (Permits /api/system/version so unauthenticated or expired instances can check/apply updates)
-  const isPublicApi = pathname === '/api/system/version';
+  // (Permits /api/system/version and /api/system/update so instances can check/apply updates)
+  const isPublicApi = pathname === '/api/system/version' || pathname === '/api/system/update';
   if ((pathname.startsWith('/api/') || pathname === '/api/stream' || pathname === '/events') && !isPublicApi) {
     const auth = getAuthStatus();
     if (!auth.authenticated) {

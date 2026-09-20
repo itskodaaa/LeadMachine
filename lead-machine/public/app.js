@@ -143,6 +143,28 @@ const diagCpu = document.getElementById('diagCpu');
 const diagRam = document.getElementById('diagRam');
 const diagOs = document.getElementById('diagOs');
 
+// Force Update DOM & State
+const forceUpdateOverlay = document.getElementById('forceUpdateOverlay');
+const forceUpdateCloseX = document.getElementById('forceUpdateCloseX');
+const forceUpdateCurrentVer = document.getElementById('forceUpdateCurrentVer');
+const forceUpdateLatestVer = document.getElementById('forceUpdateLatestVer');
+const forceUpdateNotes = document.getElementById('forceUpdateNotes');
+const forceUpdateProgressWrap = document.getElementById('forceUpdateProgressWrap');
+const forceUpdateProgressBarFill = document.getElementById('forceUpdateProgressBarFill');
+const forceUpdateProgressStatus = document.getElementById('forceUpdateProgressStatus');
+const forceUpdateFeedback = document.getElementById('forceUpdateFeedback');
+const forceUpdateNowBtn = document.getElementById('forceUpdateNowBtn');
+const forceUpdateLaterBtn = document.getElementById('forceUpdateLaterBtn');
+const updateReminderDock = document.getElementById('updateReminderDock');
+const dockVerLabel = document.getElementById('dockVerLabel');
+const dockUpdateBtn = document.getElementById('dockUpdateBtn');
+const dockOpenModalBtn = document.getElementById('dockOpenModalBtn');
+
+let latestUpdateData = null;
+let isUpdateModalDismissed = false;
+let updateSnoozeTimer = null;
+let updateIntervalId = null;
+
 // ==========================================================================
 // Initialization
 // ==========================================================================
@@ -154,6 +176,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupLeadsHandlers();
   setupProfileHandlers();
   setupSettingsHandlers();
+  setupForceUpdateHandlers();
   initDomTamperGuard();
   
   await checkAuthStatus();
@@ -1248,6 +1271,7 @@ function setupSettingsHandlers() {
             installUpdateBtn.style.display = 'inline-flex';
             installUpdateBtn.innerHTML = `${ICON_DOWNLOAD}<span>Install Latest Release (${data.latestCommit})</span>`;
           }
+          checkForSystemUpdates(true);
         } else {
           if (updateStatusPill) updateStatusPill.textContent = `v${data.version} · Latest`;
           updateFeedback.innerHTML = `✓ System is running the latest enterprise build (<strong>v${data.version} · ${data.commit || data.latestCommit}</strong>). Verified with GitHub master.`;
@@ -1330,5 +1354,182 @@ function setupSettingsHandlers() {
         forceSyncBtn.innerHTML = `${ICON_WRENCH}<span>Repair / Re-sync</span>`;
       }
     });
+  }
+}
+
+/* ==========================================================================
+   Force Update Controller & Persistent Reminder System
+   ========================================================================== */
+function setupForceUpdateHandlers() {
+  if (forceUpdateCloseX) {
+    forceUpdateCloseX.addEventListener('click', () => {
+      dismissUpdateModal();
+    });
+  }
+
+  if (forceUpdateLaterBtn) {
+    forceUpdateLaterBtn.addEventListener('click', () => {
+      dismissUpdateModal();
+    });
+  }
+
+  if (forceUpdateNowBtn) {
+    forceUpdateNowBtn.addEventListener('click', () => {
+      executeSystemUpdate();
+    });
+  }
+
+  if (dockUpdateBtn) {
+    dockUpdateBtn.addEventListener('click', () => {
+      showUpdateModal();
+      executeSystemUpdate();
+    });
+  }
+
+  if (dockOpenModalBtn) {
+    dockOpenModalBtn.addEventListener('click', () => {
+      showUpdateModal();
+    });
+  }
+
+  // Check for updates on startup
+  checkForSystemUpdates(false);
+
+  // Background interval check every 10 minutes
+  if (updateIntervalId) clearInterval(updateIntervalId);
+  updateIntervalId = setInterval(() => {
+    checkForSystemUpdates(false);
+  }, 10 * 60 * 1000);
+}
+
+function showUpdateModal() {
+  isUpdateModalDismissed = false;
+  if (forceUpdateOverlay) {
+    forceUpdateOverlay.style.display = 'flex';
+  }
+  if (updateReminderDock) {
+    updateReminderDock.style.display = 'none';
+  }
+}
+
+function dismissUpdateModal() {
+  console.log('[Update] dismissUpdateModal triggered');
+  isUpdateModalDismissed = true;
+  if (forceUpdateOverlay) {
+    forceUpdateOverlay.style.display = 'none';
+  }
+  if (updateReminderDock && latestUpdateData && latestUpdateData.updateAvailable) {
+    updateReminderDock.style.display = 'block';
+  }
+
+  // Snooze timer: automatically prompt again in 5 minutes
+  clearTimeout(updateSnoozeTimer);
+  updateSnoozeTimer = setTimeout(() => {
+    if (latestUpdateData && latestUpdateData.updateAvailable) {
+      isUpdateModalDismissed = false;
+      showUpdateModal();
+    }
+  }, 5 * 60 * 1000);
+}
+
+async function checkForSystemUpdates(isManual = false) {
+  try {
+    const res = await fetch('/api/system/version?_t=' + Date.now());
+    if (!res.ok) return;
+    const data = await res.json();
+    latestUpdateData = data;
+
+    if (versionTitle && data.version) versionTitle.textContent = `Lead Machine v${data.version}`;
+    if (updateStatusPill && data.version) {
+      updateStatusPill.textContent = data.updateAvailable ? 'Update Available' : `v${data.version}`;
+    }
+    if (updateCommitLabel && (data.commit || data.latestCommit)) {
+      updateCommitLabel.textContent = `Build: ${data.commit || data.latestCommit}`;
+    }
+
+    if (data.updateAvailable) {
+      if (forceUpdateCurrentVer) {
+        forceUpdateCurrentVer.textContent = `v${data.version} (${data.commit ? data.commit.slice(0, 7) : 'current'})`;
+      }
+      if (forceUpdateLatestVer) {
+        forceUpdateLatestVer.textContent = `v${data.latestVersion || data.version} (${data.latestCommit ? data.latestCommit.slice(0, 7) : 'latest'})`;
+      }
+      if (forceUpdateNotes) {
+        forceUpdateNotes.textContent = data.commitMessage || 'Official enterprise build verified with GitHub master.';
+      }
+      if (dockVerLabel) {
+        dockVerLabel.textContent = data.latestCommit ? `Build ${data.latestCommit.slice(0, 7)}` : `v${data.latestVersion || data.version}`;
+      }
+
+      if (!isUpdateModalDismissed || isManual) {
+        showUpdateModal();
+      } else {
+        if (updateReminderDock) updateReminderDock.style.display = 'block';
+      }
+    } else {
+      if (forceUpdateOverlay) forceUpdateOverlay.style.display = 'none';
+      if (updateReminderDock) updateReminderDock.style.display = 'none';
+    }
+  } catch (_) {}
+}
+
+async function executeSystemUpdate() {
+  const iconSpin = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>';
+  
+  if (forceUpdateNowBtn) {
+    forceUpdateNowBtn.disabled = true;
+    forceUpdateNowBtn.innerHTML = `${iconSpin}<span>Installing Update...</span>`;
+  }
+  if (forceUpdateLaterBtn) forceUpdateLaterBtn.style.display = 'none';
+  if (forceUpdateCloseX) forceUpdateCloseX.style.display = 'none';
+  if (forceUpdateProgressWrap) forceUpdateProgressWrap.style.display = 'flex';
+  if (forceUpdateFeedback) forceUpdateFeedback.style.display = 'none';
+
+  if (forceUpdateProgressStatus) {
+    forceUpdateProgressStatus.textContent = 'Contacting GitHub release server...';
+  }
+
+  try {
+    setTimeout(() => {
+      if (forceUpdateProgressStatus) {
+        forceUpdateProgressStatus.textContent = 'Downloading latest enterprise runtime assets...';
+      }
+    }, 700);
+
+    const res = await fetch('/api/system/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ forceLatest: true })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      if (forceUpdateProgressStatus) {
+        forceUpdateProgressStatus.textContent = 'Verifying checksums & reloading server...';
+      }
+      if (forceUpdateFeedback) {
+        forceUpdateFeedback.className = 'auth-feedback success';
+        forceUpdateFeedback.style.display = 'block';
+        forceUpdateFeedback.textContent = `✓ Update complete! ${data.message || 'Cockpit will reload in 2 seconds.'}`;
+      }
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    } else {
+      throw new Error(data.error || 'Update failed');
+    }
+  } catch (err) {
+    if (forceUpdateProgressWrap) forceUpdateProgressWrap.style.display = 'none';
+    if (forceUpdateNowBtn) {
+      forceUpdateNowBtn.disabled = false;
+      forceUpdateNowBtn.innerHTML = `<span>Retry Update</span>`;
+    }
+    if (forceUpdateLaterBtn) forceUpdateLaterBtn.style.display = 'block';
+    if (forceUpdateCloseX) forceUpdateCloseX.style.display = 'flex';
+    if (forceUpdateFeedback) {
+      forceUpdateFeedback.className = 'auth-feedback error';
+      forceUpdateFeedback.style.display = 'block';
+      forceUpdateFeedback.textContent = `Update failed: ${err.message}`;
+    }
   }
 }

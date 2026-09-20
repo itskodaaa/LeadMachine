@@ -865,6 +865,100 @@
     </div>
   </div>
 
+  <!-- ========================================== -->
+  <!-- FORCE UPDATE MODAL -->
+  <!-- ========================================== -->
+  <div id="forceUpdateOverlay" class="force-update-overlay" style="display: none;">
+    <div class="force-update-modal">
+      <button type="button" id="forceUpdateCloseX" class="force-update-close-btn" title="Remind Me Later">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+
+      <div class="force-update-header">
+        <div class="force-update-icon-glow">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+        </div>
+        <div class="force-update-badge">SOFTWARE UPDATE REQUIRED</div>
+        <h2 class="force-update-title">New Build Available</h2>
+        <p class="force-update-subtitle">An official enterprise update is available for your machine. Update now for the latest features and security fixes.</p>
+      </div>
+
+      <div class="force-update-card">
+        <div class="force-update-version-row">
+          <div class="ver-col">
+            <span class="ver-label">Current Build</span>
+            <span class="ver-tag current" id="forceUpdateCurrentVer">v2.2.0</span>
+          </div>
+          <div class="ver-arrow">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          </div>
+          <div class="ver-col">
+            <span class="ver-label">Latest Release</span>
+            <span class="ver-tag latest" id="forceUpdateLatestVer">v2.2.1</span>
+          </div>
+        </div>
+        <div class="force-update-notes-box">
+          <span class="notes-header">What's New:</span>
+          <p class="notes-body" id="forceUpdateNotes">Fetching release summary...</p>
+        </div>
+      </div>
+
+      <div id="forceUpdateProgressWrap" class="force-update-progress-wrap" style="display: none;">
+        <div class="force-update-progress-bar">
+          <div id="forceUpdateProgressBarFill" class="progress-bar-fill"></div>
+        </div>
+        <span id="forceUpdateProgressStatus" class="progress-status-text">Downloading release assets...</span>
+      </div>
+
+      <div id="forceUpdateFeedback" class="auth-feedback" style="display: none;"></div>
+
+      <div class="force-update-actions">
+        <button type="button" id="forceUpdateNowBtn" class="btn-primary force-update-btn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Update Now &amp; Restart</span>
+        </button>
+        <button type="button" id="forceUpdateLaterBtn" class="btn-secondary force-later-btn">
+          <span>Remind Me Later</span>
+        </button>
+      </div>
+
+      <div class="force-update-footer">
+        <span>Verified with GitHub Core Release Registry • Lead Machine Updater</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- PERSISTENT FLOATING UPDATE DOCK -->
+  <!-- ========================================== -->
+  <div id="updateReminderDock" class="update-reminder-dock" style="display: none;">
+    <div class="update-dock-content">
+      <div class="dock-pulse-dot"></div>
+      <div class="dock-text">
+        <strong>Update Available:</strong>
+        <span id="dockVerLabel">New build ready</span>
+      </div>
+      <div class="dock-actions">
+        <button type="button" id="dockUpdateBtn" class="btn-dock-update">Update Now</button>
+        <button type="button" id="dockOpenModalBtn" class="btn-dock-view">Details</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/app.js"></script>
 </body>
 </html>
