@@ -88,7 +88,7 @@ for (const f of launchers) {
 // Write streamlined, bloat-free package.json (fast npm install)
 const cleanPkg = {
   name: 'lead-machine',
-  version: '2.0.0',
+  version: '2.2.1',
   private: true,
   type: 'module',
   dependencies: {
