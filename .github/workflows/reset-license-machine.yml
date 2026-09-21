@@ -1,0 +1,89 @@
+name: "Super Admin: Reset License Machine Binding"
+
+on:
+  workflow_dispatch:
+    inputs:
+      license_key:
+        description: "License Key (e.g. LM-CLIENT-123456) or SHA-256 Hash"
+        required: true
+        default: ""
+
+jobs:
+  reset-machine:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Reset Machine Binding
+        id: reset
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const crypto = require('crypto');
+            const fs = require('fs');
+            const path = require('path');
+
+            const rawInput = context.payload.inputs.license_key.trim();
+            if (!rawInput) {
+              core.setFailed('License key input cannot be empty.');
+              return;
+            }
+
+            let hash = rawInput.toLowerCase();
+            if (rawInput.toUpperCase().startsWith('LM-') || rawInput.length !== 64) {
+              hash = crypto.createHash('sha256').update(rawInput.toUpperCase()).digest('hex');
+            }
+
+            const targetFile = path.join(process.env.GITHUB_WORKSPACE, 'licenses', `${hash}.json`);
+            if (!fs.existsSync(targetFile)) {
+              core.setFailed(`License file not found for hash: ${hash}`);
+              return;
+            }
+
+            const data = JSON.parse(fs.readFileSync(targetFile, 'utf8'));
+            const prevHw = data.boundHardwareId || 'None (Unbound)';
+            data.boundHardwareId = null;
+
+            fs.writeFileSync(targetFile, JSON.stringify(data, null, 2), 'utf8');
+
+            core.setOutput('hash', hash);
+            core.setOutput('name', data.name || 'Client');
+            core.setOutput('prev_hw', prevHw);
+
+            await core.summary
+              .addHeading('🔓 License Hardware Binding Reset Successfully!')
+              .addTable([
+                [{ data: 'Field', header: true }, { data: 'Value', header: true }],
+                ['Client Name', data.name || 'Client'],
+                ['SHA-256 Vault Hash', `\`${hash}\``],
+                ['Previous Hardware ID', `\`${prevHw}\``],
+                ['New Binding Status', '**Unbound (Ready for new computer activation)**']
+              ])
+              .write();
+
+      - name: Commit & Push to Repository
+        run: |
+          git config --global user.name "Lead Machine License Bot"
+          git config --global user.email "license-bot@leadmachine.internal"
+          git add licenses/
+          git commit -m "feat(licenses): reset hardware binding for ${{ steps.reset.outputs.name }} (${{ steps.reset.outputs.hash }})"
+          git push origin HEAD
+
+      - name: Sync to Public License Registry
+        if: env.VAULT_PAT != ''
+        env:
+          VAULT_PAT: ${{ secrets.VAULT_PAT }}
+          HASH: ${{ steps.reset.outputs.hash }}
+        run: |
+          EXISTING_SHA=$(curl -s -H "Authorization: token $VAULT_PAT" "https://api.github.com/repos/leadmachine-core/licenses/contents/${HASH}.json" | jq -r '.sha // empty')
+          FILE_CONTENT=$(base64 -w 0 licenses/${HASH}.json 2>/dev/null || base64 licenses/${HASH}.json | tr -d '\n')
+          if [ -n "$EXISTING_SHA" ] && [ "$EXISTING_SHA" != "null" ]; then
+            curl -s -X PUT \
+              -H "Authorization: token $VAULT_PAT" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/leadmachine-core/licenses/contents/${HASH}.json" \
+              -d "{\"message\":\"sync: reset hardware binding ${HASH}\",\"content\":\"$FILE_CONTENT\",\"sha\":\"$EXISTING_SHA\",\"branch\":\"main\"}" || true
+          fi

@@ -61,7 +61,8 @@ jobs:
               tier: tier,
               active: true,
               created: now.toISOString().split('T')[0],
-              expires: expires
+              expires: expires,
+              boundHardwareId: null
             };
 
             const licensesDir = path.join(process.env.GITHUB_WORKSPACE, 'licenses');

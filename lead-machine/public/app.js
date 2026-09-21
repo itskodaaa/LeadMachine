@@ -94,6 +94,22 @@ const filterPills = document.querySelectorAll('.filter-pill');
 const leadsTableBody = document.getElementById('leadsTableBody');
 const exportCsvBtn = document.getElementById('exportCsvBtn');
 const verifyReachabilityBtn = document.getElementById('verifyReachabilityBtn');
+const importWebsitesBtn = document.getElementById('importWebsitesBtn');
+
+// Bulk Importer Modal DOM
+const importWebsitesOverlay = document.getElementById('importWebsitesOverlay');
+const closeImportModalBtn = document.getElementById('closeImportModalBtn');
+const cancelImportBtn = document.getElementById('cancelImportBtn');
+const importWebsitesTextarea = document.getElementById('importWebsitesTextarea');
+const importDetectedBadge = document.getElementById('importDetectedBadge');
+const importDropzone = document.getElementById('importDropzone');
+const importFileInput = document.getElementById('importFileInput');
+const browseFileBtn = document.getElementById('browseFileBtn');
+const importPreviewBox = document.getElementById('importPreviewBox');
+const importPreviewChips = document.getElementById('importPreviewChips');
+const importFeedback = document.getElementById('importFeedback');
+const submitImportBtn = document.getElementById('submitImportBtn');
+const submitImportBtnText = document.getElementById('submitImportBtnText');
 
 // Corporate Profile DOM
 const pFullName = document.getElementById('pFullName');
@@ -989,6 +1005,197 @@ function setupLeadsHandlers() {
       verifyReachabilityBtn.innerHTML = '<span>Verify Domains</span>';
     }
   });
+
+  // ------------------------------------------------------------------------
+  // Bulk Website Importer Modal Handlers
+  // ------------------------------------------------------------------------
+  if (importWebsitesBtn && importWebsitesOverlay) {
+    importWebsitesBtn.addEventListener('click', () => {
+      importWebsitesOverlay.style.display = 'flex';
+      if (importWebsitesTextarea) {
+        setTimeout(() => importWebsitesTextarea.focus(), 50);
+      }
+    });
+  }
+
+  const closeImporter = () => {
+    if (importWebsitesOverlay) importWebsitesOverlay.style.display = 'none';
+    if (importFeedback) {
+      importFeedback.style.display = 'none';
+      importFeedback.className = 'import-feedback';
+    }
+  };
+
+  if (closeImportModalBtn) closeImportModalBtn.addEventListener('click', closeImporter);
+  if (cancelImportBtn) cancelImportBtn.addEventListener('click', closeImporter);
+
+  function clientParseWebsites(rawText) {
+    if (!rawText || typeof rawText !== 'string') return [];
+    const sanitized = rawText.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, ' ');
+    const tokenRegex = /(https?:\/\/[^\s,"'<>()]+|(?:www\.)?[a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,}(?::\d+)?(?:\/[^\s,"'<>()]*)?)/gi;
+    const matches = sanitized.match(tokenRegex) || [];
+    const seen = new Set();
+    const results = [];
+    const ignored = new Set(['google.com', 'facebook.com', 'twitter.com', 'x.com', 'instagram.com', 'linkedin.com', 'youtube.com', 'github.com', 'example.com', 'wix.com', 'wordpress.org']);
+
+    for (const m of matches) {
+      let s = m.trim().replace(/^["'<(\[]+|["'>)\];,]+$/g, '');
+      if (!s || s.includes('@')) continue;
+      if (!s.startsWith('http://') && !s.startsWith('https://')) s = 'https://' + s;
+      try {
+        const u = new URL(s);
+        let h = u.hostname.toLowerCase().replace(/^www\./, '');
+        if (!h.includes('.') || ignored.has(h) || h === 'localhost') continue;
+        const parts = h.split('.');
+        if (parts[parts.length - 1].length < 2) continue;
+        if (!seen.has(h)) {
+          seen.add(h);
+          let name = parts[0].replace(/[_-]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+          name = name.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          results.push({ cleanUrl: `https://${h}`, domain: h, companyName: name });
+        }
+      } catch (_) {}
+    }
+    return results;
+  }
+
+  function updateImporterPreview() {
+    if (!importWebsitesTextarea) return;
+    const raw = importWebsitesTextarea.value;
+    const parsed = clientParseWebsites(raw);
+    const count = parsed.length;
+
+    if (importDetectedBadge) {
+      importDetectedBadge.textContent = `${count} ${count === 1 ? 'website' : 'websites'} detected`;
+    }
+
+    if (count > 0) {
+      if (importDetectedBadge) importDetectedBadge.classList.add('active');
+      if (submitImportBtn) submitImportBtn.disabled = false;
+      if (submitImportBtnText) submitImportBtnText.textContent = `Import ${count} ${count === 1 ? 'Website' : 'Websites'}`;
+
+      if (importPreviewBox && importPreviewChips) {
+        importPreviewBox.style.display = 'flex';
+        importPreviewChips.innerHTML = '';
+        parsed.slice(0, 4).forEach(item => {
+          const chip = document.createElement('div');
+          chip.className = 'import-chip';
+          chip.innerHTML = `<span class="import-chip-name">${item.companyName}</span><span class="import-chip-domain">${item.domain}</span>`;
+          importPreviewChips.appendChild(chip);
+        });
+        if (count > 4) {
+          const moreChip = document.createElement('div');
+          moreChip.className = 'import-chip';
+          moreChip.innerHTML = `<span class="import-chip-domain">+${count - 4} more</span>`;
+          importPreviewChips.appendChild(moreChip);
+        }
+      }
+    } else {
+      if (importDetectedBadge) importDetectedBadge.classList.remove('active');
+      if (submitImportBtn) submitImportBtn.disabled = true;
+      if (submitImportBtnText) submitImportBtnText.textContent = 'Import 0 Websites';
+      if (importPreviewBox) importPreviewBox.style.display = 'none';
+      if (importPreviewChips) importPreviewChips.innerHTML = '';
+    }
+  }
+
+  if (importWebsitesTextarea) {
+    importWebsitesTextarea.addEventListener('input', updateImporterPreview);
+  }
+
+  function handleImportFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result;
+      if (text && typeof text === 'string') {
+        const existing = importWebsitesTextarea ? importWebsitesTextarea.value : '';
+        if (importWebsitesTextarea) {
+          importWebsitesTextarea.value = (existing ? existing + '\n' : '') + text.trim();
+        }
+        updateImporterPreview();
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  if (browseFileBtn && importFileInput) {
+    browseFileBtn.addEventListener('click', () => importFileInput.click());
+  }
+
+  if (importFileInput) {
+    importFileInput.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      handleImportFile(file);
+      importFileInput.value = '';
+    });
+  }
+
+  if (importDropzone) {
+    importDropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      importDropzone.classList.add('dragover');
+    });
+    importDropzone.addEventListener('dragleave', () => {
+      importDropzone.classList.remove('dragover');
+    });
+    importDropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      importDropzone.classList.remove('dragover');
+      const file = e.dataTransfer?.files?.[0];
+      handleImportFile(file);
+    });
+  }
+
+  if (submitImportBtn) {
+    submitImportBtn.addEventListener('click', async () => {
+      const rawText = (importWebsitesTextarea?.value || '').trim();
+      if (!rawText) return;
+
+      submitImportBtn.disabled = true;
+      if (submitImportBtnText) submitImportBtnText.textContent = 'Importing...';
+      if (importFeedback) importFeedback.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/leads/import-urls', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rawText })
+        });
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Failed to import websites.');
+        }
+
+        if (importFeedback) {
+          importFeedback.className = 'import-feedback success';
+          importFeedback.textContent = `✓ Successfully imported ${data.added} new ${data.added === 1 ? 'website' : 'websites'}! (${data.duplicatesSkipped} duplicates skipped)`;
+          importFeedback.style.display = 'block';
+        }
+
+        // Refresh database stats and table
+        await loadLeadsTable();
+        await loadInitialSpecs();
+
+        setTimeout(() => {
+          closeImporter();
+          if (importWebsitesTextarea) importWebsitesTextarea.value = '';
+          updateImporterPreview();
+          if (submitImportBtnText) submitImportBtnText.textContent = 'Import 0 Websites';
+        }, 1800);
+
+      } catch (err) {
+        if (importFeedback) {
+          importFeedback.className = 'import-feedback error';
+          importFeedback.textContent = 'Error: ' + err.message;
+          importFeedback.style.display = 'block';
+        }
+        submitImportBtn.disabled = false;
+        updateImporterPreview();
+      }
+    });
+  }
 }
 
 async function loadLeadsTable() {
@@ -1179,15 +1386,15 @@ function populateProfileForm(p) {
 }
 
 function updateLivePreview() {
-  if (prevFirstName) prevFirstName.textContent = pFirstName.value || 'Alexander';
-  if (prevLastName) prevLastName.textContent = pLastName.value || 'Wright';
-  if (prevJobTitle) prevJobTitle.textContent = pJobTitle.value || 'Director of Strategic Partnerships';
-  if (prevCompany) prevCompany.textContent = pCompany.value || 'Apex Precision Engineering';
-  if (prevEmail) prevEmail.textContent = pEmail.value || 'a.wright@apexprecision.com';
+  if (prevFirstName) prevFirstName.textContent = pFirstName.value || 'Pamela';
+  if (prevLastName) prevLastName.textContent = pLastName.value || 'Jameson';
+  if (prevJobTitle) prevJobTitle.textContent = pJobTitle.value || 'Purchase Director';
+  if (prevCompany) prevCompany.textContent = pCompany.value || 'Northeast Precision Machinery, Inc.';
+  if (prevEmail) prevEmail.textContent = pEmail.value || 'pamela.jameson@nortiheastprecision.com';
   if (prevPhone) prevPhone.textContent = pPhone.value || '(708) 568-3708';
 
   const fullAddr = [pAddress.value, pSuite.value, pCity.value, pState.value, pZip.value].filter(Boolean).join(', ');
-  if (prevAddress) prevAddress.textContent = fullAddr || '100 Main St, Suite 400, Chicago, IL 60601';
+  if (prevAddress) prevAddress.textContent = fullAddr || '1908 Mount Vernon Ave, Alexandria, VA 22301';
 
   let previewMsg = pMessage.value || 'Hello,\n\nI am reaching out to explore potential collaboration with your team...';
   previewMsg = previewMsg.replace(/{company_name}/gi, 'Acme Industrial Corp');

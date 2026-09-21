@@ -136,23 +136,23 @@ export function getFreshSenderProfile() {
   }
 
   return {
-    fullName: fullName || 'Alexander Wright',
-    firstName: firstName || 'Alexander',
-    lastName: lastName || 'Wright',
-    jobTitle: sender.jobTitle || 'Director of Strategic Partnerships',
-    email: sender.email || 'a.wright@apexprecision.com',
+    fullName: fullName || 'Pamela Jameson',
+    firstName: firstName || 'Pamela',
+    lastName: lastName || 'Jameson',
+    jobTitle: sender.jobTitle || 'Purchase Director',
+    email: sender.email || 'pamela.jameson@nortiheastprecision.com',
     phone: sender.phone || '708-568-3708',
-    company: sender.company || 'Apex Precision Engineering',
-    website: sender.website || 'https://apexprecision.com',
-    address: sender.address || '100 Main St',
-    suite: sender.suite || 'Suite 400',
-    city: sender.city || 'Chicago',
-    state: sender.state || 'IL',
-    stateFull: sender.stateFull || (sender.state === 'IL' ? 'Illinois' : sender.state || 'Illinois'),
-    zip: sender.zip || '60601',
+    company: sender.company || 'Northeast Precision Machinery, Inc.',
+    website: sender.website || 'https://northeastprecision.com/',
+    address: sender.address || '1908 Mount Vernon Ave',
+    suite: sender.suite || '',
+    city: sender.city || 'Alexandria',
+    state: sender.state || 'VA',
+    stateFull: sender.stateFull || (sender.state === 'VA' ? 'Virginia' : sender.state || 'Virginia'),
+    zip: sender.zip || '22301',
     country: sender.country || 'United States',
     subject: sender.subject || 'Exploring Collaboration Opportunities',
-    message: sender.message || 'Hello,\n\nI am reaching out to explore potential collaboration with your company.\n\nThank you,\n' + (fullName || 'Alexander Wright')
+    message: sender.message || 'Hello,\n\nI am reaching out to explore potential collaboration with your company.\n\nThank you,\n' + (fullName || 'Pamela Jameson')
   };
 }
 

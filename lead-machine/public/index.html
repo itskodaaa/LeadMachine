@@ -427,6 +427,13 @@
             </div>
 
             <div class="table-actions">
+              <button type="button" id="importWebsitesBtn" class="btn-primary btn-sm">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span>Import Websites</span>
+              </button>
               <button type="button" id="exportCsvBtn" class="btn-secondary btn-sm">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -535,7 +542,7 @@
                 </div>
                 <div class="form-group flex-1">
                   <label for="pSuite" class="group-label">Suite or Unit</label>
-                  <input type="text" id="pSuite" class="input-text" placeholder="Suite 400">
+                  <input type="text" id="pSuite" class="input-text" placeholder="Suite / Unit (Optional)">
                 </div>
               </div>
 
@@ -600,23 +607,23 @@
             <div class="mock-contact-form">
               <div class="mock-field">
                 <span class="mock-label">First Name</span>
-                <div class="mock-val" id="prevFirstName">Alexander</div>
+                <div class="mock-val" id="prevFirstName">Pamela</div>
               </div>
               <div class="mock-field">
                 <span class="mock-label">Last Name</span>
-                <div class="mock-val" id="prevLastName">Wright</div>
+                <div class="mock-val" id="prevLastName">Jameson</div>
               </div>
               <div class="mock-field">
                 <span class="mock-label">Job Title</span>
-                <div class="mock-val" id="prevJobTitle">Director of Strategic Partnerships</div>
+                <div class="mock-val" id="prevJobTitle">Purchase Director</div>
               </div>
               <div class="mock-field">
                 <span class="mock-label">Company</span>
-                <div class="mock-val" id="prevCompany">Apex Precision Engineering</div>
+                <div class="mock-val" id="prevCompany">Northeast Precision Machinery, Inc.</div>
               </div>
               <div class="mock-field">
                 <span class="mock-label">Corporate Email</span>
-                <div class="mock-val" id="prevEmail">a.wright@apexprecision.com</div>
+                <div class="mock-val" id="prevEmail">pamela.jameson@nortiheastprecision.com</div>
               </div>
               <div class="mock-field">
                 <span class="mock-label">Phone</span>
@@ -624,11 +631,13 @@
               </div>
               <div class="mock-field">
                 <span class="mock-label">Address</span>
-                <div class="mock-val" id="prevAddress">100 Main St, Suite 400, Chicago, IL 60601</div>
+                <div class="mock-val" id="prevAddress">1908 Mount Vernon Ave, Alexandria, VA 22301</div>
               </div>
               <div class="mock-field">
                 <span class="mock-label">Message Preview (Sample Lead)</span>
-                <div class="mock-val message-val" id="prevMessage">Hello,\n\nI am reaching out to explore potential collaboration with your team...</div>
+                <div class="mock-val message-val" id="prevMessage">Hello,
+
+I am reaching out to express our interest in your services and would appreciate the opportunity to explore a potential business relationship...</div>
               </div>
             </div>
           </div>
@@ -826,6 +835,73 @@
 
     </main>
   </div> <!-- /appContainer -->
+  <!-- ========================================== -->
+  <!-- BULK WEBSITE / URL IMPORTER MODAL -->
+  <!-- ========================================== -->
+  <div id="importWebsitesOverlay" class="import-modal-overlay" style="display: none;">
+    <div class="import-modal">
+      <div class="import-modal-header">
+        <div class="import-modal-title-row">
+          <div class="import-modal-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="import-modal-title">Bulk Website Importer</h2>
+            <p class="import-modal-subtitle">Paste a list of links or upload a file. Domains are automatically parsed, formatted, and added to your leads queue.</p>
+          </div>
+        </div>
+        <button type="button" class="modal-close-btn" id="closeImportModalBtn" aria-label="Close modal">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="import-modal-body">
+        <div class="import-input-area">
+          <div class="import-textarea-header">
+            <label for="importWebsitesTextarea" class="group-label">Paste Websites or Links</label>
+            <span class="import-detected-badge" id="importDetectedBadge">0 websites detected</span>
+          </div>
+          <textarea
+            id="importWebsitesTextarea"
+            class="import-textarea"
+            rows="7"
+            placeholder="Paste raw links or text here...&#10;&#10;e.g.&#10;https://titan-machining.com&#10;www.apex-precision.org/contact&#10;norcal-fab.net"
+          ></textarea>
+        </div>
+
+        <div class="import-dropzone" id="importDropzone">
+          <input type="file" id="importFileInput" accept=".txt,.csv" style="display: none;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <span>Drop a <strong>.txt</strong> or <strong>.csv</strong> file here, or <button type="button" class="btn-link" id="browseFileBtn">browse file</button></span>
+        </div>
+
+        <!-- Real-time Preview Area -->
+        <div class="import-preview-box" id="importPreviewBox" style="display: none;">
+          <span class="import-preview-title">Sample Parsed Leads:</span>
+          <div class="import-preview-chips" id="importPreviewChips"></div>
+        </div>
+
+        <div id="importFeedback" class="import-feedback" style="display: none;"></div>
+      </div>
+
+      <div class="import-modal-footer">
+        <button type="button" class="btn-secondary" id="cancelImportBtn">Cancel</button>
+        <button type="button" class="btn-primary" id="submitImportBtn" disabled>
+          <span id="submitImportBtnText">Import 0 Websites</span>
+        </button>
+      </div>
+    </div>
+  </div>
   <!-- ========================================== -->
   <!-- LICENSE ACTIVATION GATE MODAL -->
   <!-- ========================================== -->

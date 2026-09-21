@@ -17,3 +17,5 @@ screenshots/
 .vscode/
 .DS_Store
 LeadMachine/
+GEMINI.md
+.agents/

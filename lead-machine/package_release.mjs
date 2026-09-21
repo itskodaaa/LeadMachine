@@ -41,6 +41,7 @@ const lmFilesToCopy = [
   'hunter.mjs',
   'extractor_sync.mjs',
   'auth.mjs',
+  'url_importer.mjs',
   'config.json',
   'launch.ps1'
 ];
@@ -48,7 +49,17 @@ const lmFilesToCopy = [
 for (const file of lmFilesToCopy) {
   const src = path.join(__dirname, file);
   if (fs.existsSync(src)) {
-    fs.copyFileSync(src, path.join(targetLmDir, file));
+    if (file === 'config.json') {
+      try {
+        const raw = JSON.parse(fs.readFileSync(src, 'utf8'));
+        delete raw.license;
+        fs.writeFileSync(path.join(targetLmDir, file), JSON.stringify(raw, null, 2), 'utf8');
+      } catch (_) {
+        fs.copyFileSync(src, path.join(targetLmDir, file));
+      }
+    } else {
+      fs.copyFileSync(src, path.join(targetLmDir, file));
+    }
   }
 }
 
@@ -88,7 +99,7 @@ for (const f of launchers) {
 // Write streamlined, bloat-free package.json (fast npm install)
 const cleanPkg = {
   name: 'lead-machine',
-  version: '2.2.2',
+  version: '2.2.3',
   private: true,
   type: 'module',
   dependencies: {

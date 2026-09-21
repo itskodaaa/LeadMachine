@@ -10,6 +10,7 @@ import { orchestrator } from './orchestrator.mjs';
 import { checkExtractorStatus, syncExtractorLeads } from './extractor_sync.mjs';
 import { batchCheckWebsites } from './reachability.mjs';
 import { leadHunter } from './hunter.mjs';
+import { parseRawWebsites, importWebsitesToDb } from './url_importer.mjs';
 
 // Prioritize IPv4 on virtualized / VM networks (fixes UTM/QEMU/Hyper-V IPv6 timeout)
 try {
@@ -672,6 +673,7 @@ const server = http.createServer(async (req, res) => {
         { remote: `${baseUrl}/lead-machine/worker.mjs${cacheBust}`, local: path.join(__dirname, 'worker.mjs') },
         { remote: `${baseUrl}/lead-machine/extractor_sync.mjs${cacheBust}`, local: path.join(__dirname, 'extractor_sync.mjs') },
         { remote: `${baseUrl}/lead-machine/reachability.mjs${cacheBust}`, local: path.join(__dirname, 'reachability.mjs') },
+        { remote: `${baseUrl}/lead-machine/url_importer.mjs${cacheBust}`, local: path.join(__dirname, 'url_importer.mjs') },
         { remote: `${baseUrl}/lead-machine/public/index.html${cacheBust}`, local: path.join(__dirname, 'public', 'index.html') },
         { remote: `${baseUrl}/lead-machine/public/style.css${cacheBust}`, local: path.join(__dirname, 'public', 'style.css') },
         { remote: `${baseUrl}/lead-machine/public/app.js${cacheBust}`, local: path.join(__dirname, 'public', 'app.js') },
@@ -739,6 +741,48 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: err.message }));
     }
+    return;
+  }
+
+  // Bulk Website / Link Importer
+  if (pathname === '/api/leads/import-urls' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const rawText = payload.rawText || (Array.isArray(payload.urls) ? payload.urls.join('\n') : '');
+        
+        if (!rawText || typeof rawText !== 'string' || !rawText.trim()) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'No URLs or text provided for import.' }));
+          return;
+        }
+
+        const parsed = parseRawWebsites(rawText);
+        if (parsed.length === 0) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'No valid websites recognized in the provided input.' }));
+          return;
+        }
+
+        const db = orchestrator.getDb();
+        const result = importWebsitesToDb(db, parsed);
+        db.close();
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          totalParsed: parsed.length,
+          added: result.added,
+          duplicatesSkipped: result.skippedDuplicates,
+          leads: result.importedLeads
+        }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
     return;
   }
 
