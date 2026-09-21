@@ -365,16 +365,22 @@
             </div>
           </div>
 
-          <!-- Discovery Telemetry & Results -->
+          <!-- Discovery Progress -->
           <div class="card" id="hunterResultsCard" style="display:none;">
             <div class="card-head">
               <div>
                 <h3 class="card-title">Discovery Progress</h3>
-                <p class="card-subtitle">Real-time candidate evaluation and domain reachability verification.</p>
+                <p class="card-subtitle" id="hunterProgressSubtitle">Real-time candidate evaluation and domain reachability verification.</p>
               </div>
               <span class="badge-status active" id="hunterStatusBadge">Hunting...</span>
             </div>
 
+            <!-- Subtle Minimal Progress Line -->
+            <div class="hunter-progress-bar-wrap">
+              <div class="hunter-progress-bar-fill" id="hunterProgressFill" style="width: 0%;"></div>
+            </div>
+
+            <!-- Standard 3 Metrics Grid -->
             <div class="live-metrics-grid">
               <div class="metric-card">
                 <span class="metric-label">Discovered</span>
@@ -390,8 +396,15 @@
               </div>
             </div>
 
+            <!-- Clean Discovery Stream (Matches Live Activity Feed) -->
             <div class="hunter-stream-box" id="hunterStreamList">
-              <!-- Dynamic stream items -->
+              <div class="feed-empty-state" id="hunterEmptyState">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="empty-icon">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                <span class="empty-title">Scanning Google Maps</span>
+                <span class="empty-desc">Verified businesses will stream here as reachability is confirmed.</span>
+              </div>
             </div>
           </div>
         </div>

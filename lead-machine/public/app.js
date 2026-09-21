@@ -63,6 +63,8 @@ const hunterStatDiscovered = document.getElementById('hunterStatDiscovered');
 const hunterStatReachable = document.getElementById('hunterStatReachable');
 const hunterStatSkipped = document.getElementById('hunterStatSkipped');
 const hunterStreamList = document.getElementById('hunterStreamList');
+const hunterProgressFill = document.getElementById('hunterProgressFill');
+
 
 // Auth Gate DOM & State
 const authGateOverlay = document.getElementById('authGateOverlay');
@@ -734,14 +736,31 @@ function handleTelemetryEvent(event) {
     const tagClass = isContacted ? 'success' : 'muted';
     addFeedItem(icon, event.company, tag, tagClass);
     fetchStatusUpdate();
+  } else if (event.type === 'hunter_started') {
+    if (hunterResultsCard) hunterResultsCard.style.display = 'block';
+    if (hunterStatusBadge) {
+      hunterStatusBadge.textContent = 'Hunting...';
+      hunterStatusBadge.className = 'badge-status active';
+    }
+  } else if (event.type === 'task_progress') {
+    if (hunterStatDiscovered) hunterStatDiscovered.textContent = (event.discovered || 0).toLocaleString();
+    if (hunterStatReachable) hunterStatReachable.textContent = (event.reachable || 0).toLocaleString();
+    if (hunterStatSkipped) hunterStatSkipped.textContent = (event.skipped || 0).toLocaleString();
+    if (hunterProgressFill && hunterCurrentLimit) {
+      const pct = Math.min(100, Math.round(((event.reachable || 0) / hunterCurrentLimit) * 100));
+      hunterProgressFill.style.width = pct + '%';
+    }
   } else if (event.type === 'lead_found') {
     // Lead Hunter real-time event
     addHunterStreamItem(event);
   } else if (event.type === 'hunter_finished') {
-    hunterStatusBadge.textContent = 'Completed';
-    hunterStatusBadge.className = 'badge-status';
-    startHunterBtn.style.display = 'inline-flex';
-    stopHunterBtn.style.display = 'none';
+    if (hunterStatusBadge) {
+      hunterStatusBadge.textContent = 'Completed';
+      hunterStatusBadge.className = 'badge-status';
+    }
+    if (startHunterBtn) startHunterBtn.style.display = 'inline-flex';
+    if (stopHunterBtn) stopHunterBtn.style.display = 'none';
+    if (hunterProgressFill) hunterProgressFill.style.width = '100%';
     loadInitialSpecs();
   } else if (event.type === 'campaign_finished') {
     setCampaignRunningUI(false);
@@ -875,6 +894,9 @@ function setupHunterHandlers() {
     });
   }
 
+  let hunterCurrentLimit = 1000;
+  let hunterTotalLeadsFound = 0;
+
   startHunterBtn.addEventListener('click', async () => {
     const query = hunterCategory.value.trim();
     if (!query) {
@@ -895,15 +917,31 @@ function setupHunterHandlers() {
       limit = parseInt(hunterLimit.value, 10) || 1000;
     }
 
+    hunterCurrentLimit = limit;
+    hunterTotalLeadsFound = 0;
+
     startHunterBtn.style.display = 'none';
     stopHunterBtn.style.display = 'inline-flex';
-    hunterResultsCard.style.display = 'flex';
+    hunterResultsCard.style.display = 'block';
     hunterStatusBadge.textContent = 'Hunting...';
     hunterStatusBadge.className = 'badge-status active';
-    hunterStreamList.innerHTML = '';
-    hunterStatDiscovered.textContent = '0';
-    hunterStatReachable.textContent = '0';
-    hunterStatSkipped.textContent = '0';
+
+    if (hunterProgressFill) hunterProgressFill.style.width = '0%';
+    if (hunterStatDiscovered) hunterStatDiscovered.textContent = '0';
+    if (hunterStatReachable) hunterStatReachable.textContent = '0';
+    if (hunterStatSkipped) hunterStatSkipped.textContent = '0';
+
+    if (hunterStreamList) {
+      hunterStreamList.innerHTML = `
+        <div class="feed-empty-state" id="hunterEmptyState">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="empty-icon">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+          <span class="empty-title">Scanning Google Maps</span>
+          <span class="empty-desc">Verified businesses will stream here as reachability is confirmed.</span>
+        </div>
+      `;
+    }
 
     try {
       const res = await fetch('/api/hunter/start', {
@@ -941,9 +979,14 @@ function startHunterPolling() {
       const data = await res.json();
       if (data.success && data.status) {
         const s = data.status;
-        hunterStatDiscovered.textContent = s.discovered || 0;
-        hunterStatReachable.textContent = s.reachable || 0;
-        hunterStatSkipped.textContent = s.skipped || 0;
+        if (hunterStatDiscovered) hunterStatDiscovered.textContent = (s.discovered || 0).toLocaleString();
+        if (hunterStatReachable) hunterStatReachable.textContent = (s.reachable || 0).toLocaleString();
+        if (hunterStatSkipped) hunterStatSkipped.textContent = (s.skipped || 0).toLocaleString();
+
+        if (hunterProgressFill && s.limit) {
+          const pct = Math.min(100, Math.round(((s.reachable || 0) / s.limit) * 100));
+          hunterProgressFill.style.width = pct + '%';
+        }
 
         if (s.status === 'completed' || s.status === 'stopped' || s.status === 'error') {
           clearInterval(hunterPollInterval);
@@ -951,11 +994,12 @@ function startHunterPolling() {
           resetHunterUI();
           hunterStatusBadge.textContent = s.status === 'completed' ? 'Completed' : 'Finished';
           hunterStatusBadge.className = 'badge-status';
+          if (s.status === 'completed' && hunterProgressFill) hunterProgressFill.style.width = '100%';
           loadInitialSpecs();
         }
       }
     } catch (_) {}
-  }, 2000);
+  }, 1500);
 }
 
 function resetHunterUI() {
@@ -964,17 +1008,32 @@ function resetHunterUI() {
 }
 
 function addHunterStreamItem(item) {
-  const card = document.createElement('div');
-  card.className = 'hunter-item-card';
-  card.innerHTML = `
-    <div>
-      <div class="hunter-item-name">${item.company}</div>
-      <div class="hunter-item-web">${item.website}</div>
-    </div>
-    <span class="status-pill ready">Verified</span>
+  if (!hunterStreamList || !item || !item.company) return;
+
+  const emptyState = document.getElementById('hunterEmptyState');
+  if (emptyState) emptyState.remove();
+
+  const now = new Date();
+  const timeStr = [
+    String(now.getHours()).padStart(2, '0'),
+    String(now.getMinutes()).padStart(2, '0'),
+    String(now.getSeconds()).padStart(2, '0')
+  ].join(':');
+
+  const row = document.createElement('div');
+  row.className = 'feed-row';
+  row.innerHTML = `
+    <span class="feed-time tabular">[${timeStr}]</span>
+    <span class="badge-tag success">LEAD</span>
+    <span class="feed-company" style="font-weight: 500; color: var(--text-primary);">${item.company}</span>
+    <span style="color: var(--text-dim); margin-left: 2px;">·</span>
+    <a href="${item.website}" target="_blank" rel="noopener noreferrer" style="color: var(--text-muted); text-decoration: none; font-size: 11px;">${item.website}</a>
+    ${item.city ? `<span style="color: var(--text-dim); font-size: 11px;">(${item.city}${item.state ? ', ' + item.state : ''})</span>` : ''}
+    <span class="status-pill ready" style="margin-left: auto; font-size: 10px; padding: 2px 6px;">Verified</span>
   `;
-  hunterStreamList.prepend(card);
+  hunterStreamList.prepend(row);
 }
+
 
 // ==========================================================================
 // Leads CRM Controller
@@ -1610,11 +1669,37 @@ function setupForceUpdateHandlers() {
   // Check for updates on startup
   checkForSystemUpdates(false);
 
-  // Background interval check every 10 minutes
+  // Dynamic update check triggers (Window focus, Document visibility change, Tab navigation)
+  let lastDynamicCheck = 0;
+  function triggerDynamicUpdateCheck() {
+    const now = Date.now();
+    if (now - lastDynamicCheck < 12000) return; // throttle at most once every 12s
+    lastDynamicCheck = now;
+    // User returned to window or switched tabs: reset dismissed state so update modal displays prominently
+    isUpdateModalDismissed = false;
+    checkForSystemUpdates(false);
+  }
+
+  window.addEventListener('focus', triggerDynamicUpdateCheck);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      triggerDynamicUpdateCheck();
+    }
+  });
+
+  document.querySelectorAll('.nav-tab, [data-tab]').forEach(tab => {
+    tab.addEventListener('click', () => {
+      // Defer slightly so tab transition renders smoothly
+      setTimeout(triggerDynamicUpdateCheck, 100);
+    });
+  });
+
+  // Background interval check every 2 minutes
   if (updateIntervalId) clearInterval(updateIntervalId);
   updateIntervalId = setInterval(() => {
     checkForSystemUpdates(false);
-  }, 10 * 60 * 1000);
+  }, 2 * 60 * 1000);
 }
 
 function showUpdateModal() {
