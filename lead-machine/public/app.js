@@ -193,6 +193,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupProfileHandlers();
   setupSettingsHandlers();
   setupForceUpdateHandlers();
+  setupIndustrySelector();
   initDomTamperGuard();
   
   await checkAuthStatus();
@@ -848,10 +849,17 @@ function addFeedItem(icon, company, tag, tagClass) {
 // Lead Hunter Controller
 // ==========================================================================
 function setupHunterHandlers() {
-  // Suggestion Chips
-  document.querySelectorAll('.chip-btn').forEach(chip => {
+  // Suggestion Chips (Contextual)
+  document.querySelectorAll('.suggestion-chips .chip-btn:not(.chip-more-btn)').forEach(chip => {
     chip.addEventListener('click', () => {
-      hunterCategory.value = chip.dataset.query;
+      const isCampaign = chip.closest('.campaign-chips');
+      if (isCampaign && campaignCategory) {
+        campaignCategory.value = chip.dataset.query;
+        campaignCategory.dispatchEvent(new Event('input', { bubbles: true }));
+      } else if (hunterCategory) {
+        hunterCategory.value = chip.dataset.query;
+        hunterCategory.dispatchEvent(new Event('input', { bubbles: true }));
+      }
     });
   });
 
@@ -1740,3 +1748,610 @@ async function executeSystemUpdate() {
     }
   }
 }
+
+// ==========================================================================
+// 50+ In-Depth US Industry & Product Categories
+// ==========================================================================
+const INDUSTRY_CATEGORIES = [
+  // Sector 1: Precision Machining & Tooling (8)
+  {
+    id: 1,
+    name: "CNC Milling & Turning",
+    sector: "machining",
+    sectorLabel: "Precision & CNC",
+    query: "CNC Milling & Turning",
+    desc: "High-precision 3, 4, & 5-axis milled parts, custom shafts, complex mechanical components.",
+    keywords: "cnc machine, lathe, mill, prototyping, precision components"
+  },
+  {
+    id: 2,
+    name: "CNC Swiss Screw Machining",
+    sector: "machining",
+    sectorLabel: "Precision & CNC",
+    query: "CNC Swiss Machining",
+    desc: "Micro-machining and ultra-tight tolerance turned pins, shafts, connectors, and dental implants.",
+    keywords: "swiss lathe, micro machining, medical pins, turned parts, citizen"
+  },
+  {
+    id: 3,
+    name: "5-Axis Aerospace Machining",
+    sector: "machining",
+    sectorLabel: "Precision & CNC",
+    query: "5-Axis Aerospace Machining",
+    desc: "Complex airframe structural components, impellers, turbine blades, AS9100 certified.",
+    keywords: "aerospace, 5-axis, titanium, inconel, impellers, flight critical"
+  },
+  {
+    id: 4,
+    name: "Tool & Die Making",
+    sector: "machining",
+    sectorLabel: "Precision & CNC",
+    query: "Tool and Die Making",
+    desc: "Progressive metal stamping dies, custom punching tools, extrusion dies, jigs and gauges.",
+    keywords: "tooling, stamping dies, progressive dies, die makers, tool room"
+  },
+  {
+    id: 5,
+    name: "Wire & Sinker EDM",
+    sector: "machining",
+    sectorLabel: "Precision & CNC",
+    query: "Wire EDM Services",
+    desc: "Electrical discharge machining for hardened steels, intricate internal corners, and micro-slots.",
+    keywords: "edm, sinker, wire electrical discharge, hardened steel, tooling"
+  },
+  {
+    id: 6,
+    name: "Precision Grinding & Lapping",
+    sector: "machining",
+    sectorLabel: "Precision & CNC",
+    query: "Precision Grinding Services",
+    desc: "OD/ID cylindrical, Blanchard, and surface grinding achieving mirror finishes down to micro-inches.",
+    keywords: "surface grinding, blanchard, centerless, od id grinding, lapping"
+  },
+  {
+    id: 7,
+    name: "Gear Manufacturing & Hobbing",
+    sector: "machining",
+    sectorLabel: "Precision & CNC",
+    query: "Custom Gear Manufacturing",
+    desc: "Custom spur gears, helical gears, planetary gearboxes, pinions, and internal splines.",
+    keywords: "gear hobbing, spur gears, pinions, gearboxes, splines"
+  },
+  {
+    id: 8,
+    name: "Jig & Fixture Tooling",
+    sector: "machining",
+    sectorLabel: "Precision & CNC",
+    query: "Jig and Fixture Tooling",
+    desc: "Custom assembly jigs, robotic welding fixtures, CMM holding nests, and production workholding.",
+    keywords: "workholding, assembly jigs, welding fixtures, cmm nests, inspection"
+  },
+
+  // Sector 2: Metal Fabrication & Structural (8)
+  {
+    id: 9,
+    name: "Sheet Metal Fabrication",
+    sector: "metal",
+    sectorLabel: "Metal & Fab",
+    query: "Sheet Metal Fabrication",
+    desc: "Custom metal enclosures, electrical cabinets, server chassis, and precision brackets.",
+    keywords: "enclosures, cabinets, laser cut, press brake, sheet metal, chassis"
+  },
+  {
+    id: 10,
+    name: "Industrial Laser Cutting",
+    sector: "metal",
+    sectorLabel: "Metal & Fab",
+    query: "Industrial Laser Cutting",
+    desc: "High-power fiber laser sheet and tube processing with automated material handling.",
+    keywords: "fiber laser, laser cutting, tube laser, sheet cutting, steel plates"
+  },
+  {
+    id: 11,
+    name: "Structural Steel Fabrication",
+    sector: "metal",
+    sectorLabel: "Metal & Fab",
+    query: "Structural Steel Fabrication",
+    desc: "AISC-certified beams, building columns, heavy trusses, industrial mezzanines, stairs.",
+    keywords: "aisc, steel beams, columns, trusses, structural steel, framing"
+  },
+  {
+    id: 12,
+    name: "Custom Metal Stamping",
+    sector: "metal",
+    sectorLabel: "Metal & Fab",
+    query: "Custom Metal Stamping",
+    desc: "High-speed progressive die stamping, deep drawing, and bracket mass production.",
+    keywords: "stamping, progressive die, deep draw, clips, high volume brackets"
+  },
+  {
+    id: 13,
+    name: "Robotic & Certified Welding",
+    sector: "metal",
+    sectorLabel: "Metal & Fab",
+    query: "Contract Welding Fabrication",
+    desc: "MIG/TIG welding, robotic cell welding, certified pressure vessels and structural weldments.",
+    keywords: "tig welding, mig welding, robotic welding, certified welders, pressure vessel"
+  },
+  {
+    id: 14,
+    name: "Tube Bending & Hydroforming",
+    sector: "metal",
+    sectorLabel: "Metal & Fab",
+    query: "Tube Bending and Fabrication",
+    desc: "CNC mandrel tube bending, roll forming, fluid transfer lines, and structural roll cages.",
+    keywords: "tube bending, mandrel bending, pipe bending, hydroforming, exhaust tubing"
+  },
+  {
+    id: 15,
+    name: "Waterjet Cutting Services",
+    sector: "metal",
+    sectorLabel: "Metal & Fab",
+    query: "Waterjet Cutting Services",
+    desc: "Cold-cutting abrasive waterjet for heavy plates, composites, titanium, rubber, and glass.",
+    keywords: "waterjet, abrasive cutting, composites, thick plate cutting, non-ferrous"
+  },
+  {
+    id: 16,
+    name: "Architectural Metalwork",
+    sector: "metal",
+    sectorLabel: "Metal & Fab",
+    query: "Architectural Metal Fabrication",
+    desc: "Custom ornamental railings, decorative stainless cladding, storefront metals, and stairs.",
+    keywords: "ornamental metal, railings, decorative steel, brass, bronze, cladding"
+  },
+
+  // Sector 3: Aerospace, Defense & Automotive (7)
+  {
+    id: 17,
+    name: "Aerospace Component Manufacturing",
+    sector: "aerospace",
+    sectorLabel: "Aerospace & Auto",
+    query: "Aerospace Components Manufacturing",
+    desc: "Flight-critical structural brackets, engine housings, and landing gear assemblies (AS9100).",
+    keywords: "aerospace parts, flight hardware, as9100, airframe brackets, boeing"
+  },
+  {
+    id: 18,
+    name: "Defense Contract Machining",
+    sector: "aerospace",
+    sectorLabel: "Aerospace & Auto",
+    query: "Defense Contract Machining",
+    desc: "ITAR-registered precision machining for military guidance systems, weapon mounts, armor.",
+    keywords: "itar, defense contractors, military spec, tactical hardware, armored"
+  },
+  {
+    id: 19,
+    name: "Automotive Stamping & Parts",
+    sector: "aerospace",
+    sectorLabel: "Aerospace & Auto",
+    query: "Automotive Parts Manufacturing",
+    desc: "Tier 1 & 2 automotive components, chassis stampings, engine pulleys, and suspension links.",
+    keywords: "automotive oem, tier 1 supplier, chassis parts, powertrain, stamping"
+  },
+  {
+    id: 20,
+    name: "EV Battery & Enclosure Manufacturing",
+    sector: "aerospace",
+    sectorLabel: "Aerospace & Auto",
+    query: "EV Battery Enclosure Manufacturing",
+    desc: "Lightweight aluminum electric vehicle battery packs, cold plates, and thermal management.",
+    keywords: "electric vehicle, ev battery, aluminum cold plates, battery enclosures"
+  },
+  {
+    id: 21,
+    name: "Marine Hardware & Shipbuilding",
+    sector: "aerospace",
+    sectorLabel: "Aerospace & Auto",
+    query: "Marine Hardware Manufacturing",
+    desc: "Corrosion-resistant bronze and 316 stainless marine components, shafts, and deck fittings.",
+    keywords: "marine hardware, propeller shafts, stainless 316, marine fittings, boat parts"
+  },
+  {
+    id: 22,
+    name: "Heavy Truck Body & Equipment",
+    sector: "aerospace",
+    sectorLabel: "Aerospace & Auto",
+    query: "Commercial Truck Body Manufacturing",
+    desc: "Custom dump bodies, utility service trucks, crane booms, and heavy equipment trailers.",
+    keywords: "truck bodies, dump trailers, utility bodies, heavy equipment fabrication"
+  },
+  {
+    id: 23,
+    name: "Aircraft Interior & Galley Hardware",
+    sector: "aerospace",
+    sectorLabel: "Aerospace & Auto",
+    query: "Aircraft Interior Manufacturing",
+    desc: "FAA-compliant cabin interior components, monument latches, composite bulkheads, seating.",
+    keywords: "aircraft seating, galley equipment, faa, cabin interiors, composites"
+  },
+
+  // Sector 4: Electronics, Medical & High-Tech (7)
+  {
+    id: 24,
+    name: "Medical Device Manufacturing",
+    sector: "electronics",
+    sectorLabel: "Electronics & Med",
+    query: "Medical Device Manufacturing",
+    desc: "FDA-registered and ISO 13485 surgical instruments, orthopedic implants, and diagnostics.",
+    keywords: "medical device, iso 13485, implants, surgical tools, fda registered"
+  },
+  {
+    id: 25,
+    name: "Printed Circuit Board (PCBA)",
+    sector: "electronics",
+    sectorLabel: "Electronics & Med",
+    query: "PCB Assembly Services",
+    desc: "Surface mount (SMT) and through-hole PCB assembly, box-build integration, and testing.",
+    keywords: "pcb assembly, smt, circuit boards, electronics manufacturing, pcba"
+  },
+  {
+    id: 26,
+    name: "Semiconductor Equipment Parts",
+    sector: "electronics",
+    sectorLabel: "Electronics & Med",
+    query: "Semiconductor Equipment Machining",
+    desc: "Ultra-high purity vacuum chambers, wafer handling chucks, and cleanroom assemblies.",
+    keywords: "semiconductor, wafer chucks, vacuum chamber, high purity, silicon tooling"
+  },
+  {
+    id: 27,
+    name: "Electromechanical Box Builds",
+    sector: "electronics",
+    sectorLabel: "Electronics & Med",
+    query: "Electromechanical Assembly Contract",
+    desc: "Turnkey electronic control panels, wiring harnesses, power distribution, and testing.",
+    keywords: "box build, control panels, wiring harnesses, electromechanical, turnkey"
+  },
+  {
+    id: 28,
+    name: "Optics & Photonics Hardware",
+    sector: "electronics",
+    sectorLabel: "Electronics & Med",
+    query: "Precision Optical Machining",
+    desc: "High-precision mirror mounts, lens cells, collimator tubes, and optomechanical fixtures.",
+    keywords: "optics, photonics, lens cells, laser housings, optomechanics"
+  },
+  {
+    id: 29,
+    name: "Cleanroom Medical Molding",
+    sector: "electronics",
+    sectorLabel: "Electronics & Med",
+    query: "Cleanroom Injection Molding",
+    desc: "Class 7/8 cleanroom production of disposable medical syringes, fluid cassettes, cartridges.",
+    keywords: "cleanroom molding, class 8, medical plastics, sterile disposables"
+  },
+  {
+    id: 30,
+    name: "Electronic Enclosures & Heat Sinks",
+    sector: "electronics",
+    sectorLabel: "Electronics & Med",
+    query: "Electronic Heat Sink Manufacturing",
+    desc: "Skived-fin and extruded aluminum heat sinks, thermal interface blocks, and shielded cases.",
+    keywords: "heat sinks, thermal management, emi shielding, extruded aluminum, cooling"
+  },
+
+  // Sector 5: Plastics, Rubber & Composites (7)
+  {
+    id: 31,
+    name: "Plastic Injection Molding",
+    sector: "plastics",
+    sectorLabel: "Plastics & Rubber",
+    query: "Plastic Injection Molding",
+    desc: "Custom high-volume thermoplastic molding for consumer, automotive, and industrial housings.",
+    keywords: "injection molding, thermoplastics, molds, plastic parts, abs, nylon"
+  },
+  {
+    id: 32,
+    name: "Blow Molding & Bottles",
+    sector: "plastics",
+    sectorLabel: "Plastics & Rubber",
+    query: "Industrial Blow Molding",
+    desc: "Hollow plastic containers, jerrycans, chemical carboys, and industrial liquid bottles.",
+    keywords: "blow molding, plastic bottles, containers, drums, hdpe packaging"
+  },
+  {
+    id: 33,
+    name: "Rubber & Silicone Gaskets",
+    sector: "plastics",
+    sectorLabel: "Plastics & Rubber",
+    query: "Custom Rubber Molding",
+    desc: "Compression and transfer molded O-rings, silicone seals, vibration dampers, and gaskets.",
+    keywords: "rubber molding, silicone, o-rings, gaskets, vibration isolators, epdm"
+  },
+  {
+    id: 34,
+    name: "Carbon Fiber Composites",
+    sector: "plastics",
+    sectorLabel: "Plastics & Rubber",
+    query: "Carbon Fiber Manufacturing",
+    desc: "Prepreg autoclave cured carbon fiber tubes, drone frames, lightweight structural panels.",
+    keywords: "carbon fiber, composites, autoclave, prepreg, lightweight structures"
+  },
+  {
+    id: 35,
+    name: "Thermoforming & Vacuum Forming",
+    sector: "plastics",
+    sectorLabel: "Plastics & Rubber",
+    query: "Plastic Thermoforming Services",
+    desc: "Heavy-gauge plastic machine shrouds, packaging clamshells, trays, and equipment bezels.",
+    keywords: "thermoforming, vacuum forming, heavy gauge plastic, clamshells, plastic trays"
+  },
+  {
+    id: 36,
+    name: "Plastic Extrusion & Profiles",
+    sector: "plastics",
+    sectorLabel: "Plastics & Rubber",
+    query: "Plastic Profile Extrusion",
+    desc: "Continuous plastic tubing, architectural weatherstripping, co-extruded PVC profiles.",
+    keywords: "plastic extrusion, pvc profiles, tubing, channels, weatherstripping"
+  },
+  {
+    id: 37,
+    name: "Polyurethane & Urethane Casting",
+    sector: "plastics",
+    sectorLabel: "Plastics & Rubber",
+    query: "Custom Urethane Casting",
+    desc: "Abrasion-resistant cast urethane wheels, impact bumpers, conveyor rollers, and scrapers.",
+    keywords: "urethane casting, polyurethane, rollers, bumpers, urethane pads"
+  },
+
+  // Sector 6: Industrial Equipment, Hydraulics & Energy (7)
+  {
+    id: 38,
+    name: "Hydraulic Cylinder & Valve Mfg",
+    sector: "industrial",
+    sectorLabel: "Machinery & Power",
+    query: "Hydraulic Cylinder Manufacturing",
+    desc: "Heavy-duty tie-rod and welded hydraulic cylinders, directional valves, hydraulic manifolds.",
+    keywords: "hydraulic cylinders, valves, manifolds, fluid power, fluid cylinder"
+  },
+  {
+    id: 39,
+    name: "Industrial Pump Manufacturing",
+    sector: "industrial",
+    sectorLabel: "Machinery & Power",
+    query: "Industrial Pump Manufacturing",
+    desc: "Centrifugal pumps, slurry pumps, chemical metering systems, and high-pressure impellers.",
+    keywords: "pumps, centrifugal pump, impellers, fluid transfer, chemical pumps"
+  },
+  {
+    id: 40,
+    name: "Electric Motor & Transformer Mfg",
+    sector: "industrial",
+    sectorLabel: "Machinery & Power",
+    query: "Electric Motor Manufacturing",
+    desc: "Custom stators, rotors, motor rewinding, industrial power transformers, and coils.",
+    keywords: "electric motors, transformers, stators, rotors, windings, generators"
+  },
+  {
+    id: 41,
+    name: "Conveyor & Material Handling",
+    sector: "industrial",
+    sectorLabel: "Machinery & Power",
+    query: "Conveyor System Manufacturing",
+    desc: "Automated warehouse roller conveyors, palletizers, sorting systems, and belt elevators.",
+    keywords: "conveyor systems, material handling, roller conveyors, warehouse automation"
+  },
+  {
+    id: 42,
+    name: "Industrial Heat Exchangers & Boilers",
+    sector: "industrial",
+    sectorLabel: "Machinery & Power",
+    query: "Heat Exchanger Manufacturing",
+    desc: "Shell-and-tube heat exchangers, ASME code pressure vessels, steam boilers, economizers.",
+    keywords: "heat exchangers, asme boilers, pressure vessels, shell and tube, steam"
+  },
+  {
+    id: 43,
+    name: "Solar & Renewable Energy Equipment",
+    sector: "industrial",
+    sectorLabel: "Machinery & Power",
+    query: "Solar Mounting Hardware Manufacturing",
+    desc: "Ground-mount steel racking, single-axis solar trackers, wind turbine nacelle castings.",
+    keywords: "solar racking, renewable energy, solar hardware, tracker linkages, wind turbines"
+  },
+  {
+    id: 44,
+    name: "Oilfield Equipment & Valves",
+    sector: "industrial",
+    sectorLabel: "Machinery & Power",
+    query: "Oilfield Equipment Manufacturing",
+    desc: "API-certified wellhead valves, fracking manifolds, blow-out preventers, and drill tools.",
+    keywords: "oilfield equipment, api 6a, wellhead valves, drilling tools, subsea flanges"
+  },
+
+  // Sector 7: Food, Packaging & Commercial Trades (6)
+  {
+    id: 45,
+    name: "Food Processing Equipment",
+    sector: "commercial",
+    sectorLabel: "Food & Trades",
+    query: "Food Processing Equipment Manufacturing",
+    desc: "Sanitary stainless steel mixers, commercial blanchers, food-grade conveyors (3-A standards).",
+    keywords: "food equipment, sanitary stainless, food machinery, conveyors, 3-a sanitary"
+  },
+  {
+    id: 46,
+    name: "Corrugated Box & Packaging",
+    sector: "commercial",
+    sectorLabel: "Food & Trades",
+    query: "Corrugated Packaging Manufacturing",
+    desc: "Custom corrugated shipping cartons, die-cut protective packaging, bulk storage bins.",
+    keywords: "corrugated boxes, cardboard packaging, shipping boxes, die cut cartons"
+  },
+  {
+    id: 47,
+    name: "Commercial HVAC & Refrigeration",
+    sector: "commercial",
+    sectorLabel: "Food & Trades",
+    query: "Commercial HVAC Contractors",
+    desc: "Industrial rooftop chillers, rooftop RTUs, cleanroom air handlers, commercial VRF.",
+    keywords: "commercial hvac, chillers, refrigeration, rtu, air handling units"
+  },
+  {
+    id: 48,
+    name: "Commercial Roofing Contractors",
+    sector: "commercial",
+    sectorLabel: "Food & Trades",
+    query: "Commercial Roofing Contractors",
+    desc: "Industrial flat roofing, TPO, EPDM membranes, standing seam metal architectural roofs.",
+    keywords: "commercial roofing, tpo, epdm, flat roof, standing seam, roofers"
+  },
+  {
+    id: 49,
+    name: "Commercial Plumbing & Pipefitting",
+    sector: "commercial",
+    sectorLabel: "Food & Trades",
+    query: "Commercial Plumbing Contractors",
+    desc: "High-capacity commercial boilers, grease traps, backflow prevention, industrial piping.",
+    keywords: "commercial plumbing, pipefitting, backflow, process piping, industrial plumbing"
+  },
+  {
+    id: 50,
+    name: "Commercial Electrical Contractors",
+    sector: "commercial",
+    sectorLabel: "Food & Trades",
+    query: "Commercial Electrical Contractors",
+    desc: "Three-phase power drops, switchgear installation, motor control centers, industrial power.",
+    keywords: "commercial electrical, 3-phase, switchgear, electrical contractors, motor controls"
+  }
+];
+
+let currentIndustryTargetInput = null;
+let currentSectorFilter = 'all';
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function setupIndustrySelector() {
+  const modal = document.getElementById('industrySelectorModal');
+  const closeBtn = document.getElementById('closeIndustryModalBtn');
+  const cancelBtn = document.getElementById('cancelIndustryModalBtn');
+  const searchInput = document.getElementById('industrySearchInput');
+  const countPill = document.getElementById('industryFilterCount');
+  const cardsGrid = document.getElementById('industryCardsGrid');
+  const sectorPills = document.querySelectorAll('.sector-pill');
+
+  if (!modal || !cardsGrid) return;
+
+  function renderCategories() {
+    const searchTerm = (searchInput?.value || '').trim().toLowerCase();
+    
+    const filtered = INDUSTRY_CATEGORIES.filter(cat => {
+      // Sector filter
+      if (currentSectorFilter !== 'all' && cat.sector !== currentSectorFilter) {
+        return false;
+      }
+      // Search term filter
+      if (!searchTerm) return true;
+      return (
+        cat.name.toLowerCase().includes(searchTerm) ||
+        cat.desc.toLowerCase().includes(searchTerm) ||
+        cat.keywords.toLowerCase().includes(searchTerm) ||
+        cat.sectorLabel.toLowerCase().includes(searchTerm)
+      );
+    });
+
+    if (countPill) {
+      countPill.textContent = `${filtered.length} Categor${filtered.length === 1 ? 'y' : 'ies'}`;
+    }
+
+    if (filtered.length === 0) {
+      cardsGrid.innerHTML = `
+        <div class="industry-empty-results">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <span style="font-weight: 500; font-size: 14px;">No matching industry categories found</span>
+          <span style="font-size: 12px; color: #6b7280;">Try searching for generic terms like "metal", "medical", "plastics", "machining", or "hvac".</span>
+        </div>
+      `;
+      return;
+    }
+
+    cardsGrid.innerHTML = filtered.map(cat => `
+      <div class="industry-card-item" data-query="${escapeHtml(cat.query)}" data-name="${escapeHtml(cat.name)}">
+        <div class="industry-card-head">
+          <span class="industry-card-title">${escapeHtml(cat.name)}</span>
+          <span class="industry-card-sector-tag">${escapeHtml(cat.sectorLabel)}</span>
+        </div>
+        <div class="industry-card-desc">${escapeHtml(cat.desc)}</div>
+        <div class="industry-card-keywords">${escapeHtml(cat.keywords)}</div>
+      </div>
+    `).join('');
+
+    // Bind card clicks
+    cardsGrid.querySelectorAll('.industry-card-item').forEach(card => {
+      card.addEventListener('click', () => {
+        const query = card.dataset.query || card.dataset.name;
+        if (currentIndustryTargetInput) {
+          currentIndustryTargetInput.value = query;
+          currentIndustryTargetInput.dispatchEvent(new Event('input', { bubbles: true }));
+          currentIndustryTargetInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        closeModal();
+      });
+    });
+  }
+
+  function openModal(target) {
+    currentIndustryTargetInput = target === 'campaign' ? campaignCategory : hunterCategory;
+    if (searchInput) searchInput.value = '';
+    currentSectorFilter = 'all';
+    sectorPills.forEach(p => p.classList.toggle('active', p.dataset.sector === 'all'));
+    renderCategories();
+    modal.style.display = 'flex';
+    if (searchInput) setTimeout(() => searchInput.focus(), 50);
+  }
+
+  function closeModal() {
+    modal.style.display = 'none';
+  }
+
+  // Trigger buttons
+  document.querySelectorAll('.open-industry-modal-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openModal(btn.dataset.target || 'hunter');
+    });
+  });
+
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.style.display === 'flex') {
+      closeModal();
+    }
+  });
+
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      renderCategories();
+    });
+  }
+
+  sectorPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      sectorPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      currentSectorFilter = pill.dataset.sector;
+      renderCategories();
+    });
+  });
+}
+

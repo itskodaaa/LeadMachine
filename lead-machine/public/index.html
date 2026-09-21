@@ -129,8 +129,18 @@
 
               <!-- Industry / Search Keyword -->
               <div class="form-group">
-                <label class="group-label" for="campaignCategory">Target Industry / Keyword</label>
+                <div class="label-with-action">
+                  <label class="group-label" for="campaignCategory">Target Industry / Keyword</label>
+                  <button type="button" class="btn-text-action open-industry-modal-btn" data-target="campaign">Browse 50+ Industries ↗</button>
+                </div>
                 <input type="text" id="campaignCategory" class="input-text" placeholder="e.g. Roofing Contractors, Manufacturing, Legal" value="Manufacturing">
+                <div class="suggestion-chips campaign-chips">
+                  <button type="button" class="chip-btn" data-query="Precision Machining">Precision Machining</button>
+                  <button type="button" class="chip-btn" data-query="Sheet Metal Fabrication">Sheet Metal</button>
+                  <button type="button" class="chip-btn" data-query="CNC Swiss Machining">CNC Swiss</button>
+                  <button type="button" class="chip-btn" data-query="Medical Device Manufacturing">Medical Devices</button>
+                  <button type="button" class="chip-btn chip-more-btn open-industry-modal-btn" data-target="campaign">+ More (50+)</button>
+                </div>
               </div>
 
               <!-- Autonomous Lead Hunting Fallback Banner -->
@@ -282,15 +292,19 @@
 
             <div class="hunter-form">
               <div class="form-group">
-                <label for="hunterCategory" class="group-label">Industry or Business Category</label>
+                <div class="label-with-action">
+                  <label for="hunterCategory" class="group-label">Industry or Business Category</label>
+                  <button type="button" class="btn-text-action open-industry-modal-btn" data-target="hunter">Browse 50+ Industries ↗</button>
+                </div>
                 <input type="text" id="hunterCategory" class="input-text" placeholder="e.g. Commercial HVAC, Precision Machining, Roofing">
                 <div class="suggestion-chips">
                   <button type="button" class="chip-btn" data-query="Commercial HVAC">Commercial HVAC</button>
                   <button type="button" class="chip-btn" data-query="Precision Machining">Precision Machining</button>
-                  <button type="button" class="chip-btn" data-query="Roofing Contractors">Roofing Contractors</button>
-                  <button type="button" class="chip-btn" data-query="Plumbing Contractors">Plumbing</button>
+                  <button type="button" class="chip-btn" data-query="Sheet Metal Fabrication">Sheet Metal</button>
+                  <button type="button" class="chip-btn" data-query="CNC Swiss Machining">CNC Swiss</button>
+                  <button type="button" class="chip-btn" data-query="Roofing Contractors">Roofing</button>
                   <button type="button" class="chip-btn" data-query="Commercial Electricians">Electricians</button>
-                  <button type="button" class="chip-btn" data-query="Architecture Firms">Architects</button>
+                  <button type="button" class="chip-btn chip-more-btn open-industry-modal-btn" data-target="hunter">+ More (50+)</button>
                 </div>
               </div>
 
@@ -902,6 +916,67 @@ I am reaching out to express our interest in your services and would appreciate 
       </div>
     </div>
   </div>
+
+  <!-- ========================================== -->
+  <!-- 50+ IN-DEPTH INDUSTRY & PRODUCT SELECTOR MODAL -->
+  <!-- ========================================== -->
+  <div id="industrySelectorModal" class="import-modal-overlay" style="display: none;">
+    <div class="industry-modal-card">
+      <div class="industry-modal-header">
+        <div class="industry-modal-title-group">
+          <div class="industry-header-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+              <line x1="12" y1="22.08" x2="12" y2="12"></line>
+            </svg>
+          </div>
+          <div>
+            <h2 class="industry-modal-title">Select Target Industry &amp; Product Category</h2>
+            <p class="industry-modal-subtitle">Choose from 50 high-velocity US manufacturing, precision engineering, and commercial sectors.</p>
+          </div>
+        </div>
+        <button type="button" class="import-modal-close" id="closeIndustryModalBtn" title="Close">✕</button>
+      </div>
+
+      <!-- Search and Sector Filters -->
+      <div class="industry-search-toolbar">
+        <div class="industry-search-input-wrap">
+          <svg class="search-lens-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="industrySearchInput" class="input-text industry-search-input" placeholder="Search 50+ US industries, product types (e.g. Swiss machining, surgical screws, laser cutting, batteries)..." autocomplete="off">
+          <span class="industry-count-pill" id="industryFilterCount">50 Categories</span>
+        </div>
+
+        <!-- Sector Tab Pills -->
+        <div class="sector-pills-bar" id="sectorPillsBar">
+          <button type="button" class="sector-pill active" data-sector="all">All Sectors (50)</button>
+          <button type="button" class="sector-pill" data-sector="machining">Precision &amp; CNC (8)</button>
+          <button type="button" class="sector-pill" data-sector="metal">Metal &amp; Fabrication (8)</button>
+          <button type="button" class="sector-pill" data-sector="aerospace">Aerospace &amp; Auto (7)</button>
+          <button type="button" class="sector-pill" data-sector="electronics">Electronics &amp; Medical (7)</button>
+          <button type="button" class="sector-pill" data-sector="plastics">Plastics &amp; Rubber (7)</button>
+          <button type="button" class="sector-pill" data-sector="industrial">Machinery &amp; Hydraulics (7)</button>
+          <button type="button" class="sector-pill" data-sector="commercial">Food &amp; Commercial (6)</button>
+        </div>
+      </div>
+
+      <!-- Scrollable Category Cards Grid -->
+      <div class="industry-grid-scroll">
+        <div class="industry-cards-grid" id="industryCardsGrid">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+
+      <div class="industry-modal-footer">
+        <span class="industry-footer-hint">💡 Tip: Clicking any category immediately inserts it into your search and updates lead targets.</span>
+        <button type="button" class="btn-secondary" id="cancelIndustryModalBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ========================================== -->
   <!-- LICENSE ACTIVATION GATE MODAL -->
   <!-- ========================================== -->
