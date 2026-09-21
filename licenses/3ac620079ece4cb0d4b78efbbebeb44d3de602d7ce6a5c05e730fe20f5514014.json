@@ -2,5 +2,6 @@
   "name": "Koda Enterprise",
   "active": true,
   "created": "2026-09-19",
-  "tier": "Master"
+  "tier": "Master",
+  "boundHardwareId": "HW-7E444DCD5B6C91BB6989CD05B9C67CDD"
 }
