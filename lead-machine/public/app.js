@@ -114,6 +114,33 @@ const importFeedback = document.getElementById('importFeedback');
 const submitImportBtn = document.getElementById('submitImportBtn');
 const submitImportBtnText = document.getElementById('submitImportBtnText');
 
+// Bulk Importer Tabs & Directory Crawler DOM
+const importTabDirectBtn = document.getElementById('importTabDirectBtn');
+const importTabCrawlBtn = document.getElementById('importTabCrawlBtn');
+const directImportPane = document.getElementById('directImportPane');
+const crawlImportPane = document.getElementById('crawlImportPane');
+const crawlDirectoryInput = document.getElementById('crawlDirectoryInput');
+const startCrawlBtn = document.getElementById('startCrawlBtn');
+const startCrawlBtnText = document.getElementById('startCrawlBtnText');
+const crawlLoadingState = document.getElementById('crawlLoadingState');
+const crawlResultsBox = document.getElementById('crawlResultsBox');
+const crawlResultsTitle = document.getElementById('crawlResultsTitle');
+const crawlFoundBadge = document.getElementById('crawlFoundBadge');
+const crawlResultsChips = document.getElementById('crawlResultsChips');
+
+// Diagnostic Screenshot Modal DOM
+const screenshotModal = document.getElementById('screenshotModal');
+const closeScreenshotModalBtn = document.getElementById('closeScreenshotModalBtn');
+const screenshotModalTitle = document.getElementById('screenshotModalTitle');
+const screenshotModalSubtitle = document.getElementById('screenshotModalSubtitle');
+const screenshotModalImg = document.getElementById('screenshotModalImg');
+const screenshotMetaCompany = document.getElementById('screenshotMetaCompany');
+const screenshotMetaReason = document.getElementById('screenshotMetaReason');
+const screenshotMetaLink = document.getElementById('screenshotMetaLink');
+
+const debugModeToggle = document.getElementById('debugModeToggle');
+
+
 // Corporate Profile DOM
 const pFullName = document.getElementById('pFullName');
 const pJobTitle = document.getElementById('pJobTitle');
@@ -542,6 +569,11 @@ async function loadInitialSpecs() {
     // Populate Sender Profile
     if (systemSpecs.senderProfile) {
       populateProfileForm(systemSpecs.senderProfile);
+    }
+
+    // Debug Mode setting
+    if (systemSpecs.settings && debugModeToggle) {
+      debugModeToggle.checked = Boolean(systemSpecs.settings.debugMode);
     }
 
   } catch (err) {
@@ -1083,14 +1115,53 @@ function setupLeadsHandlers() {
     }
   });
 
+  // Diagnostic screenshot preview click handler on leads table
+  if (leadsTableBody) {
+    leadsTableBody.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-icon-screenshot');
+      if (!btn) return;
+      const shot = btn.dataset.shot;
+      const company = btn.dataset.company;
+      const reason = btn.dataset.reason;
+      const web = btn.dataset.web;
+
+      if (screenshotModalImg) screenshotModalImg.src = shot;
+      if (screenshotMetaCompany) screenshotMetaCompany.textContent = company;
+      if (screenshotMetaReason) screenshotMetaReason.textContent = reason;
+      if (screenshotMetaLink) {
+        screenshotMetaLink.href = web;
+        screenshotMetaLink.textContent = web.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      }
+      if (screenshotModal) screenshotModal.style.display = 'flex';
+    });
+  }
+
+  if (closeScreenshotModalBtn && screenshotModal) {
+    closeScreenshotModalBtn.addEventListener('click', () => {
+      screenshotModal.style.display = 'none';
+      if (screenshotModalImg) screenshotModalImg.src = '';
+    });
+    screenshotModal.addEventListener('click', (e) => {
+      if (e.target === screenshotModal) {
+        screenshotModal.style.display = 'none';
+        if (screenshotModalImg) screenshotModalImg.src = '';
+      }
+    });
+  }
+
   // ------------------------------------------------------------------------
-  // Bulk Website Importer Modal Handlers
+  // Bulk Website & Webpage Directory Importer Modal Handlers
   // ------------------------------------------------------------------------
+  let currentImportTab = 'direct';
+  let discoveredCrawlCompanies = [];
+
   if (importWebsitesBtn && importWebsitesOverlay) {
     importWebsitesBtn.addEventListener('click', () => {
       importWebsitesOverlay.style.display = 'flex';
-      if (importWebsitesTextarea) {
+      if (currentImportTab === 'direct' && importWebsitesTextarea) {
         setTimeout(() => importWebsitesTextarea.focus(), 50);
+      } else if (currentImportTab === 'crawl' && crawlDirectoryInput) {
+        setTimeout(() => crawlDirectoryInput.focus(), 50);
       }
     });
   }
@@ -1101,10 +1172,34 @@ function setupLeadsHandlers() {
       importFeedback.style.display = 'none';
       importFeedback.className = 'import-feedback';
     }
+    if (crawlLoadingState) crawlLoadingState.style.display = 'none';
   };
 
   if (closeImportModalBtn) closeImportModalBtn.addEventListener('click', closeImporter);
   if (cancelImportBtn) cancelImportBtn.addEventListener('click', closeImporter);
+
+  // Tab switching between Direct and Crawl
+  if (importTabDirectBtn && importTabCrawlBtn) {
+    importTabDirectBtn.addEventListener('click', () => {
+      currentImportTab = 'direct';
+      importTabDirectBtn.classList.add('active');
+      importTabCrawlBtn.classList.remove('active');
+      if (directImportPane) directImportPane.style.display = 'block';
+      if (crawlImportPane) crawlImportPane.style.display = 'none';
+      if (importFeedback) importFeedback.style.display = 'none';
+      updateImporterPreview();
+    });
+
+    importTabCrawlBtn.addEventListener('click', () => {
+      currentImportTab = 'crawl';
+      importTabCrawlBtn.classList.add('active');
+      importTabDirectBtn.classList.remove('active');
+      if (directImportPane) directImportPane.style.display = 'none';
+      if (crawlImportPane) crawlImportPane.style.display = 'block';
+      if (importFeedback) importFeedback.style.display = 'none';
+      updateCrawlPreview();
+    });
+  }
 
   function clientParseWebsites(rawText) {
     if (!rawText || typeof rawText !== 'string') return [];
@@ -1137,6 +1232,7 @@ function setupLeadsHandlers() {
   }
 
   function updateImporterPreview() {
+    if (currentImportTab !== 'direct') return;
     if (!importWebsitesTextarea) return;
     const raw = importWebsitesTextarea.value;
     const parsed = clientParseWebsites(raw);
@@ -1157,7 +1253,7 @@ function setupLeadsHandlers() {
         parsed.slice(0, 4).forEach(item => {
           const chip = document.createElement('div');
           chip.className = 'import-chip';
-          chip.innerHTML = `<span class="import-chip-name">${item.companyName}</span><span class="import-chip-domain">${item.domain}</span>`;
+          chip.innerHTML = `<span class="import-chip-name">${escapeHtml(item.companyName)}</span><span class="import-chip-domain">${escapeHtml(item.domain)}</span>`;
           importPreviewChips.appendChild(chip);
         });
         if (count > 4) {
@@ -1176,8 +1272,105 @@ function setupLeadsHandlers() {
     }
   }
 
+  function updateCrawlPreview() {
+    if (currentImportTab !== 'crawl') return;
+    const count = discoveredCrawlCompanies.length;
+    if (count > 0) {
+      if (submitImportBtn) submitImportBtn.disabled = false;
+      if (submitImportBtnText) submitImportBtnText.textContent = `Import ${count} Discovered ${count === 1 ? 'Lead' : 'Leads'}`;
+      if (crawlResultsBox) crawlResultsBox.style.display = 'flex';
+      if (crawlFoundBadge) crawlFoundBadge.textContent = `${count} found`;
+      if (crawlResultsTitle) crawlResultsTitle.textContent = `Discovered Companies (${count}):`;
+    } else {
+      if (submitImportBtn) submitImportBtn.disabled = true;
+      if (submitImportBtnText) submitImportBtnText.textContent = 'Import 0 Leads';
+      if (crawlResultsBox) crawlResultsBox.style.display = 'none';
+    }
+  }
+
   if (importWebsitesTextarea) {
     importWebsitesTextarea.addEventListener('input', updateImporterPreview);
+  }
+
+  // Directory Crawler Handler
+  if (startCrawlBtn) {
+    startCrawlBtn.addEventListener('click', async () => {
+      const targetUrl = (crawlDirectoryInput?.value || '').trim();
+      if (!targetUrl) {
+        if (importFeedback) {
+          importFeedback.className = 'import-feedback error';
+          importFeedback.textContent = 'Please enter a valid webpage or directory URL.';
+          importFeedback.style.display = 'block';
+        }
+        return;
+      }
+
+      startCrawlBtn.disabled = true;
+      if (startCrawlBtnText) startCrawlBtnText.textContent = 'Crawling...';
+      if (crawlLoadingState) crawlLoadingState.style.display = 'flex';
+      if (crawlResultsBox) crawlResultsBox.style.display = 'none';
+      if (importFeedback) importFeedback.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/leads/crawl-directory', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: targetUrl })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Failed to crawl webpage.');
+        }
+
+        discoveredCrawlCompanies = data.companies || [];
+        const count = discoveredCrawlCompanies.length;
+
+        if (crawlLoadingState) crawlLoadingState.style.display = 'none';
+
+        if (count === 0) {
+          if (importFeedback) {
+            importFeedback.className = 'import-feedback error';
+            importFeedback.textContent = 'No external company websites were detected on this page.';
+            importFeedback.style.display = 'block';
+          }
+          if (submitImportBtn) submitImportBtn.disabled = true;
+          if (submitImportBtnText) submitImportBtnText.textContent = 'Import 0 Leads';
+        } else {
+          if (crawlResultsBox) crawlResultsBox.style.display = 'flex';
+          if (crawlFoundBadge) crawlFoundBadge.textContent = `${count} found`;
+          if (crawlResultsTitle) crawlResultsTitle.textContent = `Discovered Companies (${count}):`;
+
+          if (crawlResultsChips) {
+            crawlResultsChips.innerHTML = '';
+            discoveredCrawlCompanies.slice(0, 8).forEach(item => {
+              const chip = document.createElement('div');
+              chip.className = 'import-chip';
+              chip.innerHTML = `<span class="import-chip-name">${escapeHtml(item.companyName)}</span><span class="import-chip-domain">${escapeHtml(item.domain)}</span>`;
+              crawlResultsChips.appendChild(chip);
+            });
+            if (count > 8) {
+              const moreChip = document.createElement('div');
+              moreChip.className = 'import-chip';
+              moreChip.innerHTML = `<span class="import-chip-domain">+${count - 8} more</span>`;
+              crawlResultsChips.appendChild(moreChip);
+            }
+          }
+
+          if (submitImportBtn) submitImportBtn.disabled = false;
+          if (submitImportBtnText) submitImportBtnText.textContent = `Import ${count} Discovered ${count === 1 ? 'Lead' : 'Leads'}`;
+        }
+      } catch (err) {
+        if (crawlLoadingState) crawlLoadingState.style.display = 'none';
+        if (importFeedback) {
+          importFeedback.className = 'import-feedback error';
+          importFeedback.textContent = `Crawl error: ${err.message}`;
+          importFeedback.style.display = 'block';
+        }
+      } finally {
+        startCrawlBtn.disabled = false;
+        if (startCrawlBtnText) startCrawlBtnText.textContent = 'Crawl Page';
+      }
+    });
   }
 
   function handleImportFile(file) {
@@ -1226,8 +1419,15 @@ function setupLeadsHandlers() {
 
   if (submitImportBtn) {
     submitImportBtn.addEventListener('click', async () => {
-      const rawText = (importWebsitesTextarea?.value || '').trim();
-      if (!rawText) return;
+      let payload = {};
+      if (currentImportTab === 'crawl') {
+        if (discoveredCrawlCompanies.length === 0) return;
+        payload = { urls: discoveredCrawlCompanies.map(c => c.cleanUrl) };
+      } else {
+        const rawText = (importWebsitesTextarea?.value || '').trim();
+        if (!rawText) return;
+        payload = { rawText };
+      }
 
       submitImportBtn.disabled = true;
       if (submitImportBtnText) submitImportBtnText.textContent = 'Importing...';
@@ -1237,7 +1437,7 @@ function setupLeadsHandlers() {
         const res = await fetch('/api/leads/import-urls', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rawText })
+          body: JSON.stringify(payload)
         });
         const data = await res.json();
 
@@ -1258,6 +1458,9 @@ function setupLeadsHandlers() {
         setTimeout(() => {
           closeImporter();
           if (importWebsitesTextarea) importWebsitesTextarea.value = '';
+          if (crawlDirectoryInput) crawlDirectoryInput.value = '';
+          discoveredCrawlCompanies = [];
+          if (crawlResultsBox) crawlResultsBox.style.display = 'none';
           updateImporterPreview();
           if (submitImportBtnText) submitImportBtnText.textContent = 'Import 0 Websites';
         }, 1800);
@@ -1269,7 +1472,8 @@ function setupLeadsHandlers() {
           importFeedback.style.display = 'block';
         }
         submitImportBtn.disabled = false;
-        updateImporterPreview();
+        if (currentImportTab === 'crawl') updateCrawlPreview();
+        else updateImporterPreview();
       }
     });
   }
@@ -1293,12 +1497,16 @@ function filterAndRenderLeadsTable() {
 
   const filtered = allLeadsData.filter(lead => {
     // Filter by Status
-    if (activeTableFilter !== 'all' && lead.status !== activeTableFilter) {
-      return false;
+    if (activeTableFilter !== 'all') {
+      if (activeTableFilter === 'unreachable') {
+        if (lead.status !== 'unreachable' && lead.status !== 'unable_to_reach') return false;
+      } else if (lead.status !== activeTableFilter) {
+        return false;
+      }
     }
     // Filter by Search Query
     if (query) {
-      const text = `${lead.company_name} ${lead.website} ${lead.notes || ''} ${lead.phone || ''}`.toLowerCase();
+      const text = `${lead.company_name || ''} ${lead.website || ''} ${lead.notes || ''} ${lead.failure_reason || ''} ${lead.phone || ''}`.toLowerCase();
       return text.includes(query);
     }
     return true;
@@ -1312,7 +1520,7 @@ function renderTableRows(leads) {
   if (leads.length === 0) {
     leadsTableBody.innerHTML = `
       <tr>
-        <td colspan="6" style="text-align: center; padding: 32px; color: var(--text-muted);">
+        <td colspan="7" style="text-align: center; padding: 32px; color: var(--text-muted);">
           No leads match your criteria.
         </td>
       </tr>
@@ -1328,20 +1536,52 @@ function renderTableRows(leads) {
     if (lead.status === 'contacted') {
       statusClass = 'contacted';
       statusText = 'Contacted';
-    } else if (lead.status === 'unable_to_reach') {
+    } else if (lead.status === 'captcha_blocked') {
+      statusClass = 'captcha';
+      statusText = 'CAPTCHA';
+    } else if (lead.status === 'no_form_found') {
+      statusClass = 'no-form';
+      statusText = 'No Form';
+    } else if (lead.status === 'form_submit_error') {
+      statusClass = 'error';
+      statusText = 'Submit Error';
+    } else if (lead.status === 'unreachable' || lead.status === 'unable_to_reach') {
       statusClass = 'unable';
-      statusText = 'Unable';
+      statusText = 'Unreachable';
     }
 
     const web = lead.website ? (lead.website.startsWith('http') ? lead.website : `https://${lead.website}`) : '#';
 
+    let shotBtnHtml = `<span style="color: var(--text-muted); font-size: 11px;">-</span>`;
+    if (lead.debug_screenshot) {
+      shotBtnHtml = `
+        <button type="button" class="btn-icon-screenshot" title="View Diagnostic Screenshot"
+          data-id="${lead.id}"
+          data-company="${escapeHtml(lead.company_name || '')}"
+          data-reason="${escapeHtml(lead.failure_reason || statusText)}"
+          data-shot="${lead.debug_screenshot}"
+          data-web="${web}">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+        </button>
+      `;
+    }
+
+    let notesHtml = escapeHtml(lead.notes || '-');
+    if (lead.failure_reason) {
+      notesHtml = `<span style="color: var(--text-primary); font-weight: 500;">${escapeHtml(lead.failure_reason)}</span>${lead.notes && lead.notes !== lead.failure_reason ? ` — <span style="color: var(--text-muted);">${escapeHtml(lead.notes)}</span>` : ''}`;
+    }
+
     tr.innerHTML = `
       <td class="tabular" style="color: var(--text-muted);">${lead.id}</td>
-      <td style="font-weight: 500; color: var(--text-primary);">${lead.company_name}</td>
-      <td><a href="${web}" target="_blank" rel="noopener noreferrer">${lead.website || '-'}</a></td>
-      <td class="tabular">${lead.phone || '-'}</td>
+      <td style="font-weight: 500; color: var(--text-primary);">${escapeHtml(lead.company_name)}</td>
+      <td><a href="${web}" target="_blank" rel="noopener noreferrer">${escapeHtml(lead.website || '-')}</a></td>
+      <td class="tabular">${escapeHtml(lead.phone || '-')}</td>
       <td><span class="badge-tag ${statusClass}">${statusText}</span></td>
-      <td style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-muted);">${lead.notes || '-'}</td>
+      <td style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px;">${notesHtml}</td>
+      <td style="text-align: center;">${shotBtnHtml}</td>
     `;
     leadsTableBody.appendChild(tr);
   });
@@ -1512,6 +1752,20 @@ function setupSettingsHandlers() {
   if (workerSlider) {
     workerSlider.addEventListener('input', () => {
       workerSliderVal.textContent = `${workerSlider.value} Workers`;
+    });
+  }
+
+  if (debugModeToggle) {
+    debugModeToggle.addEventListener('change', async () => {
+      try {
+        await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ debugMode: debugModeToggle.checked })
+        });
+      } catch (err) {
+        console.error('Failed to save debugMode:', err);
+      }
     });
   }
 

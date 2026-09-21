@@ -6,6 +6,7 @@ import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
 import { leadHunter } from './hunter.mjs';
+import { migrateDatabase } from './db_migration.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dbPath = path.resolve(__dirname, '../data/leads.db');
@@ -45,8 +46,10 @@ export class CampaignOrchestrator extends EventEmitter {
         phone TEXT,
         email TEXT,
         contact_person TEXT,
-        status TEXT DEFAULT 'not_contacted' CHECK(status IN ('not_contacted', 'pending', 'contacted', 'responded', 'unable_to_reach', 'won', 'closed')),
+        status TEXT DEFAULT 'not_contacted',
         notes TEXT,
+        failure_reason TEXT,
+        debug_screenshot TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
@@ -59,6 +62,7 @@ export class CampaignOrchestrator extends EventEmitter {
         FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE
       );
     `);
+    migrateDatabase(db);
     return db;
   }
 

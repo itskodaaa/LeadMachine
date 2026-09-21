@@ -7,6 +7,7 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 import { checkWebsite } from './reachability.mjs';
+import { migrateDatabase } from './db_migration.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 puppeteer.use(StealthPlugin());
@@ -28,8 +29,10 @@ db.exec(`
     phone TEXT,
     email TEXT,
     contact_person TEXT,
-    status TEXT DEFAULT 'not_contacted' CHECK(status IN ('not_contacted', 'pending', 'contacted', 'responded', 'unable_to_reach', 'won', 'closed')),
+    status TEXT DEFAULT 'not_contacted',
     notes TEXT,
+    failure_reason TEXT,
+    debug_screenshot TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -42,6 +45,7 @@ db.exec(`
     FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE
   );
 `);
+migrateDatabase(db);
 
 function findChromeExecutable() {
   const isWin = process.platform === 'win32';
@@ -205,19 +209,92 @@ const ERROR_SIGNALS = [
   'there was a problem'
 ];
 
-const updateStmt = db.prepare('UPDATE leads SET notes = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+const updateStmt = db.prepare(`
+  UPDATE leads 
+  SET notes = ?, 
+      status = ?, 
+      failure_reason = COALESCE(?, failure_reason), 
+      debug_screenshot = COALESCE(?, debug_screenshot), 
+      updated_at = CURRENT_TIMESTAMP 
+  WHERE id = ?
+`);
 const logStmt = db.prepare('INSERT INTO contact_logs (lead_id, action, notes, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)');
-const getStmt = db.prepare('SELECT id, company_name, status, notes FROM leads WHERE id = ?');
+const getStmt = db.prepare('SELECT id, company_name, status, notes, failure_reason, debug_screenshot FROM leads WHERE id = ?');
 
-function saveLeadResult(id, status, note, isSandbox = false) {
+function isDebugModeEnabled() {
+  try {
+    const configPath = path.join(__dirname, 'config.json');
+    if (fs.existsSync(configPath)) {
+      const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      if (cfg.settings && cfg.settings.debugMode === true) return true;
+      if (cfg.debugMode === true) return true;
+    }
+  } catch (_) {}
+  return false;
+}
+
+async function captureFailureScreenshot(page, leadId) {
+  try {
+    if (!isDebugModeEnabled() || !page || page.isClosed()) return null;
+    const shotsDir = path.resolve(__dirname, '../data/debug_screenshots');
+    if (!fs.existsSync(shotsDir)) fs.mkdirSync(shotsDir, { recursive: true });
+    const filename = `lead_${leadId}_${Date.now()}.png`;
+    const fullPath = path.join(shotsDir, filename);
+    await page.screenshot({ path: fullPath, fullPage: false });
+    return `/api/debug/screenshot/${filename}`;
+  } catch (err) {
+    console.error(`[Worker] Screenshot capture failed: ${err.message}`);
+    return null;
+  }
+}
+
+async function detectCaptchaOrSecurityBlock(page) {
+  try {
+    return await page.evaluate(() => {
+      const text = (document.body ? document.body.innerText.toLowerCase() : '');
+      const title = (document.title || '').toLowerCase();
+
+      // Cloudflare / Turnstile
+      if (text.includes('checking your browser') ||
+          (text.includes('cloudflare') && (text.includes('ray id') || text.includes('turnstile') || text.includes('please wait') || text.includes('security check'))) ||
+          text.includes('verify you are human') ||
+          text.includes('verify that you are human') ||
+          title.includes('just a moment...') ||
+          title.includes('attention required! | cloudflare') ||
+          document.querySelector('iframe[src*="challenges.cloudflare.com"]') ||
+          document.querySelector('.cf-turnstile, input[name="cf-turnstile-response"]')) {
+        return { isBlocked: true, reason: 'Cloudflare / Turnstile Challenge' };
+      }
+
+      // reCAPTCHA / hCaptcha / generic bot challenge
+      if (document.querySelector('iframe[src*="recaptcha"]') ||
+          document.querySelector('.g-recaptcha') ||
+          document.querySelector('iframe[src*="hcaptcha"]') ||
+          document.querySelector('.h-captcha')) {
+        return { isBlocked: true, reason: 'CAPTCHA Challenge (reCAPTCHA / hCaptcha)' };
+      }
+
+      // WAF access denied
+      if (text.includes('access denied') && (text.includes('waf') || text.includes('firewall') || text.includes('403 forbidden') || text.includes('perimeterx') || text.includes('ddos-guard'))) {
+        return { isBlocked: true, reason: 'Security Firewall / WAF Block' };
+      }
+
+      return { isBlocked: false, reason: null };
+    });
+  } catch (_) {
+    return { isBlocked: false, reason: null };
+  }
+}
+
+function saveLeadResult(id, status, note, isSandbox = false, failureReason = null, debugScreenshot = null) {
   if (isSandbox) return;
   try {
     const current = getStmt.get(id);
     const targetStatus = (current?.status === 'contacted') ? 'contacted' : status;
     const newNotes = current?.notes ? current.notes + ' | ' + note : note;
     db.transaction(() => {
-      updateStmt.run(newNotes, targetStatus, id);
-      const action = targetStatus === 'contacted' ? 'sent' : 'bounced';
+      updateStmt.run(newNotes, targetStatus, failureReason, debugScreenshot, id);
+      const action = targetStatus === 'contacted' ? 'sent' : (targetStatus === 'captcha_blocked' ? 'captcha' : 'bounced');
       logStmt.run(id, action, note);
     })();
   } catch (err) {
@@ -280,9 +357,9 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
     if (!preCheck.ok && preCheck.isDefinitiveDead) {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
       console.log(`[${agentName}] ⚠️ #${lead.id} Definitive dead site (${preCheck.reason}) (${elapsed}s)`);
-      saveLeadResult(lead.id, 'unable_to_reach', `Pre-flight unreachable: ${preCheck.reason}`, isSandbox);
+      saveLeadResult(lead.id, 'unreachable', `Pre-flight unreachable: ${preCheck.reason}`, isSandbox, `Dead domain (${preCheck.reason})`, null);
       await safeClose(page);
-      return { id: lead.id, company: lead.company_name, status: 'unable_to_reach', time: elapsed, result: `Unreachable: ${preCheck.reason}` };
+      return { id: lead.id, company: lead.company_name, status: 'unreachable', time: elapsed, result: `Unreachable: ${preCheck.reason}` };
     }
 
     let siteUrl = lead.website;
@@ -308,16 +385,20 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
     if (!loadedOk) {
       const hasContent = await page.evaluate(() => Boolean(document.body && document.body.innerText.trim().length > 10)).catch(() => false);
       if (!hasContent) {
-        throw new Error('Site timed out loading on current connection');
+        const shot = await captureFailureScreenshot(page, lead.id);
+        saveLeadResult(lead.id, 'unreachable', 'Site timed out loading on current connection', isSandbox, 'Connection Timeout / DNS Failure', shot);
+        await safeClose(page);
+        return { id: lead.id, company: lead.company_name, status: 'unreachable', result: 'Site timed out loading' };
       }
     }
 
     // Check for CAPTCHA or WAF block
-    const pageText = await page.evaluate(() => document.body ? document.body.innerText.toLowerCase() : '');
-    if (pageText.includes('checking your browser') || pageText.includes('cloudflare') && pageText.includes('ray id')) {
-      saveLeadResult(lead.id, 'unable_to_reach', 'Blocked by Security WAF / Cloudflare', isSandbox);
+    const initialSecurity = await detectCaptchaOrSecurityBlock(page);
+    if (initialSecurity.isBlocked) {
+      const shot = await captureFailureScreenshot(page, lead.id);
+      saveLeadResult(lead.id, 'captcha_blocked', `Blocked by ${initialSecurity.reason}`, isSandbox, initialSecurity.reason, shot);
       await safeClose(page);
-      return { id: lead.id, company: lead.company_name, status: 'unable_to_reach', result: 'Blocked by Security WAF' };
+      return { id: lead.id, company: lead.company_name, status: 'captcha_blocked', result: initialSecurity.reason };
     }
 
     // Find contact link if not already on contact page
@@ -343,6 +424,14 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
           await page.goto(contactHref, { waitUntil: 'domcontentloaded', timeout: 30000 });
           contactPageUrl = page.url();
         } catch (_) {}
+
+        const contactSecurity = await detectCaptchaOrSecurityBlock(page);
+        if (contactSecurity.isBlocked) {
+          const shot = await captureFailureScreenshot(page, lead.id);
+          saveLeadResult(lead.id, 'captcha_blocked', `Blocked on contact page by ${contactSecurity.reason}`, isSandbox, contactSecurity.reason, shot);
+          await safeClose(page);
+          return { id: lead.id, company: lead.company_name, status: 'captcha_blocked', result: contactSecurity.reason };
+        }
       }
     }
 
@@ -463,9 +552,10 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
 
 
     if (!formFilled.filled) {
-      saveLeadResult(lead.id, 'unable_to_reach', `No suitable web contact form found on ${contactPageUrl}`, isSandbox);
+      const shot = await captureFailureScreenshot(page, lead.id);
+      saveLeadResult(lead.id, 'no_form_found', `No suitable web contact form found on ${contactPageUrl}`, isSandbox, 'No web form found', shot);
       await safeClose(page);
-      return { id: lead.id, company: lead.company_name, status: 'unable_to_reach', result: 'No web form found' };
+      return { id: lead.id, company: lead.company_name, status: 'no_form_found', result: 'No web form found' };
     }
 
     // Human-like pause before submit
@@ -555,17 +645,22 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
       return { id: lead.id, company: lead.company_name, status: 'contacted', time: elapsed, result: `Confirmed: ${confirmationPhrase}` };
     } else {
       console.log(`[${agentName}] ⚠️ #${lead.id} Unconfirmed (${elapsed}s)`);
-      saveLeadResult(lead.id, 'unable_to_reach', `Contact form: ${contactPageUrl} (Unconfirmed post-submission)`, isSandbox);
+      const shot = await captureFailureScreenshot(page, lead.id);
+      saveLeadResult(lead.id, 'form_submit_error', `Contact form: ${contactPageUrl} (Unconfirmed post-submission)`, isSandbox, 'Submission unconfirmed or rejected', shot);
       await safeClose(page);
-      return { id: lead.id, company: lead.company_name, status: 'unable_to_reach', time: elapsed, result: 'Unconfirmed post-submission' };
+      return { id: lead.id, company: lead.company_name, status: 'form_submit_error', time: elapsed, result: 'Unconfirmed post-submission' };
     }
 
   } catch (err) {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`[${agentName}] ❌ #${lead.id} Error: ${err.message} (${elapsed}s)`);
-    saveLeadResult(lead.id, 'unable_to_reach', `Error during browser automation: ${err.message.split('\n')[0]}`, isSandbox);
+    const isTimeout = (err.message || '').toLowerCase().includes('timeout') || (err.message || '').toLowerCase().includes('net::');
+    const targetStatus = isTimeout ? 'unreachable' : 'form_submit_error';
+    const reasonText = isTimeout ? 'Connection Timeout / DNS Failure' : `Automation Error: ${err.message.split('\n')[0]}`;
+    const shot = await captureFailureScreenshot(page, lead.id);
+    saveLeadResult(lead.id, targetStatus, `Error during browser automation: ${err.message.split('\n')[0]}`, isSandbox, reasonText, shot);
     await safeClose(page);
-    return { id: lead.id, company: lead.company_name, status: 'unable_to_reach', time: elapsed, result: `Error: ${err.message}` };
+    return { id: lead.id, company: lead.company_name, status: targetStatus, time: elapsed, result: `Error: ${err.message}` };
   }
 }
 

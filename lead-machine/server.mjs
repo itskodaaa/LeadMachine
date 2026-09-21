@@ -10,7 +10,7 @@ import { orchestrator } from './orchestrator.mjs';
 import { checkExtractorStatus, syncExtractorLeads } from './extractor_sync.mjs';
 import { batchCheckWebsites } from './reachability.mjs';
 import { leadHunter } from './hunter.mjs';
-import { parseRawWebsites, importWebsitesToDb } from './url_importer.mjs';
+import { parseRawWebsites, importWebsitesToDb, crawlDirectoryPage } from './url_importer.mjs';
 
 // Prioritize IPv4 on virtualized / VM networks (fixes UTM/QEMU/Hyper-V IPv6 timeout)
 try {
@@ -212,6 +212,7 @@ function getSystemSpecs() {
     recommendedWorkers,
     maxWorkers,
     senderProfile: config.sender || null,
+    settings: config.settings || {},
     extractor: checkExtractorStatus(),
     dbStats: {
       notContacted,
@@ -733,7 +734,7 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/leads' && req.method === 'GET') {
     try {
       const db = orchestrator.getDb();
-      const rows = db.prepare("SELECT id, company_name, website, phone, status, notes, created_at FROM leads ORDER BY id DESC").all();
+      const rows = db.prepare("SELECT id, company_name, website, phone, status, notes, failure_reason, debug_screenshot, created_at FROM leads ORDER BY id DESC").all();
       db.close();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, leads: rows }));
@@ -785,6 +786,115 @@ const server = http.createServer(async (req, res) => {
     });
     return;
   }
+
+  // Crawl Webpage or Directory URL for External Company Links
+  if (pathname === '/api/leads/crawl-directory' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const targetUrl = (payload.url || '').trim();
+        if (!targetUrl) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'A directory or webpage URL is required.' }));
+          return;
+        }
+
+        const crawlResult = await crawlDirectoryPage(targetUrl);
+        if (!crawlResult.success) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(crawlResult));
+          return;
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          targetUrl: crawlResult.targetUrl,
+          totalFound: crawlResult.totalFound,
+          companies: crawlResult.companies
+        }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // Debug Screenshot Image Server
+  if (pathname.startsWith('/api/debug/screenshot/') && req.method === 'GET') {
+    const rawFile = pathname.replace('/api/debug/screenshot/', '');
+    const filename = path.basename(rawFile);
+    if (!filename || !filename.endsWith('.png')) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'Invalid screenshot filename.' }));
+      return;
+    }
+
+    const shotPath = path.resolve(__dirname, '../data/debug_screenshots', filename);
+    if (!fs.existsSync(shotPath)) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'Screenshot not found.' }));
+      return;
+    }
+
+    try {
+      const stat = fs.statSync(shotPath);
+      res.writeHead(200, {
+        'Content-Type': 'image/png',
+        'Content-Length': stat.size,
+        'Cache-Control': 'public, max-age=86400'
+      });
+      fs.createReadStream(shotPath).pipe(res);
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  // System Settings (Debug Mode, Concurrency, etc.)
+  if (pathname === '/api/settings' && req.method === 'GET') {
+    const cfgPath = path.join(__dirname, 'config.json');
+    let cfg = {};
+    if (fs.existsSync(cfgPath)) {
+      try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, settings: cfg.settings || {} }));
+    return;
+  }
+
+  if (pathname === '/api/settings' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const cfgPath = path.join(__dirname, 'config.json');
+        let cfg = {};
+        if (fs.existsSync(cfgPath)) {
+          try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
+        }
+        if (!cfg.settings) cfg.settings = {};
+        if (payload.debugMode !== undefined) cfg.settings.debugMode = Boolean(payload.debugMode);
+        if (payload.defaultSpeedMode !== undefined) cfg.settings.defaultSpeedMode = payload.defaultSpeedMode;
+        if (payload.sandboxMode !== undefined) cfg.settings.sandboxMode = Boolean(payload.sandboxMode);
+        if (payload.concurrency !== undefined) cfg.settings.concurrency = Number(payload.concurrency);
+        
+        fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, settings: cfg.settings }));
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
 
   // Leads CSV Export
   if (pathname === '/api/leads/export' && req.method === 'GET') {
