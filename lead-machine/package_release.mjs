@@ -42,6 +42,7 @@ const lmFilesToCopy = [
   'extractor_sync.mjs',
   'auth.mjs',
   'url_importer.mjs',
+  'db_migration.mjs',
   'config.json',
   'launch.ps1'
 ];
@@ -99,7 +100,7 @@ for (const f of launchers) {
 // Write streamlined, bloat-free package.json (fast npm install)
 const cleanPkg = {
   name: 'lead-machine',
-  version: '2.3.0',
+  version: '2.4.0',
   private: true,
   type: 'module',
   dependencies: {
@@ -129,8 +130,10 @@ cleanDb.exec(`
     phone TEXT,
     email TEXT,
     contact_person TEXT,
-    status TEXT DEFAULT 'not_contacted' CHECK(status IN ('not_contacted', 'pending', 'contacted', 'responded', 'unable_to_reach', 'won', 'closed')),
+    status TEXT DEFAULT 'not_contacted',
     notes TEXT,
+    failure_reason TEXT,
+    debug_screenshot TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
