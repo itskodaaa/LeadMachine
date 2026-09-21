@@ -19,7 +19,7 @@ export async function checkWebsite(website, timeout = TIMEOUT_MS) {
   try {
     const dnsRace = Promise.race([
       dns.lookup(domain),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('DNS Timeout')), 8000))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('DNS Timeout')), 12000))
     ]);
     const addresses = await dnsRace;
     if (!addresses || !addresses.address) return { ok: false, reason: 'DNS lookup failed', isDefinitiveDead: false };

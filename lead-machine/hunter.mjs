@@ -302,6 +302,9 @@ export class LeadHunter {
     this.discoveredCount = 0;
     this.reachableCount = 0;
     this.skippedCount = 0;
+    this.duplicatesCount = 0;
+    this.noWebsiteCount = 0;
+    this.unreachableCount = 0;
     this.tasks = [];
     this.currentTaskIndex = 0;
     this.recentLeads = [];
@@ -323,6 +326,11 @@ export class LeadHunter {
       discovered: this.discoveredCount,
       reachable: this.reachableCount,
       skipped: this.skippedCount,
+      breakdown: {
+        duplicates: this.duplicatesCount,
+        noWebsite: this.noWebsiteCount,
+        unreachable: this.unreachableCount
+      },
       currentTaskIndex: this.currentTaskIndex,
       totalTasks: this.tasks.length,
       activeTask: this.tasks[this.currentTaskIndex] || null,
@@ -430,6 +438,9 @@ export class LeadHunter {
     this.discoveredCount = 0;
     this.reachableCount = 0;
     this.skippedCount = 0;
+    this.duplicatesCount = 0;
+    this.noWebsiteCount = 0;
+    this.unreachableCount = 0;
     this.targetLimit = Math.max(1, Math.min(100000, Number(limit) || 1000));
     this.recentLeads = [];
     this.startTime = Date.now();
@@ -462,7 +473,20 @@ export class LeadHunter {
       throw new Error(this.errorMessage);
     }
 
-    const checkExistingStmt = db.prepare('SELECT id FROM leads WHERE website LIKE ? OR company_name LIKE ? LIMIT 1');
+    // Exact domain boundary & company name match (prevents false-positive substring collisions)
+    const checkExistingStmt = db.prepare(`
+      SELECT id FROM leads 
+      WHERE LOWER(company_name) = LOWER(?)
+         OR LOWER(website) = ?
+         OR LOWER(website) = ?
+         OR LOWER(website) = ?
+         OR LOWER(website) = ?
+         OR LOWER(website) LIKE ?
+         OR LOWER(website) LIKE ?
+         OR LOWER(website) LIKE ?
+         OR LOWER(website) LIKE ?
+      LIMIT 1
+    `);
     const insertLeadStmt = db.prepare(`
       INSERT INTO leads (company_name, website, city, state, phone, email, notes, contact_person, status)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'not_contacted')
@@ -525,6 +549,7 @@ export class LeadHunter {
             }
 
             if (!cleanUrl) {
+              this.noWebsiteCount++;
               this.skippedCount++;
               continue;
             }
@@ -538,19 +563,32 @@ export class LeadHunter {
               lowerUrl.includes('linkedin.com') ||
               lowerUrl.includes('mapquest.com')
             ) {
+              this.noWebsiteCount++;
               this.skippedCount++;
               continue;
             }
 
             let normalized = cleanUrl.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0].split('?')[0];
             if (!normalized.includes('.') || seenDomains.has(normalized)) {
+              this.duplicatesCount++;
               this.skippedCount++;
               continue;
             }
 
-            // Check database duplicate
-            const existing = checkExistingStmt.get(`%${normalized}%`, item.name);
+            // Check database duplicate (Exact domain boundary match - avoids substring collisions)
+            const existing = checkExistingStmt.get(
+              item.name,
+              normalized,
+              `http://${normalized}`,
+              `https://${normalized}`,
+              `https://www.${normalized}`,
+              `http://${normalized}/%`,
+              `https://${normalized}/%`,
+              `http://www.${normalized}/%`,
+              `https://www.${normalized}/%`
+            );
             if (existing) {
+              this.duplicatesCount++;
               this.skippedCount++;
               continue;
             }
@@ -568,8 +606,10 @@ export class LeadHunter {
             const batchPromises = candidatesToVerify.map(async (candidate) => {
               if (this.reachableCount >= this.targetLimit || this.abortRequested) return;
 
-              const check = await checkWebsite(candidate.cleanUrl, 7000);
+              // Generous 12,000ms timeout accounts for slow networks and sluggish small business servers
+              const check = await checkWebsite(candidate.cleanUrl, 12000);
               if (!check.ok) {
+                this.unreachableCount++;
                 this.skippedCount++;
                 return;
               }
@@ -604,7 +644,8 @@ export class LeadHunter {
 
                 emit('lead_found', leadObj);
               } catch (insertErr) {
-                // If unique constraint triggers, skip
+                // If unique constraint triggers, record duplicate
+                this.duplicatesCount++;
                 this.skippedCount++;
               }
             });
@@ -620,7 +661,12 @@ export class LeadHunter {
             taskFound: taskLeadsCount,
             discovered: this.discoveredCount,
             reachable: this.reachableCount,
-            skipped: this.skippedCount
+            skipped: this.skippedCount,
+            breakdown: {
+              duplicates: this.duplicatesCount,
+              noWebsite: this.noWebsiteCount,
+              unreachable: this.unreachableCount
+            }
           });
 
           // Polite pacing delay between offset pagination requests

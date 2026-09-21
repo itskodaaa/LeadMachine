@@ -62,6 +62,7 @@ const hunterStatusBadge = document.getElementById('hunterStatusBadge');
 const hunterStatDiscovered = document.getElementById('hunterStatDiscovered');
 const hunterStatReachable = document.getElementById('hunterStatReachable');
 const hunterStatSkipped = document.getElementById('hunterStatSkipped');
+const hunterStatSkippedDetail = document.getElementById('hunterStatSkippedDetail');
 const hunterStreamList = document.getElementById('hunterStreamList');
 const hunterProgressFill = document.getElementById('hunterProgressFill');
 
@@ -746,6 +747,10 @@ function handleTelemetryEvent(event) {
     if (hunterStatDiscovered) hunterStatDiscovered.textContent = (event.discovered || 0).toLocaleString();
     if (hunterStatReachable) hunterStatReachable.textContent = (event.reachable || 0).toLocaleString();
     if (hunterStatSkipped) hunterStatSkipped.textContent = (event.skipped || 0).toLocaleString();
+    if (event.breakdown && hunterStatSkippedDetail) {
+      const b = event.breakdown;
+      hunterStatSkippedDetail.textContent = `${b.duplicates || 0} Dup · ${b.noWebsite || 0} No Web · ${b.unreachable || 0} Unreach`;
+    }
     if (hunterProgressFill && hunterCurrentLimit) {
       const pct = Math.min(100, Math.round(((event.reachable || 0) / hunterCurrentLimit) * 100));
       hunterProgressFill.style.width = pct + '%';
@@ -930,6 +935,7 @@ function setupHunterHandlers() {
     if (hunterStatDiscovered) hunterStatDiscovered.textContent = '0';
     if (hunterStatReachable) hunterStatReachable.textContent = '0';
     if (hunterStatSkipped) hunterStatSkipped.textContent = '0';
+    if (hunterStatSkippedDetail) hunterStatSkippedDetail.textContent = '';
 
     if (hunterStreamList) {
       hunterStreamList.innerHTML = `
@@ -982,6 +988,10 @@ function startHunterPolling() {
         if (hunterStatDiscovered) hunterStatDiscovered.textContent = (s.discovered || 0).toLocaleString();
         if (hunterStatReachable) hunterStatReachable.textContent = (s.reachable || 0).toLocaleString();
         if (hunterStatSkipped) hunterStatSkipped.textContent = (s.skipped || 0).toLocaleString();
+        if (s.breakdown && hunterStatSkippedDetail) {
+          const b = s.breakdown;
+          hunterStatSkippedDetail.textContent = `${b.duplicates || 0} Dup · ${b.noWebsite || 0} No Web · ${b.unreachable || 0} Unreach`;
+        }
 
         if (hunterProgressFill && s.limit) {
           const pct = Math.min(100, Math.round(((s.reachable || 0) / s.limit) * 100));
