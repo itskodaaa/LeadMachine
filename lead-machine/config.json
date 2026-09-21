@@ -19,7 +19,7 @@
   },
   "settings": {
     "version": "2.3.0",
-    "buildCommit": "e62b1db",
+    "buildCommit": "24722da",
     "defaultSpeedMode": "recommended",
     "sandboxMode": false,
     "concurrency": 8,
