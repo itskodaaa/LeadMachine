@@ -19,13 +19,13 @@
   },
   "settings": {
     "version": "2.4.0",
-    "buildCommit": "cb7e063",
+    "buildCommit": "4addd23",
     "defaultSpeedMode": "recommended",
     "sandboxMode": false,
     "concurrency": 8,
     "autoUpdate": true,
     "updateChannel": "stable",
-    "lastUpdated": "2026-09-21T18:10:18.754Z",
+    "lastUpdated": "2026-09-22T08:41:57.455Z",
     "debugMode": true
   },
   "license": {

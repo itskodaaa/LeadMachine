@@ -1,11 +1,17 @@
 import https from 'https';
 import http from 'http';
 import dns from 'dns/promises';
+import dnsSync from 'dns';
+
+// Rule 2 Invariant: Priority IPv4 networking to prevent IPv6 timeout hangs
+try {
+  dnsSync.setDefaultResultOrder('ipv4first');
+} catch (_) {}
 
 const TIMEOUT_MS = 15000;
 
 export async function checkWebsite(website, timeout = TIMEOUT_MS) {
-  if (!website) return { ok: false, reason: 'No website URL', isDefinitiveDead: true };
+  if (!website) return { ok: false, reachable: false, reason: 'No website URL', isDefinitiveDead: true };
   let domain = String(website).toLowerCase()
     .replace(/^https?:\/\//, '')
     .replace(/^www\./, '')
@@ -14,7 +20,7 @@ export async function checkWebsite(website, timeout = TIMEOUT_MS) {
     .split('?')[0]
     .split('#')[0];
 
-  if (!domain || !domain.includes('.')) return { ok: false, reason: 'Invalid domain', isDefinitiveDead: true };
+  if (!domain || !domain.includes('.')) return { ok: false, reachable: false, reason: 'Invalid domain', isDefinitiveDead: true };
 
   try {
     const dnsRace = Promise.race([
@@ -22,10 +28,10 @@ export async function checkWebsite(website, timeout = TIMEOUT_MS) {
       new Promise((_, reject) => setTimeout(() => reject(new Error('DNS Timeout')), 12000))
     ]);
     const addresses = await dnsRace;
-    if (!addresses || !addresses.address) return { ok: false, reason: 'DNS lookup failed', isDefinitiveDead: false };
+    if (!addresses || !addresses.address) return { ok: false, reachable: false, reason: 'DNS lookup failed', isDefinitiveDead: false };
   } catch (dnsErr) {
     const reason = dnsErr.message === 'DNS Timeout' ? 'DNS Timeout' : 'Domain does not resolve';
-    return { ok: false, reason, isDefinitiveDead: false };
+    return { ok: false, reachable: false, reason, isDefinitiveDead: false };
   }
 
   const tryUrl = (url) => new Promise((resolve) => {
@@ -36,7 +42,7 @@ export async function checkWebsite(website, timeout = TIMEOUT_MS) {
       if (!settled) {
         settled = true;
         try { req.destroy(); } catch (_) {}
-        resolve({ ok: false, reason: 'Connection Timeout', isDefinitiveDead: false });
+        resolve({ ok: false, reachable: false, reason: 'Connection Timeout', isDefinitiveDead: false });
       }
     }, timeout);
 
@@ -54,15 +60,15 @@ export async function checkWebsite(website, timeout = TIMEOUT_MS) {
       clearTimeout(timer);
       res.resume();
       if (res.statusCode === 404 || res.statusCode === 410) {
-        resolve({ ok: false, reason: `HTTP ${res.statusCode}`, isDefinitiveDead: true });
+        resolve({ ok: false, reachable: false, reason: `HTTP ${res.statusCode}`, isDefinitiveDead: true });
       } else if (res.statusCode >= 200 && res.statusCode < 400) {
-        resolve({ ok: true, statusCode: res.statusCode });
+        resolve({ ok: true, reachable: true, statusCode: res.statusCode });
       } else if (res.statusCode === 403 || res.statusCode === 401 || res.statusCode === 429) {
-        resolve({ ok: true, statusCode: res.statusCode, note: 'Protected/WAF' });
+        resolve({ ok: true, reachable: true, statusCode: res.statusCode, note: 'Protected/WAF' });
       } else if (res.statusCode >= 500) {
-        resolve({ ok: false, reason: `HTTP ${res.statusCode}`, isDefinitiveDead: false });
+        resolve({ ok: false, reachable: false, reason: `HTTP ${res.statusCode}`, isDefinitiveDead: false });
       } else {
-        resolve({ ok: true, statusCode: res.statusCode });
+        resolve({ ok: true, reachable: true, statusCode: res.statusCode });
       }
     });
 
@@ -71,14 +77,14 @@ export async function checkWebsite(website, timeout = TIMEOUT_MS) {
       settled = true;
       clearTimeout(timer);
       req.destroy();
-      resolve({ ok: false, reason: 'Connection Timeout', isDefinitiveDead: false });
+      resolve({ ok: false, reachable: false, reason: 'Connection Timeout', isDefinitiveDead: false });
     });
 
     req.on('error', (err) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve({ ok: false, reason: err.code || err.message, isDefinitiveDead: false });
+      resolve({ ok: false, reachable: false, reason: err.code || err.message, isDefinitiveDead: false });
     });
 
     req.end();
@@ -91,7 +97,7 @@ export async function checkWebsite(website, timeout = TIMEOUT_MS) {
   const resHttp = await tryUrl(`http://${domain}`);
   if (resHttp.ok) return resHttp;
 
-  return { ok: false, reason: resHttps.reason || resHttp.reason, isDefinitiveDead: Boolean(resHttps.isDefinitiveDead || resHttp.isDefinitiveDead) };
+  return { ok: false, reachable: false, reason: resHttps.reason || resHttp.reason, isDefinitiveDead: Boolean(resHttps.isDefinitiveDead || resHttp.isDefinitiveDead) };
 }
 
 export async function batchCheckWebsites(items, concurrency = 15, onProgress = null) {

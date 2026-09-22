@@ -1045,7 +1045,7 @@ export class LeadHunter {
               let isReachable = false;
               try {
                 const check = await checkWebsite(cleanUrl, 12000);
-                isReachable = check.reachable;
+                isReachable = Boolean(check.ok ?? check.reachable);
               } catch (_) {
                 isReachable = false;
               }
