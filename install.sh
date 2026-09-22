@@ -10,7 +10,7 @@
 set -e
 
 APP_NAME="Lead Machine"
-APP_VERSION="2.4.4"
+APP_VERSION="2.5.0"
 INSTALL_DIR="${HOME}/.leadmachine"
 
 echo "======================================================================"

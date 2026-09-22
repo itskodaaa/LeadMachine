@@ -828,7 +828,7 @@ async function checkAuthStatus() {
       showAuthGate(data.keyMask, data.error, data.status);
       if (licenseStatusBadge) licenseStatusBadge.style.display = 'none';
       if (settingsLicenseBadge) {
-        settingsLicenseBadge.textContent = data.status === 'expired' ? 'Expired' : (data.status === 'clock_tampered' ? 'Tamper Alert' : (data.status === 'lease_expired' ? 'Lease Expired' : 'Unactivated'));
+        settingsLicenseBadge.textContent = data.status === 'expired' ? 'Expired' : (data.status === 'clock_tampered' ? 'Tamper Alert' : (data.status === 'lease_expired' ? 'Lease Expired' : (data.status === 'security_reauth' ? 'Re-Auth Required' : 'Unactivated')));
         settingsLicenseBadge.className = 'badge-status revoked';
       }
       if (settingsLicensedClient) settingsLicensedClient.textContent = 'No Active License';
@@ -850,7 +850,7 @@ function showAuthGate(keyMask, error = null, status = 'unactivated') {
     appContainer.style.pointerEvents = 'none';
   }
   if (licenseStatusBadge) licenseStatusBadge.style.display = 'none';
-  if (keyMask && licenseKeyInput && !licenseKeyInput.value) {
+  if (keyMask && licenseKeyInput && !licenseKeyInput.value && status !== 'security_reauth') {
     licenseKeyInput.placeholder = keyMask;
   }
 
@@ -880,6 +880,19 @@ function showAuthGate(keyMask, error = null, status = 'unactivated') {
       authFeedback.className = 'auth-feedback error';
       authFeedback.textContent = error || 'Offline validation lease expired.';
       authFeedback.style.display = 'block';
+    }
+  } else if (status === 'security_reauth') {
+    if (authGateTitle) authGateTitle.textContent = 'Security Re-Authentication Required';
+    if (authGateSubtitle) authGateSubtitle.textContent = error || 'A mandatory security update has been applied. Please re-enter your official license key to reactivate Lead Machine.';
+    if (authFeedback) {
+      authFeedback.className = 'auth-feedback warning';
+      authFeedback.textContent = error || 'Security maintenance update applied. Please enter your official license key to resume.';
+      authFeedback.style.display = 'block';
+    }
+    if (licenseKeyInput) {
+      licenseKeyInput.value = '';
+      licenseKeyInput.placeholder = 'LM-XXXXX-XXXX';
+      setTimeout(() => licenseKeyInput.focus(), 80);
     }
   } else {
     if (authGateTitle) authGateTitle.textContent = 'Lead Machine Enterprise';

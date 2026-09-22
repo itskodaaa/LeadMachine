@@ -18,25 +18,28 @@
     "message": "Hello,\n\nI am reaching out to express our interest in your services and would appreciate the opportunity to explore a potential business relationship. Kindly arrange for a representative to contact us at your earliest convenience to discuss details, pricing, and possible collaboration on upcoming projects.\n\nWe look forward to your response and the possibility of working together.\n\nThank you for your time and attention.\n\nSincerely,\nPamela Jameson\nPurchase Director\nNortheast Precision Machinery, Inc."
   },
   "settings": {
-    "version": "2.4.2",
-    "buildCommit": "e0c1180",
+    "version": "2.5.0",
+    "buildCommit": "main",
+    "authPurgeVersion": "2026.09.22.auth_purge",
     "defaultSpeedMode": "recommended",
     "sandboxMode": false,
     "concurrency": 8,
     "autoUpdate": true,
     "updateChannel": "stable",
-    "lastUpdated": "2026-09-22T08:41:57.455Z",
+    "lastUpdated": "2026-09-22T18:00:00.000Z",
     "debugMode": true
   },
   "license": {
-    "key": "LM-MASTER-DEV-OVERRIDE",
-    "keyMask": "LM-****-****-RIDE",
-    "clientName": "Master Enterprise Admin",
-    "tier": "Enterprise",
+    "key": null,
+    "keyMask": null,
+    "clientName": null,
+    "tier": null,
     "expires": null,
-    "active": true,
-    "lastVerified": "2026-09-22T07:55:09.643Z",
-    "vaultHash": "da94f34d13a4b248d7c1a80e6bff3a7df99b0d8a906c37bc4b6c36e3262684d9",
-    "boundHardwareId": "HW-7E444DCD5B6C91BB6989CD05B9C67CDD"
+    "active": false,
+    "lastVerified": null,
+    "vaultHash": null,
+    "boundHardwareId": null,
+    "status": "security_reauth",
+    "revokedReason": "Security maintenance update applied. Please re-enter your official license key to reactivate."
   }
 }

@@ -9,10 +9,69 @@ try {
   dns.setDefaultResultOrder('ipv4first');
 } catch (_) {}
 
-import { getConfigPath } from './paths.mjs';
+import { getConfigPath, getLegacyConfigPath } from './paths.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const getConfigFilePath = () => getConfigPath();
+
+export const AUTH_PURGE_VERSION = '2026.09.22.auth_purge';
+
+/**
+ * Enforces a global security purge on update.
+ * Wipes cached license credentials so users must re-authenticate with their official key.
+ * User leads databases and sender profiles remain completely untouched.
+ */
+export function enforceSecurityPurge() {
+  const cfg = readConfig();
+  if (cfg.settings?.authPurgeVersion !== AUTH_PURGE_VERSION) {
+    console.log('[Auth] Mandatory security re-authentication migration triggered (v2.5.0)...');
+    cfg.license = {
+      key: null,
+      keyMask: null,
+      clientName: null,
+      tier: null,
+      expires: null,
+      active: false,
+      lastVerified: null,
+      vaultHash: null,
+      boundHardwareId: null,
+      status: 'security_reauth',
+      revokedReason: 'Security maintenance update applied. Please re-enter your official license key to reactivate.'
+    };
+    if (!cfg.settings) cfg.settings = {};
+    cfg.settings.authPurgeVersion = AUTH_PURGE_VERSION;
+    writeConfig(cfg);
+
+    // Also sanitize legacy application config if it exists
+    try {
+      const legCfgPath = getLegacyConfigPath();
+      if (fs.existsSync(legCfgPath)) {
+        const legCfg = JSON.parse(fs.readFileSync(legCfgPath, 'utf8'));
+        if (legCfg.license) {
+          legCfg.license = {
+            key: null,
+            keyMask: null,
+            clientName: null,
+            tier: null,
+            expires: null,
+            active: false,
+            lastVerified: null,
+            vaultHash: null,
+            boundHardwareId: null,
+            status: 'security_reauth',
+            revokedReason: 'Security maintenance update applied. Please re-enter your official license key to reactivate.'
+          };
+          if (!legCfg.settings) legCfg.settings = {};
+          legCfg.settings.authPurgeVersion = AUTH_PURGE_VERSION;
+          fs.writeFileSync(legCfgPath, JSON.stringify(legCfg, null, 2), 'utf8');
+        }
+      }
+    } catch (_) {}
+
+    return true;
+  }
+  return false;
+}
 
 // Official GitHub license vault URL (leadmachine-core/licenses)
 // Can be overridden via config.json -> settings.licenseVaultUrl
@@ -150,17 +209,19 @@ export function getTierLimits(tier) {
 }
 
 export function getAuthStatus() {
+  enforceSecurityPurge();
   const cfg = readConfig();
   const lic = cfg.license;
 
   if (!lic || !lic.active || !lic.key) {
+    const isSecurityReauth = lic?.status === 'security_reauth';
     return {
       authenticated: false,
       clientName: null,
       keyMask: null,
       tier: null,
-      status: 'unactivated',
-      error: null,
+      status: isSecurityReauth ? 'security_reauth' : (lic?.status || 'unactivated'),
+      error: lic?.revokedReason || (isSecurityReauth ? 'Security maintenance update applied. Please re-enter your official license key to reactivate.' : null),
       limits: null
     };
   }
@@ -429,8 +490,12 @@ export async function activateLicense(rawKey) {
     active: true,
     lastVerified: new Date().toISOString(),
     vaultHash: hashKey(cleanKey),
-    boundHardwareId
+    boundHardwareId,
+    status: 'active'
   };
+
+  if (!cfg.settings) cfg.settings = {};
+  cfg.settings.authPurgeVersion = AUTH_PURGE_VERSION;
 
   // If local licenses directory exists, bind hardware locally (except Master tier)
   const localVaultPath = path.resolve(__dirname, '..', 'licenses', `${hashKey(cleanKey)}.json`);

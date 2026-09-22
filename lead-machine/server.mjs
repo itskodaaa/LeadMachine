@@ -156,6 +156,9 @@ try {
   startLicenseHeartbeat = authMod.startLicenseHeartbeat;
   if (authMod.getTierLimits) getTierLimits = authMod.getTierLimits;
   if (authMod.TIER_LIMITS) TIER_LIMITS = authMod.TIER_LIMITS;
+  if (authMod.enforceSecurityPurge) {
+    authMod.enforceSecurityPurge();
+  }
 } catch (e) {
   console.warn('[Server] Auth module import deferred:', e.message);
 }
@@ -584,7 +587,7 @@ const server = http.createServer(async (req, res) => {
     if (fs.existsSync(cfgPath)) {
       try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
     }
-    const currentVer = cfg.settings?.version || '2.1.0';
+    const currentVer = cfg.settings?.version || '2.5.0';
     const currentCommit = cfg.settings?.buildCommit || 'master';
     const repo = 'leadmachine-core/installer';
     const branch = 'main';
@@ -719,7 +722,7 @@ const server = http.createServer(async (req, res) => {
 
     try {
       let latestCommit = '';
-      let remoteVer = '2.1.0';
+      let remoteVer = '2.5.0';
 
       // 1. Resolve absolute latest HEAD of master branch (bypasses any intermediate commit)
       try {
