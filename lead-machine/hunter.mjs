@@ -18,7 +18,8 @@ export const STATE_CITIES = {
     'Berwyn', 'Mount Prospect', 'Wheaton', 'Normal', 'Hoffman Estates', 'Oak Park', 'Downers Grove',
     'Elmhurst', 'Lombard', 'DeKalb', 'Belleville', 'Moline', 'Buffalo Grove', 'Bartlett', 'Urbana',
     'Quincy', 'Crystal Lake', 'Carol Stream', 'Streamwood', 'Romeoville', 'Plainfield', 'Rock Island',
-    'Hanover Park', 'Carpentersville', 'Wheeling', 'Park Ridge', 'Elk Grove Village', 'Addison'
+    'Hanover Park', 'Carpentersville', 'Wheeling', 'Park Ridge', 'Elk Grove Village', 'Addison',
+    'St. Charles', 'Batavia', 'Geneva', 'Woodridge', 'Libertyville', 'Lake Zurich', 'Mundelein', 'Gurnee'
   ],
   'Texas': [
     'Houston', 'San Antonio', 'Dallas', 'Austin', 'Fort Worth', 'El Paso', 'Arlington', 'Corpus Christi',
@@ -26,7 +27,8 @@ export const STATE_CITIES = {
     'Brownsville', 'Killeen', 'Pasadena', 'Mesquite', 'McAllen', 'Carrollton', 'Midland', 'Waco',
     'Denton', 'Abilene', 'Odessa', 'Beaumont', 'Round Rock', 'The Woodlands', 'Richardson', 'Pearland',
     'College Station', 'Wichita Falls', 'Lewisville', 'Tyler', 'San Angelo', 'League City', 'Allen',
-    'Sugar Land', 'Edinburg', 'Mission', 'Longview', 'Bryan', 'Pharr', 'Baytown', 'Missouri City', 'Temple'
+    'Sugar Land', 'Edinburg', 'Mission', 'Longview', 'Bryan', 'Pharr', 'Baytown', 'Missouri City', 'Temple',
+    'Conroe', 'New Braunfels', 'Grapevine', 'Waxahachie', 'Mansfield', 'Rowlett', 'Sherman', 'Burleson'
   ],
   'California': [
     'Los Angeles', 'San Diego', 'San Jose', 'San Francisco', 'Fresno', 'Sacramento', 'Long Beach', 'Oakland',
@@ -35,34 +37,51 @@ export const STATE_CITIES = {
     'Santa Clarita', 'Garden Grove', 'Oceanside', 'Rancho Cucamonga', 'Santa Rosa', 'Ontario', 'Lancaster',
     'Elk Grove', 'Corona', 'Palmdale', 'Salinas', 'Pomona', 'Hayward', 'Escondido', 'Sunnyvale', 'Torrance',
     'Pasadena', 'Orange', 'Fullerton', 'Thousand Oaks', 'Visalia', 'Roseville', 'Concord', 'Simi Valley',
-    'Santa Clara', 'Victorville', 'Vallejo', 'Berkeley', 'El Monte', 'Downey', 'Costa Mesa', 'Inglewood'
+    'Santa Clara', 'Victorville', 'Vallejo', 'Berkeley', 'El Monte', 'Downey', 'Costa Mesa', 'Inglewood',
+    'Carlsbad', 'Temecula', 'Murrieta', 'Burbank', 'San Mateo', 'Compton', 'South Gate', 'Carson', 'Santa Monica'
   ],
   'Florida': [
     'Jacksonville', 'Miami', 'Tampa', 'Orlando', 'St. Petersburg', 'Hialeah', 'Port St. Lucie', 'Cape Coral',
     'Tallahassee', 'Fort Lauderdale', 'Pembroke Pines', 'Hollywood', 'Gainesville', 'Miramar', 'Coral Springs',
     'Clearwater', 'Palm Bay', 'Pompano Beach', 'West Palm Beach', 'Lakeland', 'Davie', 'Boca Raton',
     'Sunrise', 'Plantation', 'Miami Gardens', 'Deltona', 'Fort Myers', 'Palm Coast', 'Largo', 'Melbourne',
-    'Boynton Beach', 'Deerfield Beach', 'Kissimmee', 'Homestead', 'Tamarac', 'Bradenton', 'Ocala'
+    'Boynton Beach', 'Deerfield Beach', 'Kissimmee', 'Homestead', 'Tamarac', 'Bradenton', 'Ocala',
+    'Sanford', 'Sarasota', 'Pensacola', 'Bradenton', 'Pinellas Park', 'Daytona Beach', 'Winter Haven'
   ],
   'New York': [
     'New York City', 'Buffalo', 'Rochester', 'Yonkers', 'Syracuse', 'Albany', 'New Rochelle', 'Mount Vernon',
     'Schenectady', 'Utica', 'White Plains', 'Hempstead', 'Troy', 'Niagara Falls', 'Binghamton', 'Freeport',
-    'Valley Stream', 'Long Beach', 'Rome', 'Ithaca', 'Poughkeepsie', 'North Tonawanda', 'Jamestown', 'Elmira'
+    'Valley Stream', 'Long Beach', 'Rome', 'Ithaca', 'Poughkeepsie', 'North Tonawanda', 'Jamestown', 'Elmira',
+    'Newburgh', 'Middletown', 'Auburn', 'Watertown', 'Glen Cove', 'Kingston', 'Peekskill', 'Lockport'
   ],
   'Pennsylvania': [
     'Philadelphia', 'Pittsburgh', 'Allentown', 'Reading', 'Erie', 'Scranton', 'Bethlehem', 'Lancaster',
     'Harrisburg', 'York', 'Wilkes-Barre', 'Chester', 'Williamsport', 'Easton', 'Lebanon', 'Hazleton',
-    'New Castle', 'Johnstown', 'McKeesport', 'Hermitage', 'Greensburg', 'Pottsville', 'Sharon', 'Butler'
+    'New Castle', 'Johnstown', 'McKeesport', 'Hermitage', 'Greensburg', 'Pottsville', 'Sharon', 'Butler',
+    'State College', 'Norristown', 'Bethel Park', 'Monroeville', 'King of Prussia', 'Altoona', 'Upper Darby',
+    'Lansdale', 'West Chester', 'Malvern', 'Exton', 'Horsham', 'Fort Washington', 'Warminster', 'Phoenixville',
+    'Pottstown', 'Coatesville', 'Carlisle', 'Chambersburg', 'Hanover', 'Bloomsburg', 'Lewisburg', 'Sunbury',
+    'Cranberry Township', 'Penn Hills', 'Mount Lebanon', 'North Huntingdon', 'Murrysville', 'Wexford', 'Bridgeville',
+    'Radnor', 'Conshohocken', 'Wayne', 'Bryn Mawr', 'Doylestown', 'Quakertown', 'Perkasie', 'Sellersville',
+    'Mechanicsburg', 'Camp Hill', 'Shippensburg', 'Waynesboro'
   ],
   'Ohio': [
     'Columbus', 'Cleveland', 'Cincinnati', 'Toledo', 'Akron', 'Dayton', 'Parma', 'Canton', 'Youngstown',
     'Lorain', 'Hamilton', 'Springfield', 'Kettering', 'Elyria', 'Lakewood', 'Cuyahoga Falls', 'Euclid',
-    'Middletown', 'Mansfield', 'Newark', 'Mentor', 'Cleveland Heights', 'Beavercreek', 'Strongsville', 'Fairfield'
+    'Middletown', 'Mansfield', 'Newark', 'Mentor', 'Cleveland Heights', 'Beavercreek', 'Strongsville', 'Fairfield',
+    'Findlay', 'Lima', 'Warren', 'Marion', 'Troy', 'Bowling Green', 'Zanesville', 'Massillon', 'Wooster',
+    'Medina', 'Perrysburg', 'Westerville', 'Dublin', 'Mason', 'Reynoldsburg', 'Grove City', 'Delaware'
   ],
   'Michigan': [
     'Detroit', 'Grand Rapids', 'Warren', 'Sterling Heights', 'Ann Arbor', 'Lansing', 'Dearborn', 'Livonia',
     'Troy', 'Westland', 'Flint', 'Kalamazoo', 'Canton', 'Macomb', 'Clinton', 'Farmington Hills', 'Southfield',
-    'Rochester Hills', 'Pontiac', 'Taylor', 'St. Clair Shores', 'Royal Oak', 'Novi', 'Dearborn Heights', 'Battle Creek'
+    'Rochester Hills', 'Pontiac', 'Taylor', 'St. Clair Shores', 'Royal Oak', 'Novi', 'Dearborn Heights', 'Battle Creek',
+    'Holland', 'Zeeland', 'Auburn Hills', 'Plymouth', 'Romulus', 'Wixom', 'Saginaw', 'Midland', 'Bay City',
+    'Jackson', 'Muskegon', 'Port Huron', 'Monroe', 'Adrian', 'Ypsilanti', 'Waterford', 'Clarkston',
+    'Shelby Township', 'Chesterfield', 'Traverse City', 'Marquette', 'Benton Harbor', 'St. Joseph', 'Coldwater',
+    'Sturgis', 'Hastings', 'Ionia', 'Owosso', 'Mount Pleasant', 'Big Rapids', 'Cadillac', 'Alpena',
+    'Escanaba', 'Sault Ste. Marie', 'Howell', 'Brighton', 'Saline', 'Southgate', 'Lincoln Park', 'Wyandotte',
+    'Allen Park', 'Garden City', 'Inkster', 'Madison Heights', 'Hazel Park', 'Ferndale', 'Oak Park', 'Clawson'
   ],
   'North Carolina': [
     'Charlotte', 'Raleigh', 'Greensboro', 'Durham', 'Winston-Salem', 'Fayetteville', 'Cary', 'Wilmington',
@@ -77,12 +96,14 @@ export const STATE_CITIES = {
   'Indiana': [
     'Indianapolis', 'Fort Wayne', 'Evansville', 'South Bend', 'Carmel', 'Fishers', 'Bloomington', 'Hammond',
     'Gary', 'Lafayette', 'Muncie', 'Noblesville', 'Terre Haute', 'Greenwood', 'Kokomo', 'Elkhart',
-    'Mishawaka', 'Lawrence', 'Columbus', 'Jeffersonville', 'Westfield', 'Portage', 'Richmond', 'Anderson'
+    'Mishawaka', 'Lawrence', 'Columbus', 'Jeffersonville', 'Westfield', 'Portage', 'Richmond', 'Anderson',
+    'Warsaw', 'Goshen', 'Auburn', 'Crown Point', 'Valparaiso', 'La Porte', 'Marion', 'Seymour', 'Shelbyville'
   ],
   'Wisconsin': [
     'Milwaukee', 'Madison', 'Green Bay', 'Kenosha', 'Racine', 'Appleton', 'Waukesha', 'Eau Claire',
     'Oshkosh', 'Janesville', 'West Allis', 'La Crosse', 'Sheboygan', 'Wauwatosa', 'Fond du Lac', 'Brookfield',
-    'Wausau', 'New Berlin', 'Beloit', 'Greenfield', 'Manitowoc', 'West Bend', 'Sun Prairie', 'Superior'
+    'Wausau', 'New Berlin', 'Beloit', 'Greenfield', 'Manitowoc', 'West Bend', 'Sun Prairie', 'Superior',
+    'Stevens Point', 'Neenah', 'Menasha', 'Watertown', 'Marshfield', 'Wisconsin Rapids', 'Menomonee Falls'
   ],
   'New Jersey': [
     'Newark', 'Jersey City', 'Paterson', 'Elizabeth', 'Lakewood', 'Edison', 'Woodbridge', 'Toms River',
@@ -122,81 +143,404 @@ export const STATE_CITIES = {
 };
 
 // ==========================================================================
-// Semantic B2B Industrial Query Expansions
-// Helps niche categories (e.g. Semiconductor Tooling) find up to 10,000 leads
+// Comprehensive US Counties by State (Subdivision Grid Scraping)
 // ==========================================================================
-export const RELATED_QUERIES = {
-  'Semiconductor Equipment Machining': [
-    'Semiconductor Equipment Machining',
-    'Semiconductor Tooling',
-    'Cleanroom Equipment Manufacturing',
-    'Precision CNC Machining',
-    'Semiconductor Parts Fabrication',
-    'Vacuum Chamber Machining',
-    'Wafer Handling Equipment'
+export const STATE_COUNTIES = {
+  'Michigan': [
+    'Wayne', 'Oakland', 'Macomb', 'Kent', 'Genesee', 'Washtenaw', 'Ingham', 'Ottawa', 'Kalamazoo', 'Saginaw',
+    'Livingston', 'Muskegon', 'St. Clair', 'Jackson', 'Berrien', 'Monroe', 'Calhoun', 'Allegan', 'Eaton', 'Bay',
+    'Midland', 'Lenawee', 'Grand Traverse', 'Lapeer', 'Shiawassee', 'Van Buren', 'Ionia', 'Clinton', 'Barry', 'Branch',
+    'Cass', 'St. Joseph', 'Mecosta', 'Isabella', 'Montcalm', 'Tuscola', 'Huron', 'Sanilac', 'Gratiot', 'Newaygo'
   ],
-  'CNC Swiss Machining': [
-    'CNC Swiss Machining',
-    'Swiss Screw Machine',
-    'Precision Turning',
-    'Micro Machining',
-    'CNC Lathe Parts',
-    'Precision Screw Machine Products'
+  'Pennsylvania': [
+    'Adams', 'Allegheny', 'Armstrong', 'Beaver', 'Bedford', 'Berks', 'Blair', 'Bradford', 'Bucks', 'Butler',
+    'Cambria', 'Cameron', 'Carbon', 'Centre', 'Chester', 'Clarion', 'Clearfield', 'Clinton', 'Columbia', 'Crawford',
+    'Cumberland', 'Dauphin', 'Delaware', 'Elk', 'Erie', 'Fayette', 'Forest', 'Franklin', 'Fulton', 'Greene',
+    'Huntingdon', 'Indiana', 'Jefferson', 'Juniata', 'Lackawanna', 'Lancaster', 'Lawrence', 'Lebanon', 'Lehigh', 'Luzerne',
+    'Lycoming', 'McKean', 'Mercer', 'Mifflin', 'Monroe', 'Montgomery', 'Montour', 'Northampton', 'Northumberland', 'Perry',
+    'Philadelphia', 'Pike', 'Potter', 'Schuylkill', 'Snyder', 'Somerset', 'Sullivan', 'Susquehanna', 'Tioga', 'Union',
+    'Venango', 'Warren', 'Washington', 'Wayne', 'Westmoreland', 'Wyoming', 'York'
   ],
-  'Sheet Metal Fabrication': [
-    'Sheet Metal Fabrication',
-    'Laser Cutting Services',
-    'Custom Metal Enclosures',
-    'Metal Stamping',
-    'Precision Sheet Metal',
-    'Waterjet Cutting'
+  'Illinois': [
+    'Cook', 'DuPage', 'Lake', 'Will', 'Kane', 'McHenry', 'Winnebago', 'Madison', 'St. Clair', 'Champaign',
+    'Sangamon', 'Peoria', 'McLean', 'Rock Island', 'Tazewell', 'Kankakee', 'DeKalb', 'Macon', 'Vermilion', 'Adams',
+    'Whiteside', 'Jackson', 'LaSalle', 'Kendall', 'Grundy', 'Boone', 'Stephenson', 'Knox', 'Christian', 'Macoupin'
   ],
-  'Precision Machining': [
-    'Precision CNC Machining',
-    '5-Axis CNC Milling',
-    'Precision Machine Shop',
-    'Prototype Machining',
-    'Tool and Die Maker',
-    'Precision Wire EDM'
+  'Texas': [
+    'Harris', 'Dallas', 'Tarrant', 'Bexar', 'Travis', 'Collin', 'Denton', 'Hidalgo', 'Fort Bend', 'El Paso',
+    'Montgomery', 'Williamson', 'Cameron', 'Nueces', 'Brazoria', 'Bell', 'Galveston', 'Lubbock', 'Webb', 'Jefferson',
+    'McLennan', 'Smith', 'Brazos', 'Hays', 'Johnson', 'Ellis', 'Ector', 'Midland', 'Guadalupe', 'Taylor',
+    'Comal', 'Wichita', 'Gregg', 'Potter', 'Parker', 'Randall', 'Tom Green', 'Kaufman', 'Bowie', 'Rockwall'
   ],
-  'Aerospace Structural Machining': [
-    'Aerospace Structural Machining',
-    'Aircraft Precision Parts',
-    'AS9100 Machine Shop',
-    'Aerospace Tooling',
-    'Titanium CNC Machining',
-    'Defense Machine Shop'
+  'California': [
+    'Los Angeles', 'San Diego', 'Orange', 'Riverside', 'San Bernardino', 'Santa Clara', 'Alameda', 'Sacramento',
+    'Contra Costa', 'Fresno', 'Kern', 'San Francisco', 'Ventura', 'San Mateo', 'San Joaquin', 'Stanislaus',
+    'Sonoma', 'Tulare', 'Solano', 'Monterey', 'Santa Barbara', 'Placer', 'San Luis Obispo', 'Santa Cruz', 'Merced',
+    'Marin', 'Butte', 'Yolo', 'Shasta', 'El Dorado', 'Imperial', 'Kings', 'Madera', 'Napa', 'Humboldt'
   ],
-  'Custom Plastic Injection Molding': [
-    'Custom Plastic Injection Molding',
-    'Plastic Injection Mold Tooling',
-    'Cleanroom Injection Molding',
-    'Plastic Part Manufacturing',
-    'Thermoforming Services',
-    'Custom Blow Molding'
+  'Ohio': [
+    'Franklin', 'Cuyahoga', 'Hamilton', 'Summit', 'Montgomery', 'Lucas', 'Butler', 'Stark', 'Lorain', 'Warren',
+    'Lake', 'Mahoning', 'Delaware', 'Clermont', 'Trumbull', 'Wood', 'Medina', 'Licking', 'Clark', 'Greene',
+    'Fairfield', 'Richland', 'Wayne', 'Miami', 'Allen', 'Columbiana', 'Ashtabula', 'Geauga', 'Muskingum', 'Portage'
   ],
-  'Commercial HVAC': [
-    'Commercial HVAC Contractor',
-    'Sheet Metal Ductwork Fabrication',
-    'Industrial Ventilation Services',
-    'Commercial Heating and Cooling',
-    'Mechanical Piping Contractor'
+  'Indiana': [
+    'Marion', 'Lake', 'Allen', 'Hamilton', 'St. Joseph', 'Elkhart', 'Tippecanoe', 'Vanderburgh', 'Porter', 'Hendricks',
+    'Johnson', 'Monroe', 'Madison', 'Clark', 'Delaware', 'Laporte', 'Vigo', 'Bartholomew', 'Howard', 'Kosciusko'
   ],
-  'Medical Device & Surgical Implants': [
-    'Medical Device Machining',
-    'Surgical Implant Manufacturing',
-    'Cleanroom Medical Tooling',
-    'Titanium Medical Implants',
-    'ISO 13485 Machine Shop'
+  'Wisconsin': [
+    'Milwaukee', 'Dane', 'Waukesha', 'Brown', 'Racine', 'Outagamie', 'Winnebago', 'Kenosha', 'Rock', 'Marathon',
+    'Washington', 'Sheboygan', 'La Crosse', 'Fond du Lac', 'Ozaukee', 'Eau Claire', 'St. Croix', 'Walworth', 'Manitowoc', 'Dodge'
   ],
-  'Hydraulic Cylinder & Valve Machining': [
-    'Hydraulic Cylinder Manufacturing',
-    'Hydraulic Valve Machining',
-    'Industrial Fluid Power Repair',
-    'Heavy Equipment Hydraulic Rebuilding',
-    'Custom Hydraulic Manifolds'
+  'New York': [
+    'New York', 'Kings', 'Queens', 'Bronx', 'Richmond', 'Nassau', 'Suffolk', 'Westchester', 'Erie', 'Monroe',
+    'Onondaga', 'Orange', 'Rockland', 'Albany', 'Dutchess', 'Saratoga', 'Oneida', 'Niagara', 'Broome', 'Ulster'
+  ],
+  'Florida': [
+    'Miami-Dade', 'Broward', 'Palm Beach', 'Hillsborough', 'Orange', 'Pinellas', 'Duval', 'Lee', 'Polk', 'Brevard',
+    'Volusia', 'Pasco', 'Seminole', 'Sarasota', 'Manatee', 'Collier', 'Marion', 'Osceola', 'Lake', 'Escambia'
   ]
 };
+
+// ==========================================================================
+// Regional Neighboring State Spillover Mappings
+// Used when statewide capacity for specialized niches is completely reached
+// ==========================================================================
+export const REGIONAL_EXPANSIONS = {
+  'Michigan': ['Ohio', 'Indiana', 'Illinois', 'Wisconsin', 'Pennsylvania'],
+  'Pennsylvania': ['New Jersey', 'New York', 'Ohio', 'Maryland', 'Delaware'],
+  'Illinois': ['Indiana', 'Wisconsin', 'Michigan', 'Missouri', 'Iowa'],
+  'Texas': ['Oklahoma', 'Louisiana', 'New Mexico', 'Arkansas'],
+  'California': ['Nevada', 'Arizona', 'Oregon', 'Washington'],
+  'Ohio': ['Pennsylvania', 'Michigan', 'Indiana', 'Kentucky', 'West Virginia'],
+  'New York': ['New Jersey', 'Connecticut', 'Pennsylvania', 'Massachusetts'],
+  'Florida': ['Georgia', 'Alabama'],
+  'North Carolina': ['South Carolina', 'Virginia', 'Tennessee', 'Georgia'],
+  'Georgia': ['Florida', 'Alabama', 'Tennessee', 'North Carolina', 'South Carolina'],
+  'Indiana': ['Illinois', 'Ohio', 'Kentucky', 'Michigan'],
+  'Wisconsin': ['Illinois', 'Minnesota', 'Iowa', 'Michigan'],
+  'New Jersey': ['New York', 'Pennsylvania', 'Delaware', 'Connecticut']
+};
+
+// ==========================================================================
+// Nationwide Manufacturing Hubs (Tier 6 Maximum Quota Expansion)
+// ==========================================================================
+export const NATIONWIDE_METROS = [
+  { city: 'Chicago', state: 'Illinois' },
+  { city: 'Houston', state: 'Texas' },
+  { city: 'Los Angeles', state: 'California' },
+  { city: 'Detroit', state: 'Michigan' },
+  { city: 'Dallas', state: 'Texas' },
+  { city: 'Cleveland', state: 'Ohio' },
+  { city: 'Philadelphia', state: 'Pennsylvania' },
+  { city: 'Atlanta', state: 'Georgia' },
+  { city: 'Minneapolis', state: 'Minnesota' },
+  { city: 'Phoenix', state: 'Arizona' },
+  { city: 'Indianapolis', state: 'Indiana' },
+  { city: 'Milwaukee', state: 'Wisconsin' },
+  { city: 'Cincinnati', state: 'Ohio' },
+  { city: 'Charlotte', state: 'North Carolina' },
+  { city: 'St. Louis', state: 'Missouri' },
+  { city: 'Kansas City', state: 'Missouri' },
+  { city: 'Pittsburgh', state: 'Pennsylvania' },
+  { city: 'Denver', state: 'Colorado' },
+  { city: 'Columbus', state: 'Ohio' },
+  { city: 'Seattle', state: 'Washington' },
+  { city: 'Tampa', state: 'Florida' },
+  { city: 'Nashville', state: 'Tennessee' },
+  { city: 'Orlando', state: 'Florida' },
+  { city: 'San Diego', state: 'California' },
+  { city: 'San Antonio', state: 'Texas' },
+  { city: 'Newark', state: 'New Jersey' },
+  { city: 'Fort Worth', state: 'Texas' },
+  { city: 'Grand Rapids', state: 'Michigan' },
+  { city: 'Elkhart', state: 'Indiana' },
+  { city: 'Greenville', state: 'South Carolina' },
+  { city: 'Dayton', state: 'Ohio' },
+  { city: 'Rockford', state: 'Illinois' },
+  { city: 'Akron', state: 'Ohio' },
+  { city: 'Allentown', state: 'Pennsylvania' },
+  { city: 'Erie', state: 'Pennsylvania' }
+];
+
+// ==========================================================================
+// Smart Root Noun Extractor
+// ==========================================================================
+export function cleanRootNoun(rawQuery) {
+  if (!rawQuery) return '';
+  let q = String(rawQuery).trim();
+  q = q.replace(/\b(services|service|manufacturers|manufacturer|manufacturing|companies|company|solutions|solution|specialists|specialist|supplies|suppliers|supplier|fabrication|fabricators|fabricator|shops|shop|contractors|contractor|co|inc|llc|corp)\b/gi, '').trim();
+  q = q.replace(/\s+/g, ' ');
+  return q || rawQuery.trim();
+}
+
+// ==========================================================================
+// Comprehensive 50-Category Real-World Google Maps Thesaurus
+// Maps industry categories to authentic, high-yielding search queries
+// ==========================================================================
+export const INDUSTRY_EXPANSIONS = {
+  // Sector 1: CNC & Precision Machining (8)
+  'CNC Milling & Turning': [
+    'CNC Machining', 'Precision CNC Milling', 'CNC Lathe Turning', 'Machine Shop',
+    'Prototype Machining', '5 Axis Machining', 'Precision Turning', 'Custom CNC Parts', 'Milling and Turning'
+  ],
+  'CNC Swiss Machining': [
+    'CNC Swiss Machining', 'Swiss Screw Machine', 'Precision Turning', 'Micro Machining',
+    'CNC Lathe Parts', 'Precision Screw Machine Products', 'Swiss Turn Machining', 'Medical Pin Machining'
+  ],
+  '5-Axis Aerospace Machining': [
+    'Aerospace Machining', '5-Axis CNC Milling', 'Aircraft Precision Parts', 'AS9100 Machine Shop',
+    'Titanium CNC Machining', 'Aerospace Components', 'Flight Hardware Machining', 'Aerospace Machine Shop'
+  ],
+  'Tool and Die Making': [
+    'Tool and Die Maker', 'Stamping Dies', 'Progressive Dies', 'Toolroom Machining',
+    'Die Maker', 'Injection Mold Tooling', 'Tool & Die Shop', 'Custom Tooling Manufacturer'
+  ],
+  'Wire EDM Services': [
+    'Wire EDM Services', 'EDM Machining', 'Electrical Discharge Machining', 'Sinker EDM',
+    'Wire Cut EDM', 'Precision EDM Tooling', 'Wire EDM Shop', 'EDM Wire Cutting'
+  ],
+  'Precision Grinding Services': [
+    'Precision Grinding Services', 'Surface Grinding', 'Blanchard Grinding', 'Centerless Grinding',
+    'OD ID Grinding', 'Precision Lapping', 'Industrial Grinding Shop', 'Cylindrical Grinding'
+  ],
+  'Custom Gear Manufacturing': [
+    'Gear Manufacturing', 'Gear Hobbing', 'Spur Gears', 'Precision Gearboxes',
+    'Gear Cutting Services', 'Custom Gears', 'Pinion Gear Manufacturer', 'Industrial Gears'
+  ],
+  'Jig and Fixture Tooling': [
+    'Jig and Fixture Tooling', 'Workholding Fixtures', 'Assembly Jigs', 'Welding Fixtures',
+    'Inspection Fixtures', 'Tooling and Fixtures', 'Custom Workholding Fixtures'
+  ],
+
+  // Sector 2: Sheet Metal & Structural (8)
+  'Sheet Metal Fabrication': [
+    'Sheet Metal Fabrication', 'Laser Cutting Services', 'Custom Metal Enclosures', 'Metal Stamping',
+    'Precision Sheet Metal', 'Waterjet Cutting', 'Sheet Metal Shop', 'Custom Metal Fabrication'
+  ],
+  'Industrial Laser Cutting': [
+    'Industrial Laser Cutting', 'Laser Cutting Services', 'Fiber Laser Cutting', 'Tube Laser Cutting',
+    'Sheet Metal Laser Cutting', 'Steel Plate Laser Cutting', 'Laser Cutting Shop'
+  ],
+  'Structural Steel Fabrication': [
+    'Structural Steel Fabrication', 'Steel Fabricator', 'Structural Steel Framing', 'Steel Beams and Trusses',
+    'AISC Steel Fabricator', 'Steel Fabrication Shop', 'Structural Metal Building'
+  ],
+  'Custom Metal Stamping': [
+    'Metal Stamping', 'Progressive Die Stamping', 'Precision Metal Stamping', 'Deep Draw Stamping',
+    'High Volume Stamping', 'Metal Stamping Shop', 'Custom Metal Stamping'
+  ],
+  'Contract Welding Fabrication': [
+    'Contract Welding Fabrication', 'Robotic Welding', 'Certified Welding Services', 'TIG and MIG Welding',
+    'Custom Welding Fabrication', 'Welding Shop', 'Metal Welding Fabricator'
+  ],
+  'Tube Bending and Fabrication': [
+    'Tube Bending and Fabrication', 'Mandrel Tube Bending', 'Pipe Bending Services', 'Hydroforming Services',
+    'Custom Exhaust Tubing', 'Tubular Fabrication', 'Precision Tube Bending'
+  ],
+  'Waterjet Cutting Services': [
+    'Waterjet Cutting Services', 'Abrasive Waterjet Cutting', 'Precision Waterjet Cutting',
+    'Custom Waterjet Cutting', 'Waterjet Cutting Shop', 'Waterjet Metal Cutting'
+  ],
+  'Architectural Metal Fabrication': [
+    'Architectural Metal Fabrication', 'Ornamental Metalwork', 'Architectural Railings',
+    'Custom Metal Cladding', 'Decorative Metal Fabrication', 'Ornamental Iron Shop'
+  ],
+
+  // Sector 3: Aerospace, Defense & Transportation (7)
+  'Aerospace Components Manufacturing': [
+    'Aerospace Components Manufacturing', 'Aircraft Parts Manufacturer', 'Aerospace Flight Hardware',
+    'AS9100 Aerospace Machine Shop', 'Aerospace Brackets', 'Aircraft Precision Components'
+  ],
+  'Defense Contract Machining': [
+    'Defense Contract Machining', 'ITAR Machine Shop', 'Military Spec Machining',
+    'Tactical Hardware Manufacturer', 'Defense Contractor Machining', 'Military Precision Parts'
+  ],
+  'Automotive Parts Manufacturing': [
+    'Automotive Parts Manufacturing', 'Tier 1 Automotive Supplier', 'Automotive Stamping',
+    'Chassis Components Manufacturer', 'Automotive Machine Shop', 'Auto Parts Fabricator'
+  ],
+  'EV Battery Enclosure Manufacturing': [
+    'EV Battery Enclosure Manufacturing', 'Aluminum Cold Plates', 'Battery Pack Enclosures',
+    'Electric Vehicle Components', 'EV Hardware Fabrication', 'Battery Enclosure Fabricator'
+  ],
+  'Marine Hardware Manufacturing': [
+    'Marine Hardware Manufacturing', 'Boat Hardware Supplier', 'Stainless Marine Fittings',
+    'Propeller Shaft Machining', 'Marine Metal Fabrication', 'Boat Parts Manufacturer'
+  ],
+  'Commercial Truck Body Manufacturing': [
+    'Commercial Truck Body Manufacturing', 'Truck Body Builders', 'Utility Truck Bodies',
+    'Dump Body Fabrication', 'Trailer Manufacturing', 'Custom Truck Equipment'
+  ],
+  'Aircraft Interior Manufacturing': [
+    'Aircraft Interior Manufacturing', 'Aircraft Cabin Equipment', 'FAA Interior Components',
+    'Aircraft Seating Hardware', 'Aviation Interiors', 'Cabin Interior Composites'
+  ],
+
+  // Sector 4: Electronics, Medical & High-Tech (6)
+  'Medical Device Manufacturing': [
+    'Medical Device Manufacturing', 'ISO 13485 Medical Machining', 'Surgical Instruments Manufacturer',
+    'Medical Implants Manufacturing', 'Medical Tooling', 'Cleanroom Medical Device Manufacturer'
+  ],
+  'PCB Assembly Services': [
+    'PCB Assembly Services', 'Printed Circuit Board Assembly', 'Electronics Manufacturing Services',
+    'SMT Assembly Services', 'Contract Electronics Manufacturer', 'Circuit Board Assembly',
+    'Cable and Wire Harness Assembly', 'Box Build Assembly', 'Electronic Contract Manufacturing'
+  ],
+  'Semiconductor Equipment Machining': [
+    'Semiconductor Equipment Machining', 'Semiconductor Tooling', 'Cleanroom Equipment Manufacturing',
+    'Wafer Handling Equipment', 'Vacuum Chamber Machining', 'Semiconductor Parts Fabrication'
+  ],
+  'Electromechanical Assembly Contract': [
+    'Electromechanical Assembly', 'Box Build Assembly', 'Control Panel Builders',
+    'Wiring Harness Assembly', 'Contract Electromechanical Manufacturer', 'Turnkey Box Builds'
+  ],
+  'Precision Optical Machining': [
+    'Precision Optical Machining', 'Optomechanics Fabrication', 'Laser Housing Machining',
+    'Optical Lens Cells', 'Photonics Hardware Manufacturer', 'Optical Component Machining'
+  ],
+  'Cleanroom Injection Molding': [
+    'Cleanroom Injection Molding', 'Class 8 Cleanroom Molding', 'Medical Plastic Molding',
+    'Cleanroom Thermoplastics', 'Sterile Medical Plastic Parts', 'Medical Injection Molding'
+  ],
+  'Electronic Heat Sink Manufacturing': [
+    'Electronic Heat Sink Manufacturing', 'Thermal Management Solutions', 'Extruded Heat Sinks',
+    'Aluminum Heat Sinks', 'EMI Shielding Fabrication', 'Thermal Heat Sinks'
+  ],
+
+  // Sector 5: Plastics, Rubber & Composites (7)
+  'Plastic Injection Molding': [
+    'Plastic Injection Molding', 'Custom Injection Molding', 'Thermoplastic Injection Molding',
+    'Plastic Parts Manufacturer', 'Injection Molded Plastics', 'Custom Plastic Molders'
+  ],
+  'Industrial Blow Molding': [
+    'Industrial Blow Molding', 'Plastic Bottle Manufacturer', 'Custom Blow Molding',
+    'Plastic Drums and Containers', 'HDPE Blow Molding', 'Plastic Container Manufacturer'
+  ],
+  'Custom Rubber Molding': [
+    'Custom Rubber Molding', 'Rubber Gaskets and O-Rings', 'Silicone Molding Services',
+    'Vibration Isolators Manufacturer', 'EPDM Rubber Parts', 'Molded Rubber Products'
+  ],
+  'Carbon Fiber Manufacturing': [
+    'Carbon Fiber Manufacturing', 'Composite Material Fabricators', 'Carbon Fiber Parts',
+    'Autoclave Composite Molding', 'Lightweight Composite Structures', 'Advanced Composites'
+  ],
+  'Plastic Thermoforming Services': [
+    'Plastic Thermoforming Services', 'Vacuum Forming Services', 'Heavy Gauge Thermoforming',
+    'Plastic Trays and Packaging', 'Custom Thermoformed Parts', 'Thermoformed Packaging'
+  ],
+  'Plastic Profile Extrusion': [
+    'Plastic Profile Extrusion', 'Custom Plastic Extrusions', 'PVC Profile Manufacturer',
+    'Plastic Tubing Extrusion', 'Weatherstripping Manufacturer', 'Plastic Extruders'
+  ],
+  'Custom Urethane Casting': [
+    'Custom Urethane Casting', 'Polyurethane Rollers and Wheels', 'Urethane Molded Parts',
+    'Cast Polyurethane Products', 'Industrial Urethane Bumpers', 'Cast Urethane'
+  ],
+
+  // Sector 6: Industrial Machinery & Power Equipment (7)
+  'Hydraulic Cylinder Manufacturing': [
+    'Hydraulic Cylinder Manufacturing', 'Hydraulic Valve Machining', 'Fluid Power Equipment',
+    'Custom Hydraulic Cylinders', 'Hydraulic Cylinder Repair', 'Hydraulic Components'
+  ],
+  'Industrial Pump Manufacturing': [
+    'Industrial Pump Manufacturing', 'Centrifugal Pump Manufacturer', 'Chemical Pumps',
+    'Fluid Transfer Pumps', 'Industrial Pump Repair', 'Commercial Water Pumps'
+  ],
+  'Electric Motor Manufacturing': [
+    'Electric Motor Manufacturing', 'Custom Electric Motors', 'Stators and Rotors Manufacturer',
+    'Industrial Motor Repair', 'Electric Motor Windings', 'Electric Generators'
+  ],
+  'Conveyor System Manufacturing': [
+    'Conveyor System Manufacturing', 'Material Handling Equipment', 'Roller Conveyor Manufacturer',
+    'Belt Conveyor Systems', 'Warehouse Automation Conveyors', 'Industrial Conveyors'
+  ],
+  'Heat Exchanger Manufacturing': [
+    'Heat Exchanger Manufacturing', 'Shell and Tube Heat Exchanger', 'ASME Pressure Vessels',
+    'Industrial Boilers', 'Steam Heat Exchanger Manufacturer', 'Plate Heat Exchangers'
+  ],
+  'Solar Mounting Hardware Manufacturing': [
+    'Solar Mounting Hardware Manufacturing', 'Solar Racking Systems', 'Ground Mount Solar Hardware',
+    'Solar Tracker Linkages', 'Renewable Energy Hardware', 'Solar Hardware Fabricators'
+  ],
+  'Oilfield Equipment Manufacturing': [
+    'Oilfield Equipment Manufacturing', 'API Wellhead Valves', 'Drilling Tools Manufacturer',
+    'Subsea Flanges and Manifolds', 'Oil & Gas Equipment', 'Oilfield Tool Manufacturer'
+  ],
+
+  // Sector 7: Food, Packaging & Commercial Trades (6)
+  'Food Processing Equipment Manufacturing': [
+    'Food Processing Equipment Manufacturing', 'Sanitary Stainless Steel Mixers', 'Food Machinery Manufacturer',
+    'Commercial Food Equipment', '3-A Sanitary Conveyors', 'Food Packaging Machinery'
+  ],
+  'Corrugated Packaging Manufacturing': [
+    'Corrugated Box Manufacturer', 'Packaging Company', 'Packaging Supplies', 'Custom Box Manufacturer',
+    'Cardboard Box Manufacturer', 'Paper Box Manufacturer', 'Shipping Box Supplier', 'Industrial Packaging',
+    'Carton Manufacturer', 'Packaging Solutions', 'Corrugated Containers', 'Packaging Materials',
+    'Contract Packaging', 'Protective Packaging', 'Cardboard Boxes', 'Folding Cartons'
+  ],
+  'Commercial HVAC Contractors': [
+    'Commercial HVAC Contractor', 'Commercial Heating and Cooling', 'Sheet Metal Ductwork Fabrication',
+    'Industrial Chillers and RTU', 'Commercial Refrigeration Contractor', 'Mechanical Piping Contractor'
+  ],
+  'Commercial Roofing Contractors': [
+    'Commercial Roofing Contractor', 'Industrial Flat Roofing', 'TPO Roofing Contractors',
+    'EPDM Membrane Roofing', 'Commercial Roofers', 'Architectural Sheet Metal Roofing'
+  ],
+  'Commercial Plumbing Contractors': [
+    'Commercial Plumbing Contractor', 'Commercial Pipefitting', 'Industrial Plumbing Contractor',
+    'Process Piping Fabrication', 'Backflow Prevention Contractors', 'Commercial Plumber'
+  ],
+  'Commercial Electrical Contractors': [
+    'Commercial Electrical Contractor', 'Industrial Electrical Contractor', '3-Phase Power Contractors',
+    'Electrical Switchgear Installation', 'Motor Control Center Contractors', 'Commercial Electrician'
+  ]
+};
+
+// Aliases and category name normalizations
+export const RELATED_QUERIES = INDUSTRY_EXPANSIONS;
+
+// ==========================================================================
+// Semantic B2B Industrial Query Expander
+// ==========================================================================
+export function getSemanticExpansions(rawQuery) {
+  if (!rawQuery) return [];
+  const clean = rawQuery.trim();
+
+  // Direct lookup
+  if (INDUSTRY_EXPANSIONS[clean]) {
+    return INDUSTRY_EXPANSIONS[clean];
+  }
+
+  // Case-insensitive lookup
+  const lower = clean.toLowerCase();
+  for (const [k, list] of Object.entries(INDUSTRY_EXPANSIONS)) {
+    if (k.toLowerCase() === lower) return list;
+  }
+
+  // Partial match against known categories (e.g. "Corrugated Packaging" matching "Corrugated Packaging Manufacturing")
+  for (const [k, list] of Object.entries(INDUSTRY_EXPANSIONS)) {
+    if (lower.includes(k.toLowerCase()) || k.toLowerCase().includes(lower)) {
+      return list;
+    }
+  }
+
+  // Fallback to smart root noun generation
+  const root = cleanRootNoun(clean);
+  const expansions = [
+    clean,
+    `${root} Manufacturer`,
+    `${root} Company`,
+    `${root} Supplies`,
+    `${root} Supplier`,
+    `Custom ${root}`,
+    `Industrial ${root}`,
+    `${root} Products`,
+    `${root} Fabrication`,
+    `${root} Services`
+  ];
+
+  return Array.from(new Set(expansions.filter(Boolean)));
+}
 
 // ==========================================================================
 // Direct Google Maps Internal RPC API Client
@@ -293,7 +637,7 @@ export async function fetchGoogleMapsPlaces(query, offset = 0, options = {}) {
 }
 
 // ==========================================================================
-// Lead Hunter Orchestrator (Multi-Task Grid Engine)
+// Lead Hunter Orchestrator (Multi-Task Dynamic Grid Engine)
 // ==========================================================================
 export class LeadHunter {
   constructor() {
@@ -307,6 +651,8 @@ export class LeadHunter {
     this.unreachableCount = 0;
     this.tasks = [];
     this.currentTaskIndex = 0;
+    this.currentTier = 1;
+    this.currentTierName = 'Primary Cities';
     this.recentLeads = [];
     this.abortRequested = false;
     this.startTime = null;
@@ -333,12 +679,16 @@ export class LeadHunter {
       },
       currentTaskIndex: this.currentTaskIndex,
       totalTasks: this.tasks.length,
+      currentTier: this.currentTier,
+      currentTierName: this.currentTierName,
       activeTask: this.tasks[this.currentTaskIndex] || null,
-      tasks: this.tasks.slice(0, 50).map(t => ({
+      tasks: this.tasks.slice(Math.max(0, this.currentTaskIndex - 5), this.currentTaskIndex + 45).map(t => ({
         id: t.id,
         query: t.query,
         city: t.city,
         state: t.state,
+        tier: t.tier || 1,
+        tierName: t.tierName || '',
         status: t.status,
         found: t.found || 0
       })),
@@ -362,70 +712,150 @@ export class LeadHunter {
   }
 
   /**
-   * Generates a multi-task queue to reach quotas up to 10,000+ leads.
+   * Generates a multi-tier task queue with geographic & synonym expansion.
    */
-  generateSubTasks({ query, state, city, limit }) {
+  generateTierTasks({ tier = 1, query, state, city, limit = 1000, existingTasks = [] }) {
     const tasks = [];
+    const existingQueries = new Set(existingTasks.map(t => (t.query || '').toLowerCase().trim()));
     const stateCities = STATE_CITIES[state] || [state];
-    const related = RELATED_QUERIES[query] || [
-      query,
-      `Precision ${query}`,
-      `${query} Manufacturer`,
-      `${query} Services`,
-      `Industrial ${query}`
-    ];
+    const stateCounties = STATE_COUNTIES[state] || [];
+    const expansions = getSemanticExpansions(query);
+
+    const addTask = (q, taskCity, taskState, meta = {}) => {
+      const cleanQ = (q || '').trim();
+      const lower = cleanQ.toLowerCase();
+      if (!cleanQ || existingQueries.has(lower)) return;
+      existingQueries.add(lower);
+
+      tasks.push({
+        id: `task-${existingTasks.length + tasks.length + 1}`,
+        query: cleanQ,
+        baseQuery: meta.baseQuery || query,
+        city: taskCity || '',
+        state: taskState || state,
+        tier: meta.tier || tier,
+        tierName: meta.tierName || this.currentTierName,
+        status: 'pending',
+        found: 0
+      });
+    };
 
     if (city && city.trim()) {
       const cleanCity = city.trim();
-      // Targeted City search
-      for (const q of related) {
-        tasks.push({
-          id: `task-${tasks.length + 1}`,
-          query: `${q} in ${cleanCity}, ${state}`,
-          baseQuery: q,
-          city: cleanCity,
-          state,
-          status: 'pending',
-          found: 0
-        });
-        if (tasks.length >= 8 && limit <= 500) break;
+      if (tier === 1) {
+        this.currentTierName = `City Focus: ${cleanCity}`;
+        for (const q of expansions.slice(0, 4)) {
+          addTask(`${q} in ${cleanCity}, ${state}`, cleanCity, state, { baseQuery: q, tier: 1, tierName: this.currentTierName });
+        }
+      } else if (tier === 2) {
+        this.currentTierName = `Metro Corridors: ${cleanCity} Area`;
+        for (const q of expansions.slice(0, 3)) {
+          for (const c of stateCities.slice(0, 25)) {
+            addTask(`${q} in ${c}, ${state}`, c, state, { baseQuery: q, tier: 2, tierName: this.currentTierName });
+          }
+        }
+      } else if (tier === 3) {
+        this.currentTierName = `County Subdivisions: ${state}`;
+        for (const q of expansions.slice(0, 3)) {
+          for (const co of stateCounties.slice(0, 35)) {
+            addTask(`${q} in ${co} County, ${state}`, co, state, { baseQuery: q, tier: 3, tierName: this.currentTierName });
+          }
+        }
+      } else if (tier === 4) {
+        this.currentTierName = `Statewide Industrial Expansion: ${state}`;
+        for (const q of expansions.slice(3, 10)) {
+          for (const c of stateCities.slice(0, 30)) {
+            addTask(`${q} in ${c}, ${state}`, c, state, { baseQuery: q, tier: 4, tierName: this.currentTierName });
+          }
+        }
+      } else if (tier === 5) {
+        this.currentTierName = `Regional Corridor Spillover`;
+        const neighbors = REGIONAL_EXPANSIONS[state] || [];
+        for (const neighborState of neighbors) {
+          const neighborCities = (STATE_CITIES[neighborState] || []).slice(0, 20);
+          for (const q of expansions.slice(0, 3)) {
+            for (const nc of neighborCities) {
+              addTask(`${q} in ${nc}, ${neighborState}`, nc, neighborState, { baseQuery: q, tier: 5, tierName: `Regional (${neighborState})` });
+            }
+          }
+        }
+      } else if (tier >= 6) {
+        this.currentTierName = `Nationwide Enterprise Grid`;
+        for (const metro of NATIONWIDE_METROS) {
+          for (const q of expansions.slice(0, 3)) {
+            addTask(`${q} in ${metro.city}, ${metro.state}`, metro.city, metro.state, { baseQuery: q, tier: 6, tierName: 'Nationwide' });
+          }
+        }
       }
     } else {
-      // Statewide Multi-City Expansion ("do it by tasks")
-      // Allocate cities and related queries according to requested volume
-      let selectedCities = stateCities;
-      let queriesToUse = [query];
-
-      if (limit > 500 && limit <= 2000) {
-        queriesToUse = related.slice(0, 2);
-      } else if (limit > 2000) {
-        queriesToUse = related.slice(0, 4);
-      }
-
-      for (const q of queriesToUse) {
-        for (const c of selectedCities) {
-          tasks.push({
-            id: `task-${tasks.length + 1}`,
-            query: `${q} in ${c}, ${state}`,
-            baseQuery: q,
-            city: c,
-            state,
-            status: 'pending',
-            found: 0
-          });
+      // Statewide Multi-Tier Geographic & Synonym Expansion
+      if (tier === 1) {
+        // Tier 1: Primary Manufacturing & Commercial Hubs
+        this.currentTierName = `Primary Cities (${state})`;
+        const primaryCities = stateCities.slice(0, 35);
+        const queriesToUse = limit <= 1000 ? expansions.slice(0, 2) : expansions.slice(0, 4);
+        for (const q of queriesToUse) {
+          for (const c of primaryCities) {
+            addTask(`${q} in ${c}, ${state}`, c, state, { baseQuery: q, tier: 1, tierName: `Primary Cities (${state})` });
+          }
+        }
+      } else if (tier === 2) {
+        // Tier 2: Extended Cities & Industrial Corridors
+        this.currentTierName = `Extended Townships & Corridors (${state})`;
+        const extendedCities = stateCities.length > 35 ? stateCities.slice(35) : stateCities.slice(15);
+        const queriesToUse = expansions.slice(0, 4);
+        for (const q of queriesToUse) {
+          for (const c of extendedCities) {
+            addTask(`${q} in ${c}, ${state}`, c, state, { baseQuery: q, tier: 2, tierName: `Extended Townships (${state})` });
+          }
+        }
+      } else if (tier === 3) {
+        // Tier 3: County Subdivisions (Catches industrial parks outside city borders)
+        this.currentTierName = `County Subdivisions (${state})`;
+        const queriesToUse = expansions.slice(0, 3);
+        for (const q of queriesToUse) {
+          for (const co of stateCounties) {
+            addTask(`${q} in ${co} County, ${state}`, co, state, { baseQuery: q, tier: 3, tierName: `County Subdivisions (${state})` });
+          }
+        }
+      } else if (tier === 4) {
+        // Tier 4: Deep B2B Industry Synonyms across Top Hubs
+        this.currentTierName = `Deep Industry Synonyms (${state})`;
+        const deepSynonyms = expansions.slice(4, 14);
+        const topHubs = stateCities.slice(0, 25);
+        for (const q of deepSynonyms) {
+          for (const c of topHubs) {
+            addTask(`${q} in ${c}, ${state}`, c, state, { baseQuery: q, tier: 4, tierName: `Deep Synonyms (${state})` });
+          }
+        }
+      } else if (tier === 5) {
+        // Tier 5: Regional Neighboring State Expansion
+        this.currentTierName = `Regional Great Lakes / Midwest Corridor`;
+        const neighbors = REGIONAL_EXPANSIONS[state] || [];
+        for (const neighborState of neighbors) {
+          const neighborCities = (STATE_CITIES[neighborState] || []).slice(0, 25);
+          for (const q of expansions.slice(0, 3)) {
+            for (const nc of neighborCities) {
+              addTask(`${q} in ${nc}, ${neighborState}`, nc, neighborState, { baseQuery: q, tier: 5, tierName: `Regional (${neighborState})` });
+            }
+          }
+        }
+      } else if (tier >= 6) {
+        // Tier 6: Nationwide Manufacturing Hubs
+        this.currentTierName = `Nationwide Enterprise Metros`;
+        for (const metro of NATIONWIDE_METROS) {
+          for (const q of expansions.slice(0, 3)) {
+            addTask(`${q} in ${metro.city}, ${metro.state}`, metro.city, metro.state, { baseQuery: q, tier: 6, tierName: 'Nationwide' });
+          }
         }
       }
     }
 
-    return tasks.length > 0 ? tasks : [{
-      id: 'task-1',
-      query: `${query} in ${state}`,
-      baseQuery: query,
-      city: '',
-      state,
-      status: 'pending',
-      found: 0
-    }];
+    return tasks;
+  }
+
+  generateSubTasks(opts) {
+    return this.generateTierTasks({ tier: 1, ...opts });
   }
 
   async startHunting({ query = 'Manufacturing', state = 'Illinois', city = '', limit = 1000, onEvent = null }) {
@@ -446,8 +876,10 @@ export class LeadHunter {
     this.startTime = Date.now();
     this.endTime = null;
     this.errorMessage = null;
+    this.currentTier = 1;
+    this.currentTierName = city && city.trim() ? `City Focus: ${city.trim()}` : `Primary Cities (${state})`;
 
-    this.tasks = this.generateSubTasks({ query, state, city, limit: this.targetLimit });
+    this.tasks = this.generateTierTasks({ tier: 1, query, state, city, limit: this.targetLimit, existingTasks: [] });
     this.currentTaskIndex = 0;
 
     const emit = (type, data) => {
@@ -458,6 +890,8 @@ export class LeadHunter {
       query,
       state,
       city,
+      tier: this.currentTier,
+      tierName: this.currentTierName,
       limit: this.targetLimit,
       totalTasks: this.tasks.length,
       tasks: this.tasks.slice(0, 50)
@@ -506,6 +940,8 @@ export class LeadHunter {
         emit('task_started', {
           taskIndex: i + 1,
           totalTasks: this.tasks.length,
+          tier: task.tier || this.currentTier,
+          tierName: task.tierName || this.currentTierName,
           task
         });
 
@@ -536,8 +972,8 @@ export class LeadHunter {
           const candidatesToVerify = [];
           for (const item of rawPlaces) {
             if (this.reachableCount >= this.targetLimit || this.abortRequested) break;
-            if (!item.name || seenNames.has(item.name)) continue;
-            seenNames.add(item.name);
+            if (!item.name || seenNames.has(item.name.toLowerCase())) continue;
+            seenNames.add(item.name.toLowerCase());
             this.discoveredCount++;
 
             let cleanUrl = item.website;
@@ -601,52 +1037,63 @@ export class LeadHunter {
             });
           }
 
-          // Asynchronous parallel reachability verification pool (concurrency = 8)
+          // Asynchronous HTTP reachability verification with 12s timeout
           if (candidatesToVerify.length > 0) {
-            const batchPromises = candidatesToVerify.map(async (candidate) => {
+            const batchPromises = candidatesToVerify.map(async ({ item, cleanUrl, normalized }) => {
               if (this.reachableCount >= this.targetLimit || this.abortRequested) return;
 
-              // Generous 12,000ms timeout accounts for slow networks and sluggish small business servers
-              const check = await checkWebsite(candidate.cleanUrl, 12000);
-              if (!check.ok) {
-                this.unreachableCount++;
+              let isReachable = false;
+              try {
+                const check = await checkWebsite(cleanUrl, 12000);
+                isReachable = check.reachable;
+              } catch (_) {
+                isReachable = false;
+              }
+
+              if (!isReachable) {
                 this.skippedCount++;
+                this.unreachableCount++;
                 return;
               }
 
-              const finalUrl = candidate.cleanUrl.startsWith('http')
-                ? candidate.cleanUrl
-                : `https://${candidate.cleanUrl}`;
-
-              const notes = `Discovered via Lead Hunter: ${task.query}${candidate.item.address ? ` | ${candidate.item.address}` : ''}`;
-              const leadCity = task.city || null;
-              const leadState = task.state || null;
-              const phone = candidate.item.phone || null;
-
+              // Verified reachable: insert into database
               try {
-                insertLeadStmt.run(candidate.item.name, finalUrl, leadCity, leadState, phone, null, notes, null);
+                const info = insertLeadStmt.run(
+                  item.name,
+                  cleanUrl,
+                  task.city || state,
+                  task.state || state,
+                  item.phone || '',
+                  '', // email
+                  `Google Maps Hunter: ${task.query}`,
+                  '', // contact_person
+                );
+
                 this.reachableCount++;
                 taskLeadsCount++;
-                task.found = taskLeadsCount;
 
-                const leadObj = {
-                  company: candidate.item.name,
-                  website: finalUrl,
-                  phone: phone || '—',
-                  address: candidate.item.address || '',
-                  city: leadCity || '',
-                  state: leadState || '',
-                  category: candidate.item.mainCategory || task.baseQuery
+                const leadEntry = {
+                  id: info.lastInsertRowid,
+                  name: item.name,
+                  website: cleanUrl,
+                  phone: item.phone || '',
+                  city: task.city || state,
+                  state: task.state || state,
+                  verified: true,
+                  timestamp: new Date().toISOString()
                 };
 
-                this.recentLeads.unshift(leadObj);
-                if (this.recentLeads.length > 50) this.recentLeads.pop();
+                this.recentLeads.unshift(leadEntry);
+                if (this.recentLeads.length > 100) this.recentLeads.pop();
 
-                emit('lead_found', leadObj);
-              } catch (insertErr) {
-                // If unique constraint triggers, record duplicate
-                this.duplicatesCount++;
-                this.skippedCount++;
+                emit('lead_found', leadEntry);
+              } catch (dbErr) {
+                if (dbErr.message && dbErr.message.includes('UNIQUE')) {
+                  this.duplicatesCount++;
+                  this.skippedCount++;
+                } else {
+                  console.error('[Lead Hunter] DB Insert error:', dbErr.message);
+                }
               }
             });
 
@@ -656,6 +1103,8 @@ export class LeadHunter {
           emit('task_progress', {
             taskIndex: i + 1,
             totalTasks: this.tasks.length,
+            tier: task.tier || this.currentTier,
+            tierName: task.tierName || this.currentTierName,
             offset,
             batchCount: rawPlaces.length,
             taskFound: taskLeadsCount,
@@ -679,8 +1128,42 @@ export class LeadHunter {
         emit('task_finished', {
           taskIndex: i + 1,
           totalTasks: this.tasks.length,
+          tier: task.tier || this.currentTier,
+          tierName: task.tierName || this.currentTierName,
           task
         });
+
+        // DYNAMIC TASK REPLENISHMENT:
+        // When nearing the end of current tasks, automatically expand to next geographic/synonym tier
+        if (i === this.tasks.length - 1 && this.reachableCount < this.targetLimit && !this.abortRequested) {
+          const nextTier = this.currentTier + 1;
+          if (nextTier <= 6) {
+            const nextTierTasks = this.generateTierTasks({
+              tier: nextTier,
+              query,
+              state,
+              city,
+              limit: this.targetLimit - this.reachableCount,
+              existingTasks: this.tasks
+            });
+
+            if (nextTierTasks && nextTierTasks.length > 0) {
+              this.currentTier = nextTier;
+              this.tasks.push(...nextTierTasks);
+              console.log(`[Lead Hunter] Dynamic Replenishment: Enqueued Tier ${nextTier} (${this.currentTierName}) with ${nextTierTasks.length} sub-tasks. Total tasks now: ${this.tasks.length}`);
+              emit('tier_replenished', {
+                tier: this.currentTier,
+                tierName: this.currentTierName,
+                addedTasks: nextTierTasks.length,
+                totalTasks: this.tasks.length,
+                reachable: this.reachableCount,
+                targetLimit: this.targetLimit
+              });
+            } else {
+              console.log(`[Lead Hunter] All geographic and synonym tiers exhausted for ${state}.`);
+            }
+          }
+        }
 
         // Pacing delay between geographic sub-tasks
         await new Promise(r => setTimeout(r, 400));
@@ -694,7 +1177,8 @@ export class LeadHunter {
         reachable: this.reachableCount,
         skipped: this.skippedCount,
         totalTasks: this.tasks.length,
-        elapsedSeconds: this.getElapsedSeconds()
+        elapsedSeconds: this.getElapsedSeconds(),
+        isSaturated: this.reachableCount < this.targetLimit && !this.abortRequested
       });
 
     } catch (err) {

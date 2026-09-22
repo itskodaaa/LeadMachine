@@ -772,7 +772,18 @@ function handleTelemetryEvent(event) {
   } else if (event.type === 'hunter_started') {
     if (hunterResultsCard) hunterResultsCard.style.display = 'block';
     if (hunterStatusBadge) {
-      hunterStatusBadge.textContent = 'Hunting...';
+      hunterStatusBadge.textContent = event.tierName ? `Tier ${event.tier || 1}: ${event.tierName}` : 'Hunting...';
+      hunterStatusBadge.className = 'badge-status active';
+    }
+  } else if (event.type === 'tier_replenished') {
+    if (hunterStatusBadge) {
+      hunterStatusBadge.textContent = `Tier ${event.tier}: ${event.tierName || 'Expanding'}`;
+      hunterStatusBadge.className = 'badge-status active';
+    }
+  } else if (event.type === 'task_started') {
+    if (hunterStatusBadge) {
+      const tierText = event.tierName ? `Tier ${event.tier || 1}: ${event.tierName}` : 'Hunting...';
+      hunterStatusBadge.textContent = `${tierText} (${event.taskIndex}/${event.totalTasks})`;
       hunterStatusBadge.className = 'badge-status active';
     }
   } else if (event.type === 'task_progress') {
@@ -791,13 +802,21 @@ function handleTelemetryEvent(event) {
     // Lead Hunter real-time event
     addHunterStreamItem(event);
   } else if (event.type === 'hunter_finished') {
+    const isTargetReached = (event.reachable || 0) >= (hunterCurrentLimit || 1);
     if (hunterStatusBadge) {
-      hunterStatusBadge.textContent = 'Completed';
+      if (isTargetReached) {
+        hunterStatusBadge.textContent = `Completed (${(event.reachable || 0).toLocaleString()} Leads)`;
+      } else {
+        hunterStatusBadge.textContent = `Quota Saturated (${(event.reachable || 0).toLocaleString()} Leads)`;
+      }
       hunterStatusBadge.className = 'badge-status';
     }
     if (startHunterBtn) startHunterBtn.style.display = 'inline-flex';
     if (stopHunterBtn) stopHunterBtn.style.display = 'none';
-    if (hunterProgressFill) hunterProgressFill.style.width = '100%';
+    if (hunterProgressFill && hunterCurrentLimit) {
+      const finalPct = Math.min(100, Math.round(((event.reachable || 0) / hunterCurrentLimit) * 100));
+      hunterProgressFill.style.width = finalPct + '%';
+    }
     loadInitialSpecs();
   } else if (event.type === 'campaign_finished') {
     setCampaignRunningUI(false);
@@ -1030,13 +1049,28 @@ function startHunterPolling() {
           hunterProgressFill.style.width = pct + '%';
         }
 
+        if (s.currentTierName && s.status === 'running' && hunterStatusBadge) {
+          hunterStatusBadge.textContent = `Tier ${s.currentTier || 1}: ${s.currentTierName} (${(s.currentTaskIndex || 0) + 1}/${s.totalTasks || 1})`;
+          hunterStatusBadge.className = 'badge-status active';
+        }
+
         if (s.status === 'completed' || s.status === 'stopped' || s.status === 'error') {
           clearInterval(hunterPollInterval);
           hunterPollInterval = null;
           resetHunterUI();
-          hunterStatusBadge.textContent = s.status === 'completed' ? 'Completed' : 'Finished';
+          const isTargetReached = (s.reachable || 0) >= (s.limit || 1);
+          if (s.status === 'completed') {
+            hunterStatusBadge.textContent = isTargetReached 
+              ? `Completed (${(s.reachable || 0).toLocaleString()} Leads)`
+              : `Quota Saturated (${(s.reachable || 0).toLocaleString()} Leads)`;
+          } else {
+            hunterStatusBadge.textContent = s.status === 'stopped' ? 'Stopped' : 'Error';
+          }
           hunterStatusBadge.className = 'badge-status';
-          if (s.status === 'completed' && hunterProgressFill) hunterProgressFill.style.width = '100%';
+          if (hunterProgressFill && s.limit) {
+            const finalPct = Math.min(100, Math.round(((s.reachable || 0) / s.limit) * 100));
+            hunterProgressFill.style.width = finalPct + '%';
+          }
           loadInitialSpecs();
         }
       }
