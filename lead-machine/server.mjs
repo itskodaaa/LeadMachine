@@ -811,13 +811,21 @@ const server = http.createServer(async (req, res) => {
       setTimeout(async () => {
         try {
           console.log('[System] Restarting Lead Machine engine for update...');
-          const { spawn } = await import('child_process');
-          const child = spawn(process.execPath, ['--dns-result-order=ipv4first', process.argv[1]], {
-            detached: true,
-            stdio: 'ignore',
-            cwd: path.dirname(process.argv[1])
-          });
-          child.unref();
+          if (process.platform === 'win32') {
+            const { exec } = await import('child_process');
+            exec(`cmd.exe /c start "" "${process.execPath}" --dns-result-order=ipv4first "${process.argv[1]}"`, {
+              cwd: path.dirname(process.argv[1]),
+              windowsHide: false
+            });
+          } else {
+            const { spawn } = await import('child_process');
+            const child = spawn(process.execPath, ['--dns-result-order=ipv4first', process.argv[1]], {
+              detached: true,
+              stdio: 'ignore',
+              cwd: path.dirname(process.argv[1])
+            });
+            child.unref();
+          }
         } catch (spawnErr) {
           console.error('[System] Failed to auto-restart process:', spawnErr.message);
         }
