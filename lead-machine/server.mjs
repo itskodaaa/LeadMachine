@@ -1420,16 +1420,23 @@ function bindServerWithFallback(srv, initialPort, maxAttempts = 10) {
       console.log(`⌨️  Press 'q' or 'Ctrl+C' to exit cleanly`);
       console.log(`======================================================\n`);
 
-      // Native instant browser launch (avoids heavy PowerShell Start-Job process)
+      // Native instant browser launch
       if (process.env.LEADMACHINE_NO_BROWSER !== '1') {
         const url = `http://localhost:${currentPort}`;
         try {
           if (process.platform === 'win32') {
             const { exec } = await import('child_process');
-            exec(`start "" "${url}"`);
+            exec(`powershell.exe -NoProfile -Command "Start-Process '${url}'"`, (err) => {
+              if (err) {
+                exec(`cmd.exe /c start "" "${url}"`);
+              }
+            });
           } else if (process.platform === 'darwin') {
             const { exec } = await import('child_process');
             exec(`open "${url}"`);
+          } else {
+            const { exec } = await import('child_process');
+            exec(`xdg-open "${url}"`);
           }
         } catch (_) {}
       }

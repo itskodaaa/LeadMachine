@@ -321,6 +321,10 @@ if (Test-Path $portFile) {
 # Start Node server with low-RAM optimization (384MB heap bound) and IPv4 priority
 $serverScript = Join-Path $appRoot "lead-machine\server.mjs"
 
+# Lightweight one-shot browser launcher (exits immediately after opening browser; 0 MB lingering RAM)
+$browserScript = "for (`$i=0; `$i -lt 50; `$i++) { Start-Sleep -Milliseconds 250; if (Test-Path '$portFile') { `$p = (Get-Content '$portFile' -ErrorAction SilentlyContinue | Out-String).Trim(); if (`$p -match '^\d+$') { Start-Process `"http://localhost:`$p`"; break } } }"
+Start-Process powershell.exe -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"$browserScript`""
+
 $bootTime = Get-Date
 & $nodeExe --max-old-space-size=384 --dns-result-order=ipv4first $serverScript
 $exitCode = $LASTEXITCODE
