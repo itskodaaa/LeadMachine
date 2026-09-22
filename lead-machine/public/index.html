@@ -724,6 +724,86 @@ I am reaching out to express our interest in your services and would appreciate 
           <div id="updateFeedback" class="feedback-banner" style="display:none;"></div>
         </div>
 
+        <!-- Workspace & Database Storage Diagnostics -->
+        <div class="card" id="workspaceCard">
+          <div class="card-head">
+            <div>
+              <h2 class="card-title">Workspace & Database Storage</h2>
+              <p class="card-subtitle">Per-user isolated filesystem architecture and multi-user data diagnostics.</p>
+            </div>
+            <span class="badge-status active" id="workspaceStatusBadge">Isolated Profile</span>
+          </div>
+
+          <div class="pref-row">
+            <div class="pref-info">
+              <span class="pref-title">Storage Architecture</span>
+              <span class="pref-desc" id="workspaceArchDesc">Isolated Per-User Directory (Prevents Windows multi-user data clashing)</span>
+            </div>
+            <div class="pref-control">
+              <span class="badge-status active" id="workspaceBadge">Per-User V2.4</span>
+            </div>
+          </div>
+
+          <div class="pref-row">
+            <div class="pref-info">
+              <span class="pref-title">Active Database File</span>
+              <span class="pref-desc tabular" id="workspaceDbPath" style="font-family: var(--font-mono); font-size: 11px; word-break: break-all; color: var(--text-secondary);">Loading...</span>
+            </div>
+            <div class="pref-control">
+              <span class="tabular" id="workspaceDbSize" style="font-size: 13px; color: var(--text-muted);">-</span>
+            </div>
+          </div>
+
+          <div class="pref-row">
+            <div class="pref-info">
+              <span class="pref-title">Leads In Active Database</span>
+              <span class="pref-desc" id="workspaceLeadsBreakdown">Verified leads in your current private session</span>
+            </div>
+            <div class="pref-control">
+              <span class="tabular" id="workspaceLeadsCount" style="font-weight: 600; font-size: 14px; color: var(--text-primary);">-</span>
+            </div>
+          </div>
+
+          <div class="pref-row">
+            <div class="pref-info">
+              <span class="pref-title">Data Claim & Migration Status</span>
+              <span class="pref-desc" id="workspaceClaimDesc">Checking migration and ownership record...</span>
+            </div>
+            <div class="pref-control">
+              <span class="badge-status" id="workspaceClaimBadge">-</span>
+            </div>
+          </div>
+
+          <!-- Detected Databases List -->
+          <div id="workspaceLegacySection" style="margin-top: 14px; border-top: 1px solid var(--border-subtle); padding-top: 12px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <span style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">Detected Databases On This Computer</span>
+              <button type="button" id="refreshWorkspaceBtn" class="btn-secondary btn-sm" style="padding: 3px 8px; font-size: 11px;">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                <span>Re-scan Disk</span>
+              </button>
+            </div>
+            <div id="workspaceDatabaseList" class="database-list">
+              <!-- Dynamically populated with database entries -->
+            </div>
+          </div>
+
+          <!-- Recovery Tools / Action Bar -->
+          <div class="update-actions" style="margin-top: 14px; border-top: 1px solid var(--border-subtle); padding-top: 12px;">
+            <div class="update-actions-left">
+              <button type="button" id="reclaimDataBtn" class="btn-primary btn-sm" style="display: none;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>Claim / Recover Legacy Leads</span>
+              </button>
+              <button type="button" id="openMigrationAssistantBtn" class="btn-secondary btn-sm">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                <span>Launch Migration Assistant</span>
+              </button>
+            </div>
+          </div>
+          <div id="workspaceFeedback" class="feedback-banner" style="display:none; margin-top: 12px;"></div>
+        </div>
+
         <!-- Enterprise License & Authentication -->
         <div class="card">
           <div class="card-head">
@@ -1104,6 +1184,12 @@ I am reaching out to express our interest in your services and would appreciate 
   <!-- ========================================== -->
   <div id="dataMigrationOverlay" class="data-migration-overlay" style="display: none;">
     <div class="data-migration-modal">
+      <button type="button" id="migrationCloseX" class="force-update-close-btn" title="Close" style="display: flex;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
       <div class="data-migration-header">
         <div class="data-migration-icon">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

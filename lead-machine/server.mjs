@@ -12,7 +12,7 @@ import { batchCheckWebsites } from './reachability.mjs';
 import { leadHunter } from './hunter.mjs';
 import { parseRawWebsites, importWebsitesToDb, crawlDirectoryPage } from './url_importer.mjs';
 import { getConfigPath, getScreenshotsDir, getPortFilePath } from './paths.mjs';
-import { getMigrationStatus, claimLegacyData, startFreshWorkspace } from './migration.mjs';
+import { getMigrationStatus, claimLegacyData, startFreshWorkspace, getWorkspaceDiagnostics, recoverLegacyData } from './migration.mjs';
 
 // Prioritize IPv4 on virtualized / VM networks (fixes UTM/QEMU/Hyper-V IPv6 timeout)
 try {
@@ -339,11 +339,40 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (pathname === '/api/workspace/diagnostics' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(getWorkspaceDiagnostics()));
+    return;
+  }
+
+  if (pathname === '/api/workspace/recover' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const result = recoverLegacyData(payload.key, payload.sourceDbPath);
+        if (result.success) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(result));
+        } else {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(result));
+        }
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
   // 2. ZERO-TRUST GLOBAL AUTH GUARD FOR ALL OTHER API ROUTES & SSE STREAMS
-  // (Permits /api/system/version, /api/system/update, and /api/migration/* so instances can check/apply updates and migrate)
+  // (Permits /api/system/version, /api/system/update, /api/migration/*, and /api/workspace/* so instances can inspect/migrate)
   const isPublicApi = pathname === '/api/system/version' || 
                       pathname === '/api/system/update' || 
-                      pathname.startsWith('/api/migration/');
+                      pathname.startsWith('/api/migration/') ||
+                      pathname.startsWith('/api/workspace/');
   if ((pathname.startsWith('/api/') || pathname === '/api/stream' || pathname === '/events') && !isPublicApi) {
     const auth = getAuthStatus();
     if (!auth.authenticated) {

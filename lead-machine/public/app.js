@@ -227,6 +227,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupForceUpdateHandlers();
   setupIndustrySelector();
   setupDataMigrationHandlers();
+  setupWorkspaceDiagnosticsHandlers();
   initDomTamperGuard();
   
   const migrationPending = await checkMigrationStatus();
@@ -280,6 +281,19 @@ function setupDataMigrationHandlers() {
   const claimBtn = document.getElementById('migrationClaimBtn');
   const claimFeedback = document.getElementById('migrationClaimFeedback');
   const startFreshBtn = document.getElementById('migrationStartFreshBtn');
+  const closeX = document.getElementById('migrationCloseX');
+
+  if (closeX) {
+    closeX.addEventListener('click', () => {
+      isMigrationModalActive = false;
+      overlay.style.display = 'none';
+      const appContainer = document.getElementById('appContainer');
+      if (appContainer) {
+        appContainer.style.filter = 'none';
+        appContainer.style.pointerEvents = 'auto';
+      }
+    });
+  }
 
   if (claimForm) {
     claimForm.addEventListener('submit', async (e) => {
@@ -353,6 +367,251 @@ function setupDataMigrationHandlers() {
       } finally {
         startFreshBtn.disabled = false;
         startFreshBtn.innerHTML = '<span>Start Fresh Workspace</span>';
+      }
+    });
+  }
+}
+
+/* ==========================================================================
+   Workspace Diagnostics & Multi-User File System Controller
+   ========================================================================== */
+async function loadWorkspaceDiagnostics(isManualRefresh = false) {
+  const badge = document.getElementById('workspaceStatusBadge');
+  const archDesc = document.getElementById('workspaceArchDesc');
+  const dbPathEl = document.getElementById('workspaceDbPath');
+  const dbSizeEl = document.getElementById('workspaceDbSize');
+  const leadsCountEl = document.getElementById('workspaceLeadsCount');
+  const leadsBreakdownEl = document.getElementById('workspaceLeadsBreakdown');
+  const claimBadge = document.getElementById('workspaceClaimBadge');
+  const claimDesc = document.getElementById('workspaceClaimDesc');
+  const dbListEl = document.getElementById('workspaceDatabaseList');
+  const reclaimBtn = document.getElementById('reclaimDataBtn');
+  const refreshBtn = document.getElementById('refreshWorkspaceBtn');
+  const feedbackEl = document.getElementById('workspaceFeedback');
+
+  if (refreshBtn && isManualRefresh) {
+    refreshBtn.disabled = true;
+    refreshBtn.innerHTML = `${ICON_SPIN}<span>Scanning...</span>`;
+  }
+
+  try {
+    const res = await fetch('/api/workspace/diagnostics');
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Failed to fetch diagnostics');
+
+    // 1. Storage Architecture & User Profile
+    if (archDesc) {
+      archDesc.textContent = `Isolated User Directory (${data.operatingSystem}) • Profile: ${data.systemUser}`;
+    }
+
+    // 2. Active Database File & Size
+    if (dbPathEl) {
+      dbPathEl.textContent = data.activeDatabase.exists ? data.activeDatabase.path : 'None (Empty / Not Created)';
+    }
+    if (dbSizeEl) {
+      dbSizeEl.textContent = data.activeDatabase.sizeFormatted || '-';
+    }
+
+    // 3. Leads In Active Database
+    if (leadsCountEl) {
+      leadsCountEl.textContent = `${Number(data.activeDatabase.leadsCount || 0).toLocaleString()} Leads`;
+    }
+    if (leadsBreakdownEl) {
+      leadsBreakdownEl.textContent = `${Number(data.activeDatabase.contactedCount || 0).toLocaleString()} contacted, ${Number(data.activeDatabase.pendingCount || 0).toLocaleString()} pending`;
+    }
+
+    // 4. Claim / Migration Status Badge & Description
+    if (claimBadge && claimDesc) {
+      if (data.claimStatus.isClaimed) {
+        claimBadge.textContent = 'Data Claimed';
+        claimBadge.className = 'badge-status active';
+        const d = data.claimStatus.claimDetails;
+        const claimDate = d?.claimedAt ? new Date(d.claimedAt).toLocaleDateString() : '';
+        claimDesc.textContent = `Claimed by "${d?.claimedBy || 'user'}"${claimDate ? ' on ' + claimDate : ''} (${d?.keyMask || 'Key Verified'})`;
+      } else if (data.claimStatus.isFreshWorkspace) {
+        claimBadge.textContent = 'Clean Workspace';
+        claimBadge.className = 'badge-status';
+        claimDesc.textContent = `Fresh isolated database initialized for ${data.systemUser}. No legacy data imported.`;
+      } else if (data.canClaimOrRecover) {
+        claimBadge.textContent = 'Unclaimed Data Available';
+        claimBadge.className = 'badge-status text-warning';
+        claimBadge.style.color = '#f59e0b';
+        claimDesc.textContent = `${Number(data.totalRecoverableLeads || 0).toLocaleString()} legacy leads detected on this computer available for recovery.`;
+      } else {
+        claimBadge.textContent = 'Active';
+        claimBadge.className = 'badge-status active';
+        claimDesc.textContent = 'Workspace is isolated and running normally.';
+      }
+    }
+
+    // 5. Detected Databases on Computer
+    if (dbListEl) {
+      dbListEl.innerHTML = '';
+      if (!data.detectedDatabases || data.detectedDatabases.length === 0) {
+        dbListEl.innerHTML = '<div style="font-size: 12px; color: var(--text-muted); padding: 8px 0;">No other database files detected on this machine.</div>';
+      } else {
+        data.detectedDatabases.forEach(db => {
+          const item = document.createElement('div');
+          item.className = `db-entry-item ${db.isActive ? 'is-active' : ''}`;
+          
+          let actionBtnHtml = '';
+          if (db.isActive) {
+            actionBtnHtml = '<span class="db-entry-badge active">Active Workspace</span>';
+          } else if (db.canRestore) {
+            actionBtnHtml = `<button type="button" class="btn-primary btn-sm restore-db-btn" data-path="${escapeHtml(db.path)}" style="padding: 3px 10px; font-size: 11px;">Restore Leads</button>`;
+          } else {
+            actionBtnHtml = '<span class="db-entry-badge">Empty / Preserved</span>';
+          }
+
+          item.innerHTML = `
+            <div class="db-entry-main">
+              <div class="db-entry-header">
+                <span class="db-entry-label">${escapeHtml(db.label)}</span>
+                <span class="db-entry-badge">${db.sizeFormatted}</span>
+              </div>
+              <div class="db-entry-path">${escapeHtml(db.path)}</div>
+            </div>
+            <div class="db-entry-meta">
+              <div class="db-entry-count">
+                ${Number(db.leadsCount || 0).toLocaleString()}
+                <small>leads</small>
+              </div>
+              ${actionBtnHtml}
+            </div>
+          `;
+          dbListEl.appendChild(item);
+        });
+
+        // Wire click handlers on dynamically created restore buttons
+        dbListEl.querySelectorAll('.restore-db-btn').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const sourcePath = btn.getAttribute('data-path');
+            await triggerWorkspaceRecovery(sourcePath);
+          });
+        });
+      }
+    }
+
+    // 6. Action Button Visibility
+    if (reclaimBtn) {
+      if (data.canClaimOrRecover) {
+        reclaimBtn.style.display = 'inline-flex';
+      } else {
+        reclaimBtn.style.display = 'none';
+      }
+    }
+
+    if (feedbackEl && isManualRefresh) {
+      feedbackEl.style.display = 'block';
+      feedbackEl.className = 'feedback-banner success';
+      feedbackEl.textContent = `✓ Storage diagnostics refreshed at ${new Date().toLocaleTimeString()}. Verified ${data.detectedDatabases.length} database locations.`;
+      setTimeout(() => { feedbackEl.style.display = 'none'; }, 4000);
+    }
+  } catch (err) {
+    console.error('Failed to load workspace diagnostics:', err);
+    if (feedbackEl && isManualRefresh) {
+      feedbackEl.style.display = 'block';
+      feedbackEl.className = 'feedback-banner error';
+      feedbackEl.textContent = 'Failed to load storage diagnostics: ' + err.message;
+    }
+  } finally {
+    if (refreshBtn && isManualRefresh) {
+      refreshBtn.disabled = false;
+      refreshBtn.innerHTML = `${ICON_REFRESH}<span>Re-scan Disk</span>`;
+    }
+  }
+}
+
+async function triggerWorkspaceRecovery(customSourcePath = null) {
+  const feedbackEl = document.getElementById('workspaceFeedback');
+  const reclaimBtn = document.getElementById('reclaimDataBtn');
+
+  // Prompt user for license key (or default to current)
+  const defaultPrompt = 'Enter the original owner license key to claim and restore these leads into your personal workspace:';
+  const inputKey = prompt(defaultPrompt, currentAuthData?.key || '');
+  if (inputKey === null) return; // cancelled
+
+  if (reclaimBtn) {
+    reclaimBtn.disabled = true;
+    reclaimBtn.innerHTML = `${ICON_SPIN}<span>Recovering...</span>`;
+  }
+  if (feedbackEl) {
+    feedbackEl.style.display = 'block';
+    feedbackEl.className = 'feedback-banner';
+    feedbackEl.textContent = 'Verifying license ownership and restoring database...';
+  }
+
+  try {
+    const res = await fetch('/api/workspace/recover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        key: inputKey.trim(),
+        sourceDbPath: customSourcePath
+      })
+    });
+    const result = await res.json();
+
+    if (res.ok && result.success) {
+      if (feedbackEl) {
+        feedbackEl.className = 'feedback-banner success';
+        feedbackEl.textContent = `✓ ${result.message}`;
+      }
+      showToast(result.message, 'success');
+      // Refresh leads table & workspace diagnostics
+      await loadLeadsTable();
+      await loadWorkspaceDiagnostics();
+    } else {
+      if (feedbackEl) {
+        feedbackEl.className = 'feedback-banner error';
+        feedbackEl.textContent = `✗ Recovery failed: ${result.error || 'Invalid license key'}`;
+      }
+      alert(result.error || 'Failed to recover database. License key does not match.');
+    }
+  } catch (err) {
+    if (feedbackEl) {
+      feedbackEl.className = 'feedback-banner error';
+      feedbackEl.textContent = `✗ Server error during recovery: ${err.message}`;
+    }
+  } finally {
+    if (reclaimBtn) {
+      reclaimBtn.disabled = false;
+      reclaimBtn.innerHTML = `${ICON_DOWNLOAD}<span>Claim / Recover Legacy Leads</span>`;
+    }
+  }
+}
+
+function setupWorkspaceDiagnosticsHandlers() {
+  const refreshBtn = document.getElementById('refreshWorkspaceBtn');
+  const reclaimBtn = document.getElementById('reclaimDataBtn');
+  const openAssistantBtn = document.getElementById('openMigrationAssistantBtn');
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      loadWorkspaceDiagnostics(true);
+    });
+  }
+
+  if (reclaimBtn) {
+    reclaimBtn.addEventListener('click', () => {
+      triggerWorkspaceRecovery(null);
+    });
+  }
+
+  if (openAssistantBtn) {
+    openAssistantBtn.addEventListener('click', async () => {
+      const overlay = document.getElementById('dataMigrationOverlay');
+      const leadCountEl = document.getElementById('migrationLeadCount');
+      if (overlay) {
+        try {
+          const res = await fetch('/api/workspace/diagnostics');
+          const data = await res.json();
+          const count = data.totalRecoverableLeads || data.activeDatabase?.leadsCount || 0;
+          if (leadCountEl) leadCountEl.textContent = Number(count).toLocaleString();
+        } catch (_) {}
+        isMigrationModalActive = true;
+        overlay.style.display = 'flex';
       }
     });
   }
@@ -643,6 +902,7 @@ function setupNavigation() {
         loadLeadsTable();
       } else if (targetId === 'tab-settings') {
         checkAuthStatus();
+        loadWorkspaceDiagnostics();
       }
     });
   });
