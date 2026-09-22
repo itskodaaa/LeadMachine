@@ -12,7 +12,7 @@ import {
   getLegacyMigratedBakPath,
   getAppRoot
 } from './paths.mjs';
-import { hashKey, maskKey } from './auth.mjs';
+import { hashKey, maskKey, verifyRemoteKey } from './auth.mjs';
 import { migrateDatabase } from './db_migration.mjs';
 
 /**
@@ -132,7 +132,7 @@ export function getMigrationStatus() {
 /**
  * Claims the legacy shared database and configuration by validating against the original owner's key.
  */
-export function claimLegacyData(rawKey) {
+export async function claimLegacyData(rawKey) {
   const cleanKey = (rawKey || '').trim().toUpperCase();
   if (!cleanKey) {
     return { success: false, error: 'Please enter the original license key to claim this workspace.' };
@@ -162,11 +162,25 @@ export function claimLegacyData(rawKey) {
   // Validate ownership
   const matchesKey = expectedKey && cleanKey === expectedKey;
   const matchesHash = expectedHash && inputHash === expectedHash;
-
-  // Master dev override key bypass
   const isMasterOverride = cleanKey === 'LM-MASTER-DEV-OVERRIDE' || cleanKey === 'LM-ADMIN-RESCUE-2026';
 
+  let isRemoteValid = false;
+  let remoteClientName = null;
+  let remoteTier = null;
   if (!matchesKey && !matchesHash && !isMasterOverride) {
+    try {
+      const verRes = await verifyRemoteKey(cleanKey);
+      if (verRes.valid) {
+        if (!expectedKey || matchesKey || matchesHash || verRes.payload?.tier === 'Master') {
+          isRemoteValid = true;
+          remoteClientName = verRes.clientName;
+          remoteTier = verRes.payload?.tier;
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (!matchesKey && !matchesHash && !isMasterOverride && !isRemoteValid) {
     return {
       success: false,
       error: 'License key does not match the database owner. Access denied. Please enter the original key or click "Start Fresh".'
@@ -175,11 +189,14 @@ export function claimLegacyData(rawKey) {
 
   const userDb = getDbPath();
   const userCfg = getConfigPath();
+  const samePath = path.resolve(legacyDb) === path.resolve(userDb);
 
   try {
-    // 1. Copy legacy database to user's isolated data directory
+    // 1. Copy legacy database to user's isolated data directory (only if distinct path)
     fs.mkdirSync(path.dirname(userDb), { recursive: true });
-    fs.copyFileSync(legacyDb, userDb);
+    if (!samePath) {
+      fs.copyFileSync(legacyDb, userDb);
+    }
 
     // 2. Ensure schema & migrations are up to date on user's database
     const db = new Database(userDb);
@@ -191,6 +208,8 @@ export function claimLegacyData(rawKey) {
     legacyCfg.license = legacyCfg.license || {};
     legacyCfg.license.key = cleanKey;
     legacyCfg.license.keyMask = maskKey(cleanKey);
+    legacyCfg.license.clientName = remoteClientName || legacyCfg.license.clientName || 'Licensed Enterprise User';
+    legacyCfg.license.tier = remoteTier || legacyCfg.license.tier || 'Enterprise';
     legacyCfg.license.active = true;
     legacyCfg.license.lastVerified = new Date().toISOString();
     legacyCfg.license.vaultHash = inputHash;
@@ -205,20 +224,27 @@ export function claimLegacyData(rawKey) {
     };
     fs.writeFileSync(claimedMarker, JSON.stringify(markerData, null, 2), 'utf8');
 
-    // 5. Safely archive legacy database file
+    // 5. Safely archive legacy database file ONLY IF DIFFERENT PATH
     const bakPath = getLegacyMigratedBakPath();
-    try {
-      if (fs.existsSync(bakPath)) fs.unlinkSync(bakPath);
-      fs.renameSync(legacyDb, bakPath);
-    } catch (_) {
-      try { fs.unlinkSync(legacyDb); } catch (_) {}
-    }
-
-    // Clean up any remaining WAL / SHM files for legacy db
-    for (const ext of ['-wal', '-shm']) {
+    if (!samePath) {
       try {
-        const p = legacyDb + ext;
-        if (fs.existsSync(p)) fs.unlinkSync(p);
+        if (fs.existsSync(bakPath)) fs.unlinkSync(bakPath);
+        fs.renameSync(legacyDb, bakPath);
+      } catch (_) {
+        try { fs.unlinkSync(legacyDb); } catch (_) {}
+      }
+
+      // Clean up any remaining WAL / SHM files for legacy db
+      for (const ext of ['-wal', '-shm']) {
+        try {
+          const p = legacyDb + ext;
+          if (fs.existsSync(p)) fs.unlinkSync(p);
+        } catch (_) {}
+      }
+    } else {
+      // If same path, keep userDb active and store a safety backup copy
+      try {
+        fs.copyFileSync(userDb, bakPath);
       } catch (_) {}
     }
 
@@ -368,31 +394,49 @@ export function getWorkspaceDiagnostics() {
     }
   }
 
-  // 3. Scan for other/legacy database files on machine
+  // 3. Scan for other/legacy database files across candidate directories on machine
   const candidatePaths = [
     { type: 'legacy', label: 'Legacy Shared App Database', path: legacyDb },
     { type: 'archived_backup', label: 'Migration Backup Archive', path: legacyMigratedBak },
     { type: 'detected_backup', label: 'App Data Backup', path: path.join(appRoot, 'data', 'leads.db.bak') }
   ];
 
-  // Also check for any .db files in <appRoot>/data
-  const appDataDir = path.join(appRoot, 'data');
-  if (fs.existsSync(appDataDir)) {
-    try {
-      const files = fs.readdirSync(appDataDir);
-      for (const file of files) {
-        if (file.endsWith('.db') && !file.includes('-wal') && !file.includes('-shm')) {
-          const fullP = path.join(appDataDir, file);
-          if (!candidatePaths.some(c => path.resolve(c.path) === path.resolve(fullP))) {
-            candidatePaths.push({
-              type: 'detected_backup',
-              label: `Backup (${file})`,
-              path: fullP
-            });
+  const home = os.homedir();
+  const searchDirs = [
+    path.join(appRoot, 'data'),
+    path.join(userDir, 'data'),
+    path.join(home, 'Downloads', 'lead-machine', 'data'),
+    path.join(home, 'Downloads', 'LeadMachine', 'data'),
+    path.join(home, 'Desktop', 'lead-machine', 'data'),
+    path.join(home, 'Desktop', 'LeadMachine', 'data'),
+    path.join(home, 'Documents', 'LeadMachine', 'data')
+  ];
+  if (process.platform === 'win32' && process.env.ALLUSERSPROFILE) {
+    searchDirs.push(path.join(process.env.ALLUSERSPROFILE, 'LeadMachine', 'data'));
+  }
+
+  for (const sDir of searchDirs) {
+    if (fs.existsSync(sDir)) {
+      try {
+        const files = fs.readdirSync(sDir);
+        for (const file of files) {
+          if ((file.endsWith('.db') || file.endsWith('.bak') || file.endsWith('.migrated_bak')) && !file.includes('-wal') && !file.includes('-shm')) {
+            const fullP = path.join(sDir, file);
+            if (!candidatePaths.some(c => path.resolve(c.path) === path.resolve(fullP))) {
+              let label = `Backup (${file})`;
+              if (sDir.includes('Downloads')) label = `Downloads Archive (${file})`;
+              else if (sDir.includes('Desktop')) label = `Desktop Backup (${file})`;
+              else if (file === 'leads.db.migrated_bak') label = `Migrated Backup (${file})`;
+              candidatePaths.push({
+                type: 'detected_backup',
+                label,
+                path: fullP
+              });
+            }
           }
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
   }
 
   // Inspect each candidate
@@ -410,7 +454,7 @@ export function getWorkspaceDiagnostics() {
           cDb.close();
         } catch (_) {}
 
-        const isCurrentActive = path.resolve(cand.path) === path.resolve(userDb);
+        const isCurrentActive = userDbExists && path.resolve(cand.path) === path.resolve(userDb);
         const canRestore = !isCurrentActive && count > 0;
         if (canRestore) totalRecoverableLeads += count;
 
@@ -475,7 +519,7 @@ export function getWorkspaceDiagnostics() {
 /**
  * Recovers or claims a legacy / backup database into the current user's workspace.
  */
-export function recoverLegacyData(rawKey, customSourceDb = null) {
+export async function recoverLegacyData(rawKey, customSourceDb = null) {
   const userDb = getDbPath();
   const userCfg = getConfigPath();
   const diagnostics = getWorkspaceDiagnostics();
@@ -525,7 +569,23 @@ export function recoverLegacyData(rawKey, customSourceDb = null) {
   const matchesHash = expectedHash && inputHash === expectedHash;
   const matchesActiveLicense = userHasValidLicense && (cleanKey === activeKey || (!cleanKey && userHasValidLicense));
 
-  if (!matchesKey && !matchesHash && !isMasterDev && !matchesActiveLicense) {
+  let isRemoteValid = false;
+  let remoteClientName = null;
+  let remoteTier = null;
+  if (!matchesKey && !matchesHash && !isMasterDev && !matchesActiveLicense && cleanKey) {
+    try {
+      const verRes = await verifyRemoteKey(cleanKey);
+      if (verRes.valid) {
+        if (!expectedKey || matchesKey || matchesHash || verRes.payload?.tier === 'Master') {
+          isRemoteValid = true;
+          remoteClientName = verRes.clientName;
+          remoteTier = verRes.payload?.tier;
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (!matchesKey && !matchesHash && !isMasterDev && !matchesActiveLicense && !isRemoteValid) {
     return {
       success: false,
       error: 'License key does not match the database owner. Access denied. Please enter the original license key.'
@@ -534,7 +594,7 @@ export function recoverLegacyData(rawKey, customSourceDb = null) {
 
   try {
     // 1. Back up current active DB if it exists
-    if (fs.existsSync(userDb)) {
+    if (fs.existsSync(userDb) && path.resolve(sourceDb) !== path.resolve(userDb)) {
       const backupPath = userDb + '.pre_recovery_bak';
       try {
         fs.copyFileSync(userDb, backupPath);
@@ -542,8 +602,18 @@ export function recoverLegacyData(rawKey, customSourceDb = null) {
     }
 
     // 2. Copy source database to user's isolated data directory
-    fs.mkdirSync(path.dirname(userDb), { recursive: true });
-    fs.copyFileSync(sourceDb, userDb);
+    if (path.resolve(sourceDb) !== path.resolve(userDb)) {
+      fs.mkdirSync(path.dirname(userDb), { recursive: true });
+      fs.copyFileSync(sourceDb, userDb);
+
+      for (const ext of ['-wal', '-shm']) {
+        const sExt = sourceDb + ext;
+        const uExt = userDb + ext;
+        if (fs.existsSync(sExt)) {
+          try { fs.copyFileSync(sExt, uExt); } catch (_) {}
+        }
+      }
+    }
 
     // 3. Ensure schema & migrations are applied
     const db = new Database(userDb);
@@ -551,9 +621,29 @@ export function recoverLegacyData(rawKey, customSourceDb = null) {
     const restoredCount = db.prepare('SELECT count(*) as c FROM leads').get()?.c || 0;
     db.close();
 
-    // 4. Update claim marker
-    const claimedMarker = getLegacyClaimedMarkerPath();
+    // 4. Update config with valid license if provided
     const effectiveKey = cleanKey || activeKey;
+    if (effectiveKey) {
+      try {
+        let uCfg = {};
+        if (fs.existsSync(userCfg)) {
+          try { uCfg = JSON.parse(fs.readFileSync(userCfg, 'utf8')); } catch (_) {}
+        }
+        uCfg.license = uCfg.license || {};
+        uCfg.license.key = effectiveKey;
+        uCfg.license.keyMask = maskKey(effectiveKey);
+        uCfg.license.clientName = remoteClientName || uCfg.license.clientName || 'Licensed Enterprise User';
+        uCfg.license.tier = remoteTier || uCfg.license.tier || 'Enterprise';
+        uCfg.license.active = true;
+        uCfg.license.lastVerified = new Date().toISOString();
+        uCfg.license.vaultHash = hashKey(effectiveKey);
+        fs.mkdirSync(path.dirname(userCfg), { recursive: true });
+        fs.writeFileSync(userCfg, JSON.stringify(uCfg, null, 2), 'utf8');
+      } catch (_) {}
+    }
+
+    // 5. Update claim marker
+    const claimedMarker = getLegacyClaimedMarkerPath();
     const markerData = {
       claimedBy: os.userInfo?.()?.username || 'user',
       claimedAt: new Date().toISOString(),

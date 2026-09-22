@@ -306,7 +306,7 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const payload = JSON.parse(body || '{}');
-        const result = claimLegacyData(payload.key);
+        const result = await claimLegacyData(payload.key);
         if (result.success) {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(result));
@@ -351,7 +351,7 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const payload = JSON.parse(body || '{}');
-        const result = recoverLegacyData(payload.key, payload.sourceDbPath);
+        const result = await recoverLegacyData(payload.key, payload.sourceDbPath);
         if (result.success) {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(result));
@@ -804,8 +804,25 @@ const server = http.createServer(async (req, res) => {
         updatedCount: updatedFiles.length,
         updatedFiles,
         commit: shortCommit,
-        message: `Successfully updated directly to latest master release (${shortCommit}).`
+        message: `Successfully updated directly to latest master release (${shortCommit}). Restarting engine...`
       }));
+
+      // Automatically spawn replacement process and restart so update takes effect in memory
+      setTimeout(async () => {
+        try {
+          console.log('[System] Restarting Lead Machine engine for update...');
+          const { spawn } = await import('child_process');
+          const child = spawn(process.execPath, ['--dns-result-order=ipv4first', process.argv[1]], {
+            detached: true,
+            stdio: 'ignore',
+            cwd: path.dirname(process.argv[1])
+          });
+          child.unref();
+        } catch (spawnErr) {
+          console.error('[System] Failed to auto-restart process:', spawnErr.message);
+        }
+        process.exit(0);
+      }, 1200);
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: err.message }));

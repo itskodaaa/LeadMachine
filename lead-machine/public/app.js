@@ -244,14 +244,29 @@ async function initializeAuthenticatedSession() {
   await loadLeadsTable();
 }
 
+async function safeFetchJson(url, options = {}) {
+  const res = await fetch(url, options);
+  let data = null;
+  try {
+    data = await res.json();
+  } catch (_) {}
+
+  if (!data) {
+    if (res.status === 404) {
+      throw new Error('Service endpoint pending engine restart. Please restart Lead Machine to apply the latest update.');
+    }
+    throw new Error(`Server returned HTTP ${res.status}`);
+  }
+  return { res, data };
+}
+
 async function checkMigrationStatus() {
   const overlay = document.getElementById('dataMigrationOverlay');
   const leadCountEl = document.getElementById('migrationLeadCount');
   if (!overlay) return false;
 
   try {
-    const res = await fetch('/api/migration/status');
-    const data = await res.json();
+    const { data } = await safeFetchJson('/api/migration/status');
 
     if (data.pending) {
       isMigrationModalActive = true;
@@ -308,12 +323,11 @@ function setupDataMigrationHandlers() {
       }
 
       try {
-        const res = await fetch('/api/migration/claim', {
+        const { res, data } = await safeFetchJson('/api/migration/claim', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ key: rawKey })
         });
-        const data = await res.json();
 
         if (res.ok && data.success) {
           isMigrationModalActive = false;
@@ -329,7 +343,7 @@ function setupDataMigrationHandlers() {
         }
       } catch (err) {
         if (claimFeedback) {
-          claimFeedback.textContent = 'Network or server error during claim: ' + err.message;
+          claimFeedback.textContent = 'Claim error: ' + err.message;
           claimFeedback.style.display = 'block';
         }
       } finally {
@@ -347,11 +361,10 @@ function setupDataMigrationHandlers() {
       startFreshBtn.innerHTML = '<span>Initializing...</span>';
 
       try {
-        const res = await fetch('/api/migration/start-fresh', {
+        const { res, data } = await safeFetchJson('/api/migration/start-fresh', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         });
-        const data = await res.json();
 
         if (res.ok && data.success) {
           isMigrationModalActive = false;
@@ -395,8 +408,7 @@ async function loadWorkspaceDiagnostics(isManualRefresh = false) {
   }
 
   try {
-    const res = await fetch('/api/workspace/diagnostics');
-    const data = await res.json();
+    const { data } = await safeFetchJson('/api/workspace/diagnostics');
     if (!data.success) throw new Error(data.error || 'Failed to fetch diagnostics');
 
     // 1. Storage Architecture & User Profile
@@ -543,7 +555,7 @@ async function triggerWorkspaceRecovery(customSourcePath = null) {
   }
 
   try {
-    const res = await fetch('/api/workspace/recover', {
+    const { res, data: result } = await safeFetchJson('/api/workspace/recover', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -551,7 +563,6 @@ async function triggerWorkspaceRecovery(customSourcePath = null) {
         sourceDbPath: customSourcePath
       })
     });
-    const result = await res.json();
 
     if (res.ok && result.success) {
       if (feedbackEl) {
@@ -2256,10 +2267,10 @@ function setupSettingsHandlers() {
         });
         const data = await res.json();
         if (data.success) {
-          updateFeedback.innerHTML = `✓ <strong>Update complete!</strong> ${data.message} Reloading cockpit in 2 seconds...`;
+          updateFeedback.innerHTML = `✓ <strong>Update complete!</strong> ${data.message} Reloading cockpit in 3 seconds...`;
           setTimeout(() => {
             window.location.reload();
-          }, 2000);
+          }, 3500);
         } else {
           updateFeedback.innerHTML = `✗ Update failed: ${data.error || 'Unknown error'}`;
           installUpdateBtn.disabled = false;
@@ -2293,10 +2304,10 @@ function setupSettingsHandlers() {
         });
         const data = await res.json();
         if (data.success) {
-          updateFeedback.innerHTML = `✓ <strong>Repair complete!</strong> ${data.message} Reloading in 2 seconds...`;
+          updateFeedback.innerHTML = `✓ <strong>Repair complete!</strong> ${data.message} Reloading in 3 seconds...`;
           setTimeout(() => {
             window.location.reload();
-          }, 2000);
+          }, 3500);
         } else {
           updateFeedback.textContent = `Repair failed: ${data.error || 'Server error'}`;
         }
@@ -2489,11 +2500,11 @@ async function executeSystemUpdate() {
       if (forceUpdateFeedback) {
         forceUpdateFeedback.className = 'auth-feedback success';
         forceUpdateFeedback.style.display = 'block';
-        forceUpdateFeedback.textContent = `✓ Update complete! ${data.message || 'Cockpit will reload in 2 seconds.'}`;
+        forceUpdateFeedback.textContent = `✓ Update complete! ${data.message || 'Cockpit will reload in 3 seconds.'}`;
       }
       setTimeout(() => {
         window.location.reload();
-      }, 2000);
+      }, 3500);
     } else {
       throw new Error(data.error || 'Update failed');
     }

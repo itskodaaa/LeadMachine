@@ -90,19 +90,19 @@ export function getSystemHardwareId() {
   try {
     if (isWin) {
       try {
-        rawUuid = execSync('powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "(Get-CimInstance -Class Win32_ComputerSystemProduct).UUID"', { encoding: 'utf8', timeout: 3500 }).trim();
+        rawUuid = execSync('powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "(Get-CimInstance -Class Win32_ComputerSystemProduct).UUID"', { encoding: 'utf8', timeout: 3500, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
       } catch (_) {
         try {
-          rawUuid = execSync('wmic csproduct get uuid', { encoding: 'utf8', timeout: 3500 }).replace(/uuid/i, '').trim();
+          rawUuid = execSync('wmic csproduct get uuid', { encoding: 'utf8', timeout: 3500, stdio: ['ignore', 'pipe', 'ignore'] }).replace(/uuid/i, '').trim();
         } catch (_) {
           try {
-            rawUuid = execSync('powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "(Get-ItemProperty -Path \'Registry::HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Cryptography\').MachineGuid"', { encoding: 'utf8', timeout: 3500 }).trim();
+            rawUuid = execSync('powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "(Get-ItemProperty -Path \'Registry::HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Cryptography\').MachineGuid"', { encoding: 'utf8', timeout: 3500, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
           } catch (_) {}
         }
       }
     } else if (process.platform === 'darwin') {
       try {
-        const out = execSync('ioreg -rd1 -c IOPlatformExpertDevice', { encoding: 'utf8', timeout: 3000 });
+        const out = execSync('ioreg -rd1 -c IOPlatformExpertDevice', { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] });
         const m = out.match(/"IOPlatformUUID"\s*=\s*"([^"]+)"/);
         if (m && m[1]) rawUuid = m[1].trim();
       } catch (_) {}
@@ -215,21 +215,22 @@ export function getAuthStatus() {
     }
   }
 
-  // 4. Hardware ID single-device binding check
+  // 4. Hardware ID single-device binding check (Master tier & developer keys exempt)
   const currentHw = getSystemHardwareId();
-  if (lic.boundHardwareId && lic.boundHardwareId !== currentHw) {
+  const tier = lic.tier || 'Enterprise';
+  const isMasterTier = tier === 'Master' || lic.key === 'LM-MASTER-DEV-OVERRIDE' || lic.key === 'LM-ADMIN-RESCUE-2026';
+  if (!isMasterTier && lic.boundHardwareId && lic.boundHardwareId !== currentHw) {
     return {
       authenticated: false,
       clientName: lic.clientName,
       keyMask: lic.keyMask,
-      tier: lic.tier || 'Enterprise',
+      tier,
       status: 'hardware_mismatch',
       error: 'License Key locked to another computer. Enterprise keys are strictly single-device.',
       limits: null
     };
   }
 
-  const tier = lic.tier || 'Enterprise';
   return {
     authenticated: true,
     clientName: lic.clientName || 'Licensed Enterprise User',
@@ -254,7 +255,7 @@ export async function verifyRemoteKey(rawKey, customVaultUrl = null) {
     return {
       valid: true,
       clientName: 'Master Enterprise Admin',
-      payload: { active: true, name: 'Master Enterprise Admin', created: '2026-09-19' }
+      payload: { active: true, name: 'Master Enterprise Admin', tier: 'Master', created: '2026-09-19' }
     };
   }
 
@@ -289,7 +290,7 @@ export async function verifyRemoteKey(rawKey, customVaultUrl = null) {
             };
           }
           const currentHw = getSystemHardwareId();
-          if (data.boundHardwareId && data.boundHardwareId !== currentHw) {
+          if (data.tier !== 'Master' && data.boundHardwareId && data.boundHardwareId !== currentHw) {
             return {
               valid: false,
               error: 'This License Key is already bound to another computer. Enterprise licenses are strictly single-device. Please contact your administrator to request a license reset.'
@@ -324,9 +325,9 @@ export async function verifyRemoteKey(rawKey, customVaultUrl = null) {
       };
     }
 
-    // Check hardware lock
+    // Check hardware lock (Master tier exempt)
     const currentHw = getSystemHardwareId();
-    if (data.boundHardwareId && data.boundHardwareId !== currentHw) {
+    if (data.tier !== 'Master' && data.boundHardwareId && data.boundHardwareId !== currentHw) {
       return {
         valid: false,
         error: 'This License Key is already bound to another computer. Enterprise licenses are strictly single-device. Please contact your administrator to request a license reset.'
@@ -352,8 +353,9 @@ export async function verifyRemoteKey(rawKey, customVaultUrl = null) {
   } catch (err) {
     // Check if offline grace period applies
     if (cfg.license && cfg.license.key === cleanKey && cfg.license.active) {
+      const isMasterKey = (cfg.license.tier === 'Master') || cleanKey === 'LM-MASTER-DEV-OVERRIDE' || cleanKey === 'LM-ADMIN-RESCUE-2026';
       const currentHw = getSystemHardwareId();
-      if (cfg.license.boundHardwareId && cfg.license.boundHardwareId !== currentHw) {
+      if (!isMasterKey && cfg.license.boundHardwareId && cfg.license.boundHardwareId !== currentHw) {
         return {
           valid: false,
           error: 'License Key locked to another computer. Enterprise keys are strictly single-device.'
@@ -383,7 +385,7 @@ export async function verifyRemoteKey(rawKey, customVaultUrl = null) {
           };
         }
         const currentHw = getSystemHardwareId();
-        if (data.boundHardwareId && data.boundHardwareId !== currentHw) {
+        if (data.tier !== 'Master' && data.boundHardwareId && data.boundHardwareId !== currentHw) {
           return {
             valid: false,
             error: 'This License Key is already bound to another computer. Enterprise licenses are strictly single-device. Please contact your administrator to request a license reset.'
@@ -416,7 +418,7 @@ export async function activateLicense(rawKey) {
   const tier = result.payload?.tier || 'Enterprise';
   const expires = result.payload?.expires || null;
   const currentHw = getSystemHardwareId();
-  const boundHardwareId = result.payload?.boundHardwareId || currentHw;
+  const boundHardwareId = (tier === 'Master') ? null : (result.payload?.boundHardwareId || currentHw);
 
   cfg.license = {
     key: cleanKey,
@@ -430,12 +432,12 @@ export async function activateLicense(rawKey) {
     boundHardwareId
   };
 
-  // If local licenses directory exists, bind hardware locally
+  // If local licenses directory exists, bind hardware locally (except Master tier)
   const localVaultPath = path.resolve(__dirname, '..', 'licenses', `${hashKey(cleanKey)}.json`);
   if (fs.existsSync(localVaultPath)) {
     try {
       const vData = JSON.parse(fs.readFileSync(localVaultPath, 'utf8'));
-      if (!vData.boundHardwareId) {
+      if (!vData.boundHardwareId && tier !== 'Master') {
         vData.boundHardwareId = currentHw;
         fs.writeFileSync(localVaultPath, JSON.stringify(vData, null, 2), 'utf8');
       }
