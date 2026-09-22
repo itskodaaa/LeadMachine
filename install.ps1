@@ -316,14 +316,27 @@ Write-Host ""
 Pop-Location
 
 # ------------------------------------------------------------------------------
-# 5. Create Desktop & Start Menu Shortcuts
+# 5. Clean Up Old/Duplicate Shortcuts & Create Single Canonical Desktop Shortcut
 # ------------------------------------------------------------------------------
-Write-Host "[5/6] Creating user interface shortcuts..." -ForegroundColor Yellow
+Write-Host "[5/6] Consolidating and updating desktop shortcuts..." -ForegroundColor Yellow
 
-$desktopPath = [System.Environment]::GetFolderPath("Desktop")
-if (-not $desktopPath -or -not (Test-Path $desktopPath)) {
-    $desktopPath = if (Test-Path "$env:USERPROFILE\Desktop") { "$env:USERPROFILE\Desktop" } else { "C:\Users\Public\Desktop" }
+$userDesktop = if (Test-Path "$env:USERPROFILE\Desktop") { "$env:USERPROFILE\Desktop" } else { [System.Environment]::GetFolderPath("Desktop") }
+$desktopLocations = @(
+    $userDesktop,
+    "C:\Users\Public\Desktop"
+) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique
+
+# Remove any duplicate, legacy, or stale Lead Machine shortcuts or batch scripts across all desktop locations
+$stalePatterns = @("*Lead*Machine*.lnk", "*LeadMachine*.lnk", "*Launch*LeadMachine*.lnk", "*Launch*LeadMachine*.bat", "*Launch_LeadMachine*", "*run_leadmachine*")
+foreach ($loc in $desktopLocations) {
+    foreach ($pat in $stalePatterns) {
+        Get-ChildItem -Path $loc -Filter $pat -File -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "  [*] Removing duplicate/stale shortcut: $($_.FullName)" -ForegroundColor DarkGray
+            Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
+
 $programsPath = [System.Environment]::GetFolderPath("Programs")
 if (-not $programsPath -or -not (Test-Path $programsPath)) {
     $programsPath = if (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs") { "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" } else { "C:\ProgramData\Microsoft\Windows\Start Menu\Programs" }
@@ -338,8 +351,8 @@ Set-Content -Path $vbsLauncher -Value $vbsCode -Encoding ASCII
 try {
     $wshShell = New-Object -ComObject WScript.Shell
     
-    # 1. Desktop Shortcut
-    $desktopShortcut = $wshShell.CreateShortcut((Join-Path $desktopPath "$APP_NAME.lnk"))
+    # 1. Single Canonical Desktop Shortcut (placed strictly on active user's desktop)
+    $desktopShortcut = $wshShell.CreateShortcut((Join-Path $userDesktop "$APP_NAME.lnk"))
     $desktopShortcut.TargetPath = $shortcutTarget
     $desktopShortcut.WorkingDirectory = $TARGET_DIR
     $desktopShortcut.Description = "Lead Machine Enterprise - Autonomous B2B Lead Generation & Outreach Engine"
@@ -354,7 +367,7 @@ try {
     $startMenuShortcut.Description = "Lead Machine Enterprise"
     $startMenuShortcut.Save()
 
-    Write-Host "[OK] Desktop and Start Menu shortcuts created." -ForegroundColor Green
+    Write-Host "[OK] Desktop and Start Menu shortcuts consolidated into single canonical launcher." -ForegroundColor Green
 } catch {
     Write-Host "  [!] Shortcut creation skipped: $($_.Exception.Message)" -ForegroundColor DarkGray
 }
