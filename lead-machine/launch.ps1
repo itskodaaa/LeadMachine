@@ -76,7 +76,7 @@ function Repair-LeadMachineFiles {
             Write-Host "  -> Restoring $rf..." -ForegroundColor Gray
             $wc.DownloadFile($remoteUrl, $destFile)
         } catch {
-            Write-Host "  [!] Could not download $rf: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "  [!] Could not download $($rf): $($_.Exception.Message)" -ForegroundColor Red
         }
     }
 }
