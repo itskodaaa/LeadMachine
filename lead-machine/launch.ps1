@@ -185,33 +185,55 @@ if (-not $browserFound) {
 }
 Write-Host ""
 
-# 5. Ensure Data Directory Exists
-$dataDir = Join-Path $appRoot "data"
-if (-not (Test-Path $dataDir)) {
-    New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+# 5. Ensure Isolated User Directory Exists
+$userAppData = if ($env:LOCALAPPDATA) { "$env:LOCALAPPDATA\LeadMachine" } else { "$env:USERPROFILE\AppData\Local\LeadMachine" }
+if (-not (Test-Path $userAppData)) {
+    New-Item -ItemType Directory -Force -Path $userAppData | Out-Null
 }
+$portFile = Join-Path $userAppData "leadmachine.port"
 
 # 6. Launch Web Dashboard & Auto-Open Browser
-Write-Host "[4/4] Starting Web Dashboard on http://localhost:3333..." -ForegroundColor Yellow
+Write-Host "[4/4] Initializing user outbound cockpit..." -ForegroundColor Yellow
 
-$alreadyRunning = Get-NetTCPConnection -LocalPort 3333 -ErrorAction SilentlyContinue
-if ($alreadyRunning) {
-    Write-Host ""
-    Write-Host "[*] Lead Machine server is already online and running on port 3333." -ForegroundColor Green
-    Write-Host "[*] Launching dashboard in your browser..." -ForegroundColor Cyan
-    Start-Process "http://localhost:3333"
-    Start-Sleep -Seconds 2
-    exit 0
+# Check if an instance is already active for this Windows user
+if (Test-Path $portFile) {
+    $activeUserPort = (Get-Content $portFile -ErrorAction SilentlyContinue).Trim()
+    if ($activeUserPort -match '^\d+$') {
+        $tcpActive = Get-NetTCPConnection -LocalPort $activeUserPort -State Listen -ErrorAction SilentlyContinue
+        if ($tcpActive) {
+            Write-Host ""
+            Write-Host "[*] Lead Machine server is already online for your account on port $activeUserPort." -ForegroundColor Green
+            Write-Host "[*] Launching dashboard in your browser..." -ForegroundColor Cyan
+            Start-Process "http://localhost:$activeUserPort"
+            Start-Sleep -Seconds 2
+            exit 0
+        }
+    }
 }
 
 Write-Host ""
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host "  Dashboard will open in your browser automatically." -ForegroundColor Cyan
-Write-Host "  Keep this window open while the Lead Machine is active." -ForegroundColor Cyan
+Write-Host "  Keep this window open while Lead Machine is active." -ForegroundColor Cyan
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host ""
 
-Start-Process "http://localhost:3333"
+# Background browser opener once server dynamically binds its port
+Start-Job -ScriptBlock {
+    param($pFile)
+    for ($i = 0; $i -lt 30; $i++) {
+        Start-Sleep -Milliseconds 400
+        if (Test-Path $pFile) {
+            try {
+                $p = (Get-Content $pFile -ErrorAction SilentlyContinue).Trim()
+                if ($p -match '^\d+$') {
+                    Start-Process "http://localhost:$p"
+                    break
+                }
+            } catch {}
+        }
+    }
+} -ArgumentList $portFile | Out-Null
 
 # Start Node server with IPv4 priority
 $serverScript = Join-Path $appRoot "lead-machine\server.mjs"

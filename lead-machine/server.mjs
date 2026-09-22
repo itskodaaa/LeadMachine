@@ -11,6 +11,8 @@ import { checkExtractorStatus, syncExtractorLeads } from './extractor_sync.mjs';
 import { batchCheckWebsites } from './reachability.mjs';
 import { leadHunter } from './hunter.mjs';
 import { parseRawWebsites, importWebsitesToDb, crawlDirectoryPage } from './url_importer.mjs';
+import { getConfigPath, getScreenshotsDir, getPortFilePath } from './paths.mjs';
+import { getMigrationStatus, claimLegacyData, startFreshWorkspace } from './migration.mjs';
 
 // Prioritize IPv4 on virtualized / VM networks (fixes UTM/QEMU/Hyper-V IPv6 timeout)
 try {
@@ -18,7 +20,7 @@ try {
 } catch (_) {}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = process.env.PORT || 3333;
+const PORT = parseInt(process.env.PORT, 10) || 3333;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
 async function fetchRemote(urlStr, options = {}) {
@@ -189,7 +191,7 @@ function getSystemSpecs() {
 
   let config = {};
   try {
-    const cfgPath = path.join(__dirname, 'config.json');
+    const cfgPath = getConfigPath();
     if (fs.existsSync(cfgPath)) config = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
   } catch (_) {}
 
@@ -291,9 +293,57 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Migration & Workspace Isolation Endpoints (Public)
+  if (pathname === '/api/migration/status' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(getMigrationStatus()));
+    return;
+  }
+
+  if (pathname === '/api/migration/claim' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const result = claimLegacyData(payload.key);
+        if (result.success) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(result));
+        } else {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(result));
+        }
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  if (pathname === '/api/migration/start-fresh' && req.method === 'POST') {
+    try {
+      const result = startFreshWorkspace();
+      if (result.success) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } else {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      }
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
   // 2. ZERO-TRUST GLOBAL AUTH GUARD FOR ALL OTHER API ROUTES & SSE STREAMS
-  // (Permits /api/system/version and /api/system/update so instances can check/apply updates)
-  const isPublicApi = pathname === '/api/system/version' || pathname === '/api/system/update';
+  // (Permits /api/system/version, /api/system/update, and /api/migration/* so instances can check/apply updates and migrate)
+  const isPublicApi = pathname === '/api/system/version' || 
+                      pathname === '/api/system/update' || 
+                      pathname.startsWith('/api/migration/');
   if ((pathname.startsWith('/api/') || pathname === '/api/stream' || pathname === '/events') && !isPublicApi) {
     const auth = getAuthStatus();
     if (!auth.authenticated) {
@@ -377,7 +427,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === '/api/profile' && req.method === 'GET') {
-    const cfgPath = path.join(__dirname, 'config.json');
+    const cfgPath = getConfigPath();
     let cfg = {};
     if (fs.existsSync(cfgPath)) {
       try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
@@ -393,7 +443,7 @@ const server = http.createServer(async (req, res) => {
     req.on('end', () => {
       try {
         const profile = JSON.parse(body || '{}');
-        const cfgPath = path.join(__dirname, 'config.json');
+        const cfgPath = getConfigPath();
         let cfg = {};
         if (fs.existsSync(cfgPath)) {
           try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
@@ -413,7 +463,7 @@ const server = http.createServer(async (req, res) => {
         }
 
         const updatedProfile = {
-          ...(cfg.sender || {}),
+          ...cfg.sender,
           ...profile,
           fullName,
           firstName,
@@ -421,6 +471,7 @@ const server = http.createServer(async (req, res) => {
         };
 
         cfg.sender = updatedProfile;
+        fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
         fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, profile: updatedProfile }));
@@ -490,7 +541,7 @@ const server = http.createServer(async (req, res) => {
 
   // System Version & Updates
   if (pathname === '/api/system/version' && req.method === 'GET') {
-    const cfgPath = path.join(__dirname, 'config.json');
+    const cfgPath = getConfigPath();
     let cfg = {};
     if (fs.existsSync(cfgPath)) {
       try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
@@ -668,6 +719,8 @@ const server = http.createServer(async (req, res) => {
 
       const filesToSync = [
         { remote: `${baseUrl}/lead-machine/server.mjs${cacheBust}`, local: path.join(__dirname, 'server.mjs') },
+        { remote: `${baseUrl}/lead-machine/paths.mjs${cacheBust}`, local: path.join(__dirname, 'paths.mjs') },
+        { remote: `${baseUrl}/lead-machine/migration.mjs${cacheBust}`, local: path.join(__dirname, 'migration.mjs') },
         { remote: `${baseUrl}/lead-machine/auth.mjs${cacheBust}`, local: path.join(__dirname, 'auth.mjs') },
         { remote: `${baseUrl}/lead-machine/hunter.mjs${cacheBust}`, local: path.join(__dirname, 'hunter.mjs') },
         { remote: `${baseUrl}/lead-machine/orchestrator.mjs${cacheBust}`, local: path.join(__dirname, 'orchestrator.mjs') },
@@ -675,6 +728,7 @@ const server = http.createServer(async (req, res) => {
         { remote: `${baseUrl}/lead-machine/extractor_sync.mjs${cacheBust}`, local: path.join(__dirname, 'extractor_sync.mjs') },
         { remote: `${baseUrl}/lead-machine/reachability.mjs${cacheBust}`, local: path.join(__dirname, 'reachability.mjs') },
         { remote: `${baseUrl}/lead-machine/url_importer.mjs${cacheBust}`, local: path.join(__dirname, 'url_importer.mjs') },
+        { remote: `${baseUrl}/lead-machine/launch.ps1${cacheBust}`, local: path.join(__dirname, 'launch.ps1') },
         { remote: `${baseUrl}/lead-machine/public/index.html${cacheBust}`, local: path.join(__dirname, 'public', 'index.html') },
         { remote: `${baseUrl}/lead-machine/public/style.css${cacheBust}`, local: path.join(__dirname, 'public', 'style.css') },
         { remote: `${baseUrl}/lead-machine/public/app.js${cacheBust}`, local: path.join(__dirname, 'public', 'app.js') },
@@ -703,7 +757,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       // Update config.json build metadata while preserving user profile & database
-      const cfgPath = path.join(__dirname, 'config.json');
+      const cfgPath = getConfigPath();
       if (fs.existsSync(cfgPath)) {
         try {
           const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
@@ -833,7 +887,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const shotPath = path.resolve(__dirname, '../data/debug_screenshots', filename);
+    const shotPath = path.join(getScreenshotsDir(), filename);
     if (!fs.existsSync(shotPath)) {
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: 'Screenshot not found.' }));
@@ -857,7 +911,7 @@ const server = http.createServer(async (req, res) => {
 
   // System Settings (Debug Mode, Concurrency, etc.)
   if (pathname === '/api/settings' && req.method === 'GET') {
-    const cfgPath = path.join(__dirname, 'config.json');
+    const cfgPath = getConfigPath();
     let cfg = {};
     if (fs.existsSync(cfgPath)) {
       try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
@@ -873,7 +927,7 @@ const server = http.createServer(async (req, res) => {
     req.on('end', () => {
       try {
         const payload = JSON.parse(body || '{}');
-        const cfgPath = path.join(__dirname, 'config.json');
+        const cfgPath = getConfigPath();
         let cfg = {};
         if (fs.existsSync(cfgPath)) {
           try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
@@ -884,6 +938,7 @@ const server = http.createServer(async (req, res) => {
         if (payload.sandboxMode !== undefined) cfg.settings.sandboxMode = Boolean(payload.sandboxMode);
         if (payload.concurrency !== undefined) cfg.settings.concurrency = Number(payload.concurrency);
         
+        fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
         fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, settings: cfg.settings }));
@@ -1126,10 +1181,53 @@ try {
   });
 } catch (_) {}
 
-server.listen(PORT, () => {
-  console.log(`======================================================`);
-  console.log(`🚀 LEAD MACHINE DASHBOARD ONLINE`);
-  console.log(`📍 Web Interface: http://localhost:${PORT}`);
-  console.log(`⚡ Zero-dependency native Node engine active`);
-  console.log(`======================================================\n`);
-});
+function bindServerWithFallback(srv, initialPort, maxAttempts = 10) {
+  let currentPort = initialPort;
+  let attempts = 0;
+
+  function tryPort() {
+    srv.once('error', (err) => {
+      if (err.code === 'EADDRINUSE' && attempts < maxAttempts) {
+        console.warn(`[Server] Port ${currentPort} in use by another session. Trying port ${currentPort + 1}...`);
+        currentPort++;
+        attempts++;
+        tryPort();
+      } else {
+        console.error(`[Server] Failed to bind server:`, err.message);
+        process.exit(1);
+      }
+    });
+
+    srv.listen(currentPort, () => {
+      // Record active port to user's private port file
+      try {
+        const portFile = getPortFilePath();
+        fs.mkdirSync(path.dirname(portFile), { recursive: true });
+        fs.writeFileSync(portFile, String(currentPort), 'utf8');
+
+        // Cleanup port file on exit
+        const cleanup = () => {
+          try {
+            if (fs.existsSync(portFile)) {
+              const saved = fs.readFileSync(portFile, 'utf8').trim();
+              if (saved === String(currentPort)) fs.unlinkSync(portFile);
+            }
+          } catch (_) {}
+        };
+        process.on('exit', cleanup);
+        process.on('SIGINT', () => { cleanup(); process.exit(0); });
+        process.on('SIGTERM', () => { cleanup(); process.exit(0); });
+      } catch (_) {}
+
+      console.log(`======================================================`);
+      console.log(`🚀 LEAD MACHINE DASHBOARD ONLINE`);
+      console.log(`📍 Web Interface: http://localhost:${currentPort}`);
+      console.log(`⚡ Zero-dependency native Node engine active`);
+      console.log(`======================================================\n`);
+    });
+  }
+
+  tryPort();
+}
+
+bindServerWithFallback(server, PORT);

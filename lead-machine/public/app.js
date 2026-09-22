@@ -211,6 +211,8 @@ let isUpdateModalDismissed = false;
 let updateSnoozeTimer = null;
 let updateIntervalId = null;
 
+let isMigrationModalActive = false;
+
 // ==========================================================================
 // Initialization
 // ==========================================================================
@@ -224,9 +226,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupSettingsHandlers();
   setupForceUpdateHandlers();
   setupIndustrySelector();
+  setupDataMigrationHandlers();
   initDomTamperGuard();
   
-  await checkAuthStatus();
+  const migrationPending = await checkMigrationStatus();
+  if (!migrationPending) {
+    await checkAuthStatus();
+  }
 });
 
 async function initializeAuthenticatedSession() {
@@ -237,14 +243,129 @@ async function initializeAuthenticatedSession() {
   await loadLeadsTable();
 }
 
+async function checkMigrationStatus() {
+  const overlay = document.getElementById('dataMigrationOverlay');
+  const leadCountEl = document.getElementById('migrationLeadCount');
+  if (!overlay) return false;
+
+  try {
+    const res = await fetch('/api/migration/status');
+    const data = await res.json();
+
+    if (data.pending) {
+      isMigrationModalActive = true;
+      if (leadCountEl) leadCountEl.textContent = Number(data.legacyCount || 0).toLocaleString();
+      overlay.style.display = 'flex';
+      const appContainer = document.getElementById('appContainer');
+      if (appContainer) {
+        appContainer.style.filter = 'blur(10px)';
+        appContainer.style.pointerEvents = 'none';
+      }
+      return true;
+    } else {
+      overlay.style.display = 'none';
+      isMigrationModalActive = false;
+      return false;
+    }
+  } catch (err) {
+    console.warn('[Migration] Status check failed:', err);
+    return false;
+  }
+}
+
+function setupDataMigrationHandlers() {
+  const overlay = document.getElementById('dataMigrationOverlay');
+  const claimForm = document.getElementById('migrationClaimForm');
+  const claimInput = document.getElementById('migrationKeyInput');
+  const claimBtn = document.getElementById('migrationClaimBtn');
+  const claimFeedback = document.getElementById('migrationClaimFeedback');
+  const startFreshBtn = document.getElementById('migrationStartFreshBtn');
+
+  if (claimForm) {
+    claimForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const rawKey = (claimInput ? claimInput.value : '').trim();
+      if (!rawKey) return;
+
+      if (claimFeedback) claimFeedback.style.display = 'none';
+      if (claimBtn) {
+        claimBtn.disabled = true;
+        claimBtn.innerHTML = '<span>Verifying Key &amp; Claiming...</span>';
+      }
+
+      try {
+        const res = await fetch('/api/migration/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: rawKey })
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          isMigrationModalActive = false;
+          overlay.style.display = 'none';
+          showToast(data.message || 'Workspace claimed successfully!', 'success');
+          // Re-check auth and initialize session with claimed data
+          await checkAuthStatus();
+        } else {
+          if (claimFeedback) {
+            claimFeedback.textContent = data.error || 'Failed to claim database with the provided key.';
+            claimFeedback.style.display = 'block';
+          }
+        }
+      } catch (err) {
+        if (claimFeedback) {
+          claimFeedback.textContent = 'Network or server error during claim: ' + err.message;
+          claimFeedback.style.display = 'block';
+        }
+      } finally {
+        if (claimBtn) {
+          claimBtn.disabled = false;
+          claimBtn.innerHTML = '<span>Verify &amp; Claim Data</span>';
+        }
+      }
+    });
+  }
+
+  if (startFreshBtn) {
+    startFreshBtn.addEventListener('click', async () => {
+      startFreshBtn.disabled = true;
+      startFreshBtn.innerHTML = '<span>Initializing...</span>';
+
+      try {
+        const res = await fetch('/api/migration/start-fresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          isMigrationModalActive = false;
+          overlay.style.display = 'none';
+          showToast('Fresh workspace initialized for your account.', 'info');
+          // Proceed to standard license activation gate
+          await checkAuthStatus();
+        } else {
+          alert('Error initializing workspace: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Server error: ' + err.message);
+      } finally {
+        startFreshBtn.disabled = false;
+        startFreshBtn.innerHTML = '<span>Start Fresh Workspace</span>';
+      }
+    });
+  }
+}
+
 function initDomTamperGuard() {
   const overlay = document.getElementById('authGateOverlay');
   const appContainer = document.getElementById('appContainer');
   if (!overlay) return;
 
   const observer = new MutationObserver(() => {
-    // If client is unauthenticated, tampering with the modal locks everything down
-    if (!currentAuthData.authenticated) {
+    // If client is unauthenticated and migration is not active, tampering locks everything down
+    if (!currentAuthData.authenticated && !isMigrationModalActive) {
       const isDetached = !document.body.contains(overlay);
       let isHidden = isDetached;
       if (!isHidden) {

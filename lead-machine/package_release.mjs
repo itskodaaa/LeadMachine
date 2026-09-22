@@ -35,6 +35,8 @@ fs.mkdirSync(targetLmDir, { recursive: true });
 
 const lmFilesToCopy = [
   'server.mjs',
+  'paths.mjs',
+  'migration.mjs',
   'orchestrator.mjs',
   'worker.mjs',
   'reachability.mjs',

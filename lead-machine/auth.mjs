@@ -9,8 +9,10 @@ try {
   dns.setDefaultResultOrder('ipv4first');
 } catch (_) {}
 
+import { getConfigPath } from './paths.mjs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const configPath = path.resolve(__dirname, 'config.json');
+const getConfigFilePath = () => getConfigPath();
 
 // Official GitHub license vault URL (leadmachine-core/licenses)
 // Can be overridden via config.json -> settings.licenseVaultUrl
@@ -32,8 +34,9 @@ export function maskKey(rawKey) {
 
 function readConfig() {
   try {
-    if (fs.existsSync(configPath)) {
-      return JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    const cfgPath = getConfigFilePath();
+    if (fs.existsSync(cfgPath)) {
+      return JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
     }
   } catch (_) {}
   return {};
@@ -41,7 +44,9 @@ function readConfig() {
 
 function writeConfig(cfg) {
   try {
-    fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2), 'utf8');
+    const cfgPath = getConfigFilePath();
+    fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
+    fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), 'utf8');
     return true;
   } catch (err) {
     console.error('[Auth] Failed to write config.json:', err.message);

@@ -8,8 +8,10 @@ import { fileURLToPath } from 'url';
 import { leadHunter } from './hunter.mjs';
 import { migrateDatabase } from './db_migration.mjs';
 
+import { getDbPath, getConfigPath } from './paths.mjs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.resolve(__dirname, '../data/leads.db');
+const getDatabasePath = () => getDbPath();
 
 export class CampaignOrchestrator extends EventEmitter {
   constructor() {
@@ -31,9 +33,10 @@ export class CampaignOrchestrator extends EventEmitter {
   }
 
   getDb() {
-    const dir = path.dirname(dbPath);
+    const activeDb = getDatabasePath();
+    const dir = path.dirname(activeDb);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    const db = new Database(dbPath);
+    const db = new Database(activeDb);
     db.pragma('journal_mode = WAL');
     db.pragma('busy_timeout = 10000');
     db.exec(`
@@ -158,7 +161,8 @@ export class CampaignOrchestrator extends EventEmitter {
     // Save custom profile to config.json if provided
     if (profile) {
       try {
-        const cfgPath = path.join(__dirname, 'config.json');
+        const cfgPath = getConfigPath();
+        fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
         let currentCfg = {};
         if (fs.existsSync(cfgPath)) currentCfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
         currentCfg.sender = { ...(currentCfg.sender || {}), ...profile };

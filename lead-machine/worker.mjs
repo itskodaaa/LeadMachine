@@ -15,6 +15,8 @@ try {
   dns.setDefaultResultOrder('ipv4first');
 } catch (_) {}
 
+import { getDbPath, getConfigPath, getScreenshotsDir } from './paths.mjs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 puppeteer.use(StealthPlugin());
 
@@ -30,7 +32,7 @@ const STEALTH_LAUNCH_ARGS = [
 ];
 
 // Resolve database path
-const dbPath = path.resolve(__dirname, '../data/leads.db');
+const dbPath = getDbPath();
 const dbDir = path.dirname(dbPath);
 if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
 const db = new Database(dbPath);
@@ -134,11 +136,11 @@ const CHROME_BIN = getOrInstallChrome();
 
 // Load sender profile dynamically with zero stale caching
 export function getFreshSenderProfile() {
-  const configPath = path.join(__dirname, 'config.json');
+  const cfgPath = getConfigPath();
   let sender = {};
-  if (fs.existsSync(configPath)) {
+  if (fs.existsSync(cfgPath)) {
     try {
-      const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
       if (cfg.sender) sender = cfg.sender;
     } catch (_) {}
   }
@@ -240,9 +242,9 @@ const getStmt = db.prepare('SELECT id, company_name, status, notes, failure_reas
 
 function isDebugModeEnabled() {
   try {
-    const configPath = path.join(__dirname, 'config.json');
-    if (fs.existsSync(configPath)) {
-      const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    const cfgPath = getConfigPath();
+    if (fs.existsSync(cfgPath)) {
+      const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
       if (cfg.settings && cfg.settings.debugMode === true) return true;
       if (cfg.debugMode === true) return true;
     }
@@ -253,7 +255,7 @@ function isDebugModeEnabled() {
 async function captureFailureScreenshot(page, leadId) {
   try {
     if (!isDebugModeEnabled() || !page || page.isClosed()) return null;
-    const shotsDir = path.resolve(__dirname, '../data/debug_screenshots');
+    const shotsDir = getScreenshotsDir();
     if (!fs.existsSync(shotsDir)) fs.mkdirSync(shotsDir, { recursive: true });
     const filename = `lead_${leadId}_${Date.now()}.png`;
     const fullPath = path.join(shotsDir, filename);

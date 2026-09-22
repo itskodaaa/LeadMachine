@@ -4,8 +4,10 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { checkWebsite } from './reachability.mjs';
 
+import { getDbPath } from './paths.mjs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.resolve(__dirname, '../data/leads.db');
+const getDatabasePath = () => getDbPath();
 
 // ==========================================================================
 // Comprehensive US Commercial & Manufacturing Cities by State
@@ -899,7 +901,7 @@ export class LeadHunter {
 
     let db;
     try {
-      db = new Database(dbPath);
+      db = new Database(getDatabasePath());
     } catch (e) {
       this.status = 'error';
       this.errorMessage = 'Database connection failed: ' + e.message;

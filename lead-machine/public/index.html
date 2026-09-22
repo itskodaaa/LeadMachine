@@ -1100,6 +1100,78 @@ I am reaching out to express our interest in your services and would appreciate 
   </div>
 
   <!-- ========================================== -->
+  <!-- DATA MIGRATION & OWNERSHIP CLAIM MODAL -->
+  <!-- ========================================== -->
+  <div id="dataMigrationOverlay" class="data-migration-overlay" style="display: none;">
+    <div class="data-migration-modal">
+      <div class="data-migration-header">
+        <div class="data-migration-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+          </svg>
+        </div>
+        <h2 class="data-migration-title">Existing Database Detected</h2>
+        <p class="data-migration-subtitle">
+          An existing leads database with <strong id="migrationLeadCount">0</strong> leads was detected on this computer.
+          Each user on this Windows machine now has their own isolated private workspace.
+        </p>
+      </div>
+
+      <div class="migration-options-grid">
+        <!-- Option 1: Claim Existing Data -->
+        <div class="migration-card" id="migrationClaimCard">
+          <div class="migration-card-badge">Data Ownership Claim</div>
+          <div class="migration-card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+            </svg>
+          </div>
+          <h3 class="migration-card-title">Claim Existing Data</h3>
+          <p class="migration-card-desc">
+            Restore previous leads, campaign history, and settings into your personal Windows user profile.
+          </p>
+          <form id="migrationClaimForm" class="migration-claim-form">
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label for="migrationKeyInput" class="group-label">Original Owner License Key</label>
+              <input type="text" id="migrationKeyInput" class="input-text auth-key-input" placeholder="LM-XXXXX-XXXX" autocomplete="off" spellcheck="false" required>
+              <span class="auth-hint">Must match the key that generated these results.</span>
+            </div>
+            <div id="migrationClaimFeedback" class="auth-feedback error" style="display: none; margin-bottom: 12px;"></div>
+            <button type="submit" id="migrationClaimBtn" class="btn-primary" style="width: 100%; justify-content: center;">
+              <span>Verify &amp; Claim Data</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Option 2: Start Fresh -->
+        <div class="migration-card" id="migrationFreshCard">
+          <div class="migration-card-badge fresh">Clean Workspace</div>
+          <div class="migration-card-icon fresh">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </div>
+          <h3 class="migration-card-title">Start Fresh</h3>
+          <p class="migration-card-desc">
+            Initialize an empty, dedicated database for your Windows login. Existing data remains preserved on this machine for its owner.
+          </p>
+          <div style="flex: 1; min-height: 24px;"></div>
+          <button type="button" id="migrationStartFreshBtn" class="btn-secondary" style="width: 100%; justify-content: center; margin-top: 14px;">
+            <span>Start Fresh Workspace</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="data-migration-footer">
+        <span>🔒 Zero Data Loss Guarantee &bull; Cryptographic License Validation &bull; Multi-User Isolation</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
   <!-- LICENSE ACTIVATION GATE MODAL -->
   <!-- ========================================== -->
   <div id="authGateOverlay" class="auth-gate-overlay" style="display: none;">

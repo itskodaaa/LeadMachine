@@ -3,7 +3,10 @@ import { spawn, execSync } from 'child_process';
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
+
+import { getDbPath } from './paths.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEST_PORT = 3339;
@@ -55,10 +58,24 @@ async function runTests() {
     }
   }
 
-  // --- TEST 1: Database Health ---
-  console.log('\n[1/5] Testing Database Connection & WAL Mode...');
-  const dbPath = path.resolve(__dirname, '../data/leads.db');
-  assert(fs.existsSync(dbPath), 'data/leads.db exists');
+  // --- TEST 1: Database Health & Test Isolation Environment ---
+  console.log('\n[1/5] Testing Database Connection & Test Isolation Environment...');
+  const testDataDir = path.join(os.tmpdir(), 'lm_sandbox_' + Date.now());
+  fs.mkdirSync(path.join(testDataDir, 'data'), { recursive: true });
+
+  let realDbPath = path.resolve(__dirname, '../data/leads.db');
+  if (!fs.existsSync(realDbPath)) {
+    if (fs.existsSync(path.resolve(__dirname, '../data/leads.db.bak'))) {
+      realDbPath = path.resolve(__dirname, '../data/leads.db.bak');
+    } else {
+      realDbPath = getDbPath();
+    }
+  }
+  assert(fs.existsSync(realDbPath), 'Source database exists (' + realDbPath + ')');
+  fs.copyFileSync(realDbPath, path.join(testDataDir, 'data/leads.db'));
+  fs.copyFileSync(path.resolve(__dirname, 'config.json'), path.join(testDataDir, 'config.json'));
+
+  const dbPath = path.join(testDataDir, 'data/leads.db');
   const db = new Database(dbPath);
   const leadsCount = db.prepare("SELECT count(*) as c FROM leads").get().c;
   const notContacted = db.prepare("SELECT count(*) as c FROM leads WHERE status = 'not_contacted'").get().c;
@@ -71,7 +88,7 @@ async function runTests() {
   // --- TEST 2: Start Web Server on Test Port ---
   console.log('\n[2/5] Booting Test Web Server on Port ' + TEST_PORT + '...');
   serverProc = spawn('node', ['lead-machine/server.mjs'], {
-    env: { ...process.env, PORT: String(TEST_PORT) },
+    env: { ...process.env, PORT: String(TEST_PORT), LEADMACHINE_DATA_DIR: testDataDir },
     stdio: ['ignore', 'pipe', 'pipe']
   });
 

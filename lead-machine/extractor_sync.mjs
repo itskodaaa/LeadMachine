@@ -6,8 +6,10 @@ import readline from 'readline';
 import { fileURLToPath } from 'url';
 import { batchCheckWebsites } from './reachability.mjs';
 
+import { getDbPath } from './paths.mjs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.resolve(__dirname, '../data/leads.db');
+const getDatabasePath = () => getDbPath();
 
 const usStates = {
   alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA',
@@ -106,10 +108,11 @@ export async function syncExtractorLeads(progressCb) {
     };
   }
 
-  const dir = path.dirname(dbPath);
+  const activeDbPath = getDatabasePath();
+  const dir = path.dirname(activeDbPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-  const db = new Database(dbPath);
+  const db = new Database(activeDbPath);
   db.pragma('journal_mode = WAL');
   db.pragma('busy_timeout = 10000');
 
