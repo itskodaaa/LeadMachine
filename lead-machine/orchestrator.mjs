@@ -6,7 +6,7 @@ import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
 import { leadHunter } from './hunter.mjs';
-import { migrateDatabase } from './db_migration.mjs';
+import { migrateDatabase, applyPerformancePragmas } from './db_migration.mjs';
 
 import { getDbPath, getConfigPath } from './paths.mjs';
 
@@ -30,43 +30,66 @@ export class CampaignOrchestrator extends EventEmitter {
     this.activeChildren = new Set();
     this.shouldStop = false;
     this.isPaused = false;
+    this.cachedDb = null;
+    this.cachedDbPath = null;
+    this.schemaInitializedPath = null;
   }
 
   getDb() {
     const activeDb = getDatabasePath();
+    if (this.cachedDb && this.cachedDb.open && this.cachedDbPath === activeDb) {
+      return this.cachedDb;
+    }
+    if (this.cachedDb && this.cachedDb.open) {
+      try { this.cachedDb.close(); } catch (_) {}
+    }
     const dir = path.dirname(activeDb);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     const db = new Database(activeDb);
-    db.pragma('journal_mode = WAL');
-    db.pragma('busy_timeout = 10000');
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS leads (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        company_name TEXT NOT NULL,
-        website TEXT NOT NULL UNIQUE,
-        city TEXT,
-        state TEXT,
-        phone TEXT,
-        email TEXT,
-        contact_person TEXT,
-        status TEXT DEFAULT 'not_contacted',
-        notes TEXT,
-        failure_reason TEXT,
-        debug_screenshot TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE TABLE IF NOT EXISTS contact_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        lead_id INTEGER NOT NULL,
-        action TEXT NOT NULL,
-        notes TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE
-      );
-    `);
-    migrateDatabase(db);
+    applyPerformancePragmas(db);
+    if (!this.schemaInitializedPath || this.schemaInitializedPath !== activeDb) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS leads (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          company_name TEXT NOT NULL,
+          website TEXT NOT NULL UNIQUE,
+          city TEXT,
+          state TEXT,
+          phone TEXT,
+          email TEXT,
+          contact_person TEXT,
+          status TEXT DEFAULT 'not_contacted',
+          notes TEXT,
+          failure_reason TEXT,
+          debug_screenshot TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS contact_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          lead_id INTEGER NOT NULL,
+          action TEXT NOT NULL,
+          notes TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE
+        );
+      `);
+      migrateDatabase(db);
+      this.schemaInitializedPath = activeDb;
+    }
+    this.cachedDb = db;
+    this.cachedDbPath = activeDb;
     return db;
+  }
+
+  closeDb() {
+    if (this.cachedDb && this.cachedDb.open) {
+      try {
+        this.cachedDb.pragma('wal_checkpoint(TRUNCATE)');
+        this.cachedDb.close();
+      } catch (_) {}
+      this.cachedDb = null;
+    }
   }
 
   checkAndKillMail() {

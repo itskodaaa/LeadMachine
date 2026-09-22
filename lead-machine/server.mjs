@@ -196,12 +196,19 @@ function getSystemSpecs() {
   } catch (_) {}
 
   const db = orchestrator.getDb();
-  const notContacted = db.prepare("SELECT count(*) as c FROM leads WHERE status = 'not_contacted'").get().c;
-  const contacted = db.prepare("SELECT count(*) as c FROM leads WHERE status = 'contacted'").get().c;
-  const unableToReach = db.prepare("SELECT count(*) as c FROM leads WHERE status = 'unable_to_reach'").get().c;
-  const total = db.prepare("SELECT count(*) as c FROM leads").get().c;
+  const counts = db.prepare(`
+    SELECT 
+      COUNT(*) as total,
+      SUM(CASE WHEN status = 'not_contacted' THEN 1 ELSE 0 END) as not_contacted,
+      SUM(CASE WHEN status = 'contacted' THEN 1 ELSE 0 END) as contacted,
+      SUM(CASE WHEN status = 'unable_to_reach' THEN 1 ELSE 0 END) as unable_to_reach
+    FROM leads
+  `).get();
+  const notContacted = counts?.not_contacted || 0;
+  const contacted = counts?.contacted || 0;
+  const unableToReach = counts?.unable_to_reach || 0;
+  const total = counts?.total || 0;
   const states = db.prepare("SELECT state, count(*) as count FROM leads WHERE status = 'not_contacted' AND state IS NOT NULL GROUP BY state ORDER BY count DESC LIMIT 15").all();
-  db.close();
 
   return {
     cpuCount,
@@ -368,9 +375,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   // 2. ZERO-TRUST GLOBAL AUTH GUARD FOR ALL OTHER API ROUTES & SSE STREAMS
-  // (Permits /api/system/version, /api/system/update, /api/migration/*, and /api/workspace/* so instances can inspect/migrate)
+  // (Permits /api/system/version, /api/system/update, /api/system/shutdown, /api/migration/*, and /api/workspace/* so instances can inspect/migrate/exit)
   const isPublicApi = pathname === '/api/system/version' || 
                       pathname === '/api/system/update' || 
+                      pathname === '/api/system/shutdown' || 
                       pathname.startsWith('/api/migration/') ||
                       pathname.startsWith('/api/workspace/');
   if ((pathname.startsWith('/api/') || pathname === '/api/stream' || pathname === '/events') && !isPublicApi) {
@@ -750,6 +758,7 @@ const server = http.createServer(async (req, res) => {
         { remote: `${baseUrl}/lead-machine/server.mjs${cacheBust}`, local: path.join(__dirname, 'server.mjs') },
         { remote: `${baseUrl}/lead-machine/paths.mjs${cacheBust}`, local: path.join(__dirname, 'paths.mjs') },
         { remote: `${baseUrl}/lead-machine/migration.mjs${cacheBust}`, local: path.join(__dirname, 'migration.mjs') },
+        { remote: `${baseUrl}/lead-machine/db_migration.mjs${cacheBust}`, local: path.join(__dirname, 'db_migration.mjs') },
         { remote: `${baseUrl}/lead-machine/auth.mjs${cacheBust}`, local: path.join(__dirname, 'auth.mjs') },
         { remote: `${baseUrl}/lead-machine/hunter.mjs${cacheBust}`, local: path.join(__dirname, 'hunter.mjs') },
         { remote: `${baseUrl}/lead-machine/orchestrator.mjs${cacheBust}`, local: path.join(__dirname, 'orchestrator.mjs') },
@@ -765,25 +774,48 @@ const server = http.createServer(async (req, res) => {
         { remote: `${baseUrl}/Launch_LeadMachine.bat${cacheBust}`, local: path.join(__dirname, '..', 'Launch_LeadMachine.bat') }
       ];
 
-      const updatedFiles = [];
-      for (const item of filesToSync) {
-        try {
-          const fileRes = await fetchRemote(item.remote);
-          if (fileRes.ok) {
-            const content = await fileRes.text();
-            if (content && content.length > 50) {
-              const dir = path.dirname(item.local);
-              if (!fs.existsSync(dir)) {
-                fs.mkdirSync(dir, { recursive: true });
+      // Bounded parallel downloads (4 concurrent requests)
+      const downloadBatch = async (items, concurrency = 4) => {
+        const results = [];
+        for (let i = 0; i < items.length; i += concurrency) {
+          const batch = items.slice(i, i + concurrency);
+          const batchResults = await Promise.all(batch.map(async (item) => {
+            try {
+              const fileRes = await fetchRemote(item.remote);
+              if (fileRes.ok) {
+                const content = await fileRes.text();
+                if (content && content.length > 50) {
+                  const dir = path.dirname(item.local);
+                  if (!fs.existsSync(dir)) {
+                    fs.mkdirSync(dir, { recursive: true });
+                  }
+                  // Only write if file is missing or content changed (avoids disk thrashing on slow HDDs)
+                  let isIdentical = false;
+                  if (fs.existsSync(item.local)) {
+                    try {
+                      const existing = fs.readFileSync(item.local, 'utf8');
+                      if (existing === content) isIdentical = true;
+                    } catch (_) {}
+                  }
+                  if (!isIdentical) {
+                    fs.writeFileSync(item.local, content, 'utf8');
+                    return path.basename(item.local);
+                  }
+                }
               }
-              fs.writeFileSync(item.local, content, 'utf8');
-              updatedFiles.push(path.basename(item.local));
+            } catch (fileErr) {
+              console.error(`[Updater] Failed to sync ${item.remote}:`, fileErr.message);
             }
+            return null;
+          }));
+          for (const res of batchResults) {
+            if (res) results.push(res);
           }
-        } catch (fileErr) {
-          console.error(`[Updater] Failed to sync ${item.remote}:`, fileErr.message);
         }
-      }
+        return results;
+      };
+
+      const updatedFiles = await downloadBatch(filesToSync, 4);
 
       // Update config.json build metadata while preserving user profile & database
       const cfgPath = getConfigPath();
@@ -807,19 +839,31 @@ const server = http.createServer(async (req, res) => {
         message: `Successfully updated directly to latest master release (${shortCommit}). Restarting engine...`
       }));
 
-      // Automatically spawn replacement process and restart so update takes effect in memory
+      // Automatically release resources, checkpoint WAL, and spawn replacement process
       setTimeout(async () => {
         try {
-          console.log('[System] Restarting Lead Machine engine for update...');
+          console.log('[System] Gracefully releasing resources and restarting Lead Machine engine...');
+          // 1. Release database locks & checkpoint WAL
+          try { orchestrator.closeDb(); } catch (_) {}
+          // 2. Terminate active SSE clients cleanly
+          clients.forEach(c => { try { c.res.end(); } catch(_) {} });
+          clients.clear();
+          // 3. Remove port file so replacement process can claim cleanly
+          try {
+            const portFile = getPortFilePath();
+            if (fs.existsSync(portFile)) fs.unlinkSync(portFile);
+          } catch (_) {}
+
+          // 4. Respawn process with low-memory bounds
           if (process.platform === 'win32') {
             const { exec } = await import('child_process');
-            exec(`cmd.exe /c start "" "${process.execPath}" --dns-result-order=ipv4first "${process.argv[1]}"`, {
+            exec(`cmd.exe /c start "" "${process.execPath}" --max-old-space-size=384 --dns-result-order=ipv4first "${process.argv[1]}"`, {
               cwd: path.dirname(process.argv[1]),
               windowsHide: false
             });
           } else {
             const { spawn } = await import('child_process');
-            const child = spawn(process.execPath, ['--dns-result-order=ipv4first', process.argv[1]], {
+            const child = spawn(process.execPath, ['--max-old-space-size=384', '--dns-result-order=ipv4first', process.argv[1]], {
               detached: true,
               stdio: 'ignore',
               cwd: path.dirname(process.argv[1])
@@ -830,11 +874,19 @@ const server = http.createServer(async (req, res) => {
           console.error('[System] Failed to auto-restart process:', spawnErr.message);
         }
         process.exit(0);
-      }, 1200);
+      }, 1000);
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: err.message }));
     }
+    return;
+  }
+
+  // Graceful System Shutdown
+  if (pathname === '/api/system/shutdown' && req.method === 'POST') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, message: 'Shutting down Lead Machine cleanly...' }));
+    setTimeout(() => shutdownGracefully(0), 200);
     return;
   }
 
@@ -843,7 +895,6 @@ const server = http.createServer(async (req, res) => {
     try {
       const db = orchestrator.getDb();
       const rows = db.prepare("SELECT id, company_name, website, phone, status, notes, failure_reason, debug_screenshot, created_at FROM leads ORDER BY id DESC").all();
-      db.close();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, leads: rows }));
     } catch (err) {
@@ -877,7 +928,6 @@ const server = http.createServer(async (req, res) => {
 
         const db = orchestrator.getDb();
         const result = importWebsitesToDb(db, parsed);
-        db.close();
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
@@ -1021,7 +1071,6 @@ const server = http.createServer(async (req, res) => {
     try {
       const db = orchestrator.getDb();
       const rows = db.prepare("SELECT id, company_name, website, phone, status, notes, created_at FROM leads ORDER BY id ASC").all();
-      db.close();
 
       res.writeHead(200, {
         'Content-Type': 'text/csv',
@@ -1099,7 +1148,6 @@ const server = http.createServer(async (req, res) => {
         tx(verified);
 
         const newNotContacted = db.prepare("SELECT count(*) as c FROM leads WHERE status = 'not_contacted'").get().c;
-        db.close();
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
@@ -1143,7 +1191,6 @@ const server = http.createServer(async (req, res) => {
       tx(verified);
 
       const remainingNotContacted = db.prepare("SELECT count(*) as c FROM leads WHERE status = 'not_contacted'").get().c;
-      db.close();
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
@@ -1165,7 +1212,6 @@ const server = http.createServer(async (req, res) => {
       const db = orchestrator.getDb();
       const info = db.prepare("UPDATE leads SET status = 'not_contacted', notes = NULL WHERE status = 'unable_to_reach'").run();
       const notContacted = db.prepare("SELECT count(*) as c FROM leads WHERE status = 'not_contacted'").get().c;
-      db.close();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, updated: info.changes, totalNotContacted: notContacted }));
     } catch (err) {
@@ -1228,6 +1274,71 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
+// Graceful Engine Shutdown Pipeline
+let isShuttingDown = false;
+export function shutdownGracefully(code = 0) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log('\n[System] Initiating graceful shutdown of Lead Machine engine...');
+
+  // 1. Broadcast shutdown event and close all SSE streams
+  try {
+    broadcastSSE({ type: 'server_shutdown', message: 'Engine shutting down cleanly.' });
+    for (const client of sseClients) {
+      try { client.end(); } catch (_) {}
+    }
+    sseClients.clear();
+  } catch (_) {}
+
+  // 2. Stop orchestrator & child worker processes
+  try {
+    orchestrator.stop();
+  } catch (_) {}
+
+  // 3. Flush and checkpoint SQLite database, releasing all locks
+  try {
+    orchestrator.closeDb();
+  } catch (_) {}
+
+  // 4. Remove active port file
+  try {
+    const portFile = getPortFilePath();
+    if (fs.existsSync(portFile)) fs.unlinkSync(portFile);
+  } catch (_) {}
+
+  // 5. Close HTTP server
+  try {
+    server.close();
+  } catch (_) {}
+
+  console.log('[System] All resources released cleanly. Goodbye!\n');
+  setTimeout(() => process.exit(code), 150);
+}
+
+// Hook process signals for clean shutdown
+process.on('SIGINT', () => shutdownGracefully(0));
+process.on('SIGTERM', () => shutdownGracefully(0));
+process.on('exit', () => {
+  try {
+    const portFile = getPortFilePath();
+    if (fs.existsSync(portFile)) fs.unlinkSync(portFile);
+  } catch (_) {}
+  try { orchestrator.closeDb(); } catch (_) {}
+});
+
+// Interactive terminal key handling: allow typing 'q' or 'exit'
+if (process.stdin && process.stdin.isTTY) {
+  try {
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', (chunk) => {
+      const input = (chunk || '').toString().trim().toLowerCase();
+      if (input === 'q' || input === 'exit' || input === 'quit') {
+        shutdownGracefully(0);
+      }
+    });
+  } catch (_) {}
+}
+
 // Start background license heartbeat check
 try {
   startLicenseHeartbeat((reason) => {
@@ -1252,32 +1363,34 @@ function bindServerWithFallback(srv, initialPort, maxAttempts = 10) {
       }
     });
 
-    srv.listen(currentPort, () => {
+    srv.listen(currentPort, async () => {
       // Record active port to user's private port file
       try {
         const portFile = getPortFilePath();
         fs.mkdirSync(path.dirname(portFile), { recursive: true });
         fs.writeFileSync(portFile, String(currentPort), 'utf8');
-
-        // Cleanup port file on exit
-        const cleanup = () => {
-          try {
-            if (fs.existsSync(portFile)) {
-              const saved = fs.readFileSync(portFile, 'utf8').trim();
-              if (saved === String(currentPort)) fs.unlinkSync(portFile);
-            }
-          } catch (_) {}
-        };
-        process.on('exit', cleanup);
-        process.on('SIGINT', () => { cleanup(); process.exit(0); });
-        process.on('SIGTERM', () => { cleanup(); process.exit(0); });
       } catch (_) {}
 
       console.log(`======================================================`);
       console.log(`🚀 LEAD MACHINE DASHBOARD ONLINE`);
       console.log(`📍 Web Interface: http://localhost:${currentPort}`);
-      console.log(`⚡ Zero-dependency native Node engine active`);
+      console.log(`⚡ Low-RAM Optimized Engine (384MB heap bound)`);
+      console.log(`⌨️  Press 'q' or 'Ctrl+C' to exit cleanly`);
       console.log(`======================================================\n`);
+
+      // Native instant browser launch (avoids heavy PowerShell Start-Job process)
+      if (process.env.LEADMACHINE_NO_BROWSER !== '1') {
+        const url = `http://localhost:${currentPort}`;
+        try {
+          if (process.platform === 'win32') {
+            const { exec } = await import('child_process');
+            exec(`start "" "${url}"`);
+          } else if (process.platform === 'darwin') {
+            const { exec } = await import('child_process');
+            exec(`open "${url}"`);
+          }
+        } catch (_) {}
+      }
     });
   }
 

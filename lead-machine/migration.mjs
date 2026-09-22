@@ -13,14 +13,14 @@ import {
   getAppRoot
 } from './paths.mjs';
 import { hashKey, maskKey, verifyRemoteKey } from './auth.mjs';
-import { migrateDatabase } from './db_migration.mjs';
+import { migrateDatabase, applyPerformancePragmas } from './db_migration.mjs';
 
 /**
  * Initializes tables in a SQLite database.
  */
 export function initDatabaseSchema(db) {
-  db.pragma('journal_mode = WAL');
-  db.pragma('busy_timeout = 10000');
+  applyPerformancePragmas(db);
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS leads (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

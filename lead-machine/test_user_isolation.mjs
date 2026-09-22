@@ -114,13 +114,13 @@ async function runIsolationSuite() {
     assert(status.legacyCount === expectedTotal, `Legacy lead count is ${expectedTotal} (got ${status.legacyCount})`);
 
     // Wrong key attempt
-    const wrongRes = claimLegacyData('LM-WRONG-KEY-0000');
+    const wrongRes = await claimLegacyData('LM-WRONG-KEY-0000');
     assert(wrongRes.success === false, 'Claim with wrong license key was rejected');
     assert(!fs.existsSync(getDbPath()), 'User A database NOT created after failed claim');
     assert(fs.existsSync(realLegacyDb), 'Legacy database remains intact after failed claim');
 
     // Correct key attempt
-    const correctRes = claimLegacyData(LEGACY_TEST_KEY);
+    const correctRes = await claimLegacyData(LEGACY_TEST_KEY);
     assert(correctRes.success === true, 'Claim with correct license key succeeded');
     assert(fs.existsSync(getDbPath()), 'User A private database successfully populated');
     assert(fs.existsSync(getLegacyClaimedMarkerPath()), '.legacy_claimed lock file created');
@@ -212,7 +212,7 @@ async function runIsolationSuite() {
     process.env.LEADMACHINE_DATA_DIR = userDDir;
     const statusD = getMigrationStatus();
     assert(statusD.pending === true, 'Original owner User D sees legacy pending');
-    const claimD = claimLegacyData(LEGACY_TEST_KEY);
+    const claimD = await claimLegacyData(LEGACY_TEST_KEY);
     assert(claimD.success === true, 'Original owner User D successfully claims preserved legacy database');
 
     // ------------------------------------------------------------------------

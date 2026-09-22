@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { checkWebsite } from './reachability.mjs';
+import { applyPerformancePragmas } from './db_migration.mjs';
 
 import { getDbPath } from './paths.mjs';
 
@@ -902,6 +903,7 @@ export class LeadHunter {
     let db;
     try {
       db = new Database(getDatabasePath());
+      applyPerformancePragmas(db);
     } catch (e) {
       this.status = 'error';
       this.errorMessage = 'Database connection failed: ' + e.message;
@@ -1191,7 +1193,10 @@ export class LeadHunter {
       console.error('[Lead Hunter] Multi-task error:', err);
     } finally {
       if (db) {
-        try { db.close(); } catch (_) {}
+        try {
+          db.pragma('wal_checkpoint(PASSIVE)');
+          db.close();
+        } catch (_) {}
       }
     }
 

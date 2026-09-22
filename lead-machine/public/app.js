@@ -228,6 +228,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupIndustrySelector();
   setupDataMigrationHandlers();
   setupWorkspaceDiagnosticsHandlers();
+  setupShutdownHandlers();
   initDomTamperGuard();
   
   const migrationPending = await checkMigrationStatus();
@@ -897,6 +898,9 @@ function hideAuthGate() {
   if (authFeedback) authFeedback.style.display = 'none';
 }
 
+let lastLeadsFetchTime = 0;
+let lastDiagnosticsFetchTime = 0;
+
 // Navigation Handling
 function setupNavigation() {
   navTabs.forEach(tab => {
@@ -909,11 +913,19 @@ function setupNavigation() {
       const pane = document.getElementById(targetId);
       if (pane) pane.classList.add('active');
 
+      const now = Date.now();
       if (targetId === 'tab-leads') {
-        loadLeadsTable();
+        // Only re-fetch from database if empty or older than 10 seconds
+        if (!allLeadsData || allLeadsData.length === 0 || now - lastLeadsFetchTime > 10000) {
+          lastLeadsFetchTime = now;
+          loadLeadsTable();
+        }
       } else if (targetId === 'tab-settings') {
-        checkAuthStatus();
-        loadWorkspaceDiagnostics();
+        if (now - lastDiagnosticsFetchTime > 15000) {
+          lastDiagnosticsFetchTime = now;
+          checkAuthStatus();
+          loadWorkspaceDiagnostics();
+        }
       }
     });
   });
@@ -1215,7 +1227,42 @@ function handleTelemetryEvent(event) {
     addFeedItem('DONE', 'Campaign Finished', 'Complete', 'success');
     fetchStatusUpdate();
     loadInitialSpecs();
+  } else if (event.type === 'server_shutdown') {
+    renderShutdownOverlay();
   }
+}
+
+function renderShutdownOverlay() {
+  document.body.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;text-align:center;padding:24px;">
+      <div style="width:52px;height:52px;border-radius:50%;background:rgba(239,68,68,0.15);color:#ef4444;display:flex;align-items:center;justify-content:center;margin-bottom:16px;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+      </div>
+      <h2 style="margin:0 0 8px 0;font-size:22px;font-weight:600;">Lead Machine Has Stopped</h2>
+      <p style="color:#8b949e;margin:0 0 20px 0;max-width:420px;font-size:14px;line-height:1.5;">The background engine process has shut down cleanly and released all SQLite database locks and system memory. You can safely close this browser window.</p>
+    </div>
+  `;
+}
+
+function setupShutdownHandlers() {
+  const triggerShutdown = async () => {
+    if (!confirm('Are you sure you want to shut down the Lead Machine engine and release memory?')) return;
+    try {
+      const res = await fetch('/api/system/shutdown', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        renderShutdownOverlay();
+      }
+    } catch (_) {
+      renderShutdownOverlay();
+    }
+  };
+
+  const headerBtn = document.getElementById('headerShutdownBtn');
+  if (headerBtn) headerBtn.addEventListener('click', triggerShutdown);
+
+  const settingsBtn = document.getElementById('shutdownEngineBtn');
+  if (settingsBtn) settingsBtn.addEventListener('click', triggerShutdown);
 }
 
 async function fetchStatusUpdate() {
@@ -1310,6 +1357,11 @@ function addFeedItem(icon, company, tag, tagClass) {
     <span class="feed-tag ${tagClass}" style="margin-left: auto;">${tag}</span>
   `;
   feedContainer.prepend(row);
+
+  // Bound DOM elements to prevent runaway memory bloat on 4GB systems
+  while (feedContainer.children.length > 50) {
+    feedContainer.removeChild(feedContainer.lastElementChild);
+  }
 }
 
 // ==========================================================================
@@ -1500,15 +1552,24 @@ function addHunterStreamItem(item) {
     <span class="status-pill ready" style="margin-left: auto; font-size: 10px; padding: 2px 6px;">Verified</span>
   `;
   hunterStreamList.prepend(row);
+
+  // Bound DOM elements to prevent runaway memory bloat on 4GB systems
+  while (hunterStreamList.children.length > 50) {
+    hunterStreamList.removeChild(hunterStreamList.lastElementChild);
+  }
 }
 
 
 // ==========================================================================
 // Leads CRM Controller
 // ==========================================================================
+let leadSearchDebounceTimer = null;
 function setupLeadsHandlers() {
   leadSearchInput.addEventListener('input', () => {
-    filterAndRenderLeadsTable();
+    clearTimeout(leadSearchDebounceTimer);
+    leadSearchDebounceTimer = setTimeout(() => {
+      filterAndRenderLeadsTable();
+    }, 120);
   });
 
   filterPills.forEach(pill => {
@@ -1942,7 +2003,6 @@ function filterAndRenderLeadsTable() {
 }
 
 function renderTableRows(leads) {
-  leadsTableBody.innerHTML = '';
   if (leads.length === 0) {
     leadsTableBody.innerHTML = `
       <tr>
@@ -1953,6 +2013,9 @@ function renderTableRows(leads) {
     `;
     return;
   }
+
+  // Use DocumentFragment for single reflow layout on low-spec hardware
+  const fragment = document.createDocumentFragment();
 
   leads.slice(0, 100).forEach(lead => {
     const tr = document.createElement('tr');
@@ -2009,8 +2072,11 @@ function renderTableRows(leads) {
       <td style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px;">${notesHtml}</td>
       <td style="text-align: center;">${shotBtnHtml}</td>
     `;
-    leadsTableBody.appendChild(tr);
+    fragment.appendChild(tr);
   });
+
+  leadsTableBody.innerHTML = '';
+  leadsTableBody.appendChild(fragment);
 }
 
 // ==========================================================================

@@ -46,6 +46,7 @@ $requiredCoreFiles = @(
     "lead-machine\paths.mjs",
     "lead-machine\server.mjs",
     "lead-machine\migration.mjs",
+    "lead-machine\db_migration.mjs",
     "lead-machine\auth.mjs",
     "lead-machine\hunter.mjs",
     "lead-machine\orchestrator.mjs",
@@ -107,40 +108,36 @@ if ($missingCoreFiles.Count -gt 0) {
 # 2. Check / Locate Node.js
 Write-Host "[1/4] Checking Node.js runtime..." -ForegroundColor Yellow
 
-$nodeExe = $null
-$npmCmd = $null
-$npxCmd = $null
-
-# Check system PATH
-$systemNode = Get-Command node -ErrorAction SilentlyContinue
-if ($systemNode) {
-    try {
-        $testVer = & node -v 2>$null
-        if ($testVer -match "^v\d+") {
-            $nodeExe = "node"
-            $npmCmd = "npm"
-            $npxCmd = "npx"
-        }
-    } catch {}
+# Fast check common install paths first (avoids slow Get-Command PATH crawl)
+$candidates = @(
+    (Join-Path $appRoot "bin\node\node.exe"),
+    "$env:LOCALAPPDATA\Programs\nodejs\node.exe",
+    "$env:ProgramFiles\nodejs\node.exe",
+    "${env:ProgramFiles(x86)}\nodejs\node.exe"
+)
+foreach ($cand in $candidates) {
+    if (Test-Path $cand) {
+        $nodeExe = $cand
+        $dir = Split-Path -Parent $cand
+        $npmCmd = Join-Path $dir "npm.cmd"
+        $npxCmd = Join-Path $dir "npx.cmd"
+        $env:PATH = "$dir;$($env:PATH)"
+        break
+    }
 }
 
-# Check common install paths if not in PATH
+# Fallback: check system PATH if not in standard locations
 if (-not $nodeExe) {
-    $candidates = @(
-        "$env:ProgramFiles\nodejs\node.exe",
-        "${env:ProgramFiles(x86)}\nodejs\node.exe",
-        "$env:LOCALAPPDATA\Programs\nodejs\node.exe",
-        (Join-Path $appRoot "bin\node\node.exe")
-    )
-    foreach ($cand in $candidates) {
-        if (Test-Path $cand) {
-            $nodeExe = $cand
-            $dir = Split-Path -Parent $cand
-            $npmCmd = Join-Path $dir "npm.cmd"
-            $npxCmd = Join-Path $dir "npx.cmd"
-            $env:PATH = "$dir;$($env:PATH)"
-            break
-        }
+    $systemNode = Get-Command node -ErrorAction SilentlyContinue
+    if ($systemNode) {
+        try {
+            $testVer = & node -v 2>$null
+            if ($testVer -match "^v\d+") {
+                $nodeExe = "node"
+                $npmCmd = "npm"
+                $npxCmd = "npx"
+            }
+        } catch {}
     }
 }
 
@@ -304,32 +301,11 @@ if (Test-Path $portFile) {
     Remove-Item $portFile -Force -ErrorAction SilentlyContinue
 }
 
-# Background browser opener once server dynamically binds its port
-Start-Job -ScriptBlock {
-    param($pFile, $targetUser)
-    for ($i = 0; $i -lt 40; $i++) {
-        Start-Sleep -Milliseconds 400
-        if (Test-Path $pFile) {
-            try {
-                $p = (Get-Content $pFile -ErrorAction SilentlyContinue).Trim()
-                if ($p -match '^\d+$') {
-                    # Verify instance belongs to this user before opening
-                    $diag = Invoke-RestMethod -Uri "http://localhost:$p/api/workspace/diagnostics" -TimeoutSec 2 -ErrorAction Stop
-                    if ($diag -and $diag.systemUser -eq $targetUser) {
-                        Start-Process "http://localhost:$p"
-                        break
-                    }
-                }
-            } catch {}
-        }
-    }
-} -ArgumentList $portFile, $env:USERNAME | Out-Null
-
-# Start Node server with IPv4 priority
+# Start Node server with low-RAM optimization (384MB heap bound) and IPv4 priority
 $serverScript = Join-Path $appRoot "lead-machine\server.mjs"
 
 $bootTime = Get-Date
-& $nodeExe --dns-result-order=ipv4first $serverScript
+& $nodeExe --max-old-space-size=384 --dns-result-order=ipv4first $serverScript
 $exitCode = $LASTEXITCODE
 $bootDuration = (Get-Date) - $bootTime
 
@@ -344,7 +320,7 @@ if ($exitCode -ne 0 -and $bootDuration.TotalSeconds -lt 8) {
     Repair-LeadMachineFiles -targetFiles $requiredCoreFiles
     Write-Host ""
     Write-Host "[*] Retrying Lead Machine engine startup..." -ForegroundColor Cyan
-    & $nodeExe --dns-result-order=ipv4first $serverScript
+    & $nodeExe --max-old-space-size=384 --dns-result-order=ipv4first $serverScript
 }
 
 Write-Host ""

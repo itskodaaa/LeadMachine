@@ -210,16 +210,60 @@ body {
 .main-body {
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .tab-pane {
-  display: none;
+  display: flex;
   flex-direction: column;
   gap: 16px;
+  content-visibility: hidden;
+  contain-intrinsic-size: 0 500px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
 }
 
 .tab-pane.active {
-  display: flex;
+  content-visibility: visible;
+  position: relative;
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+@supports not (content-visibility: hidden) {
+  .tab-pane {
+    display: none;
+    position: static;
+  }
+  .tab-pane.active {
+    display: flex;
+  }
+}
+
+.btn-shutdown {
+  background: var(--bg-surface-2);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+.btn-shutdown:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
 }
 
 /* ==========================================================================

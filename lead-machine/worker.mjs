@@ -16,6 +16,7 @@ try {
 } catch (_) {}
 
 import { getDbPath, getConfigPath, getScreenshotsDir } from './paths.mjs';
+import { applyPerformancePragmas } from './db_migration.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 puppeteer.use(StealthPlugin());
@@ -36,8 +37,7 @@ const dbPath = getDbPath();
 const dbDir = path.dirname(dbPath);
 if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
 const db = new Database(dbPath);
-db.pragma('journal_mode = WAL');
-db.pragma('busy_timeout = 10000');
+applyPerformancePragmas(db);
 db.exec(`
   CREATE TABLE IF NOT EXISTS leads (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
