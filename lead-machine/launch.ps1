@@ -277,11 +277,28 @@ if (Test-Path $portFile) {
 
             if ($isOwnInstance) {
                 Write-Host ""
-                Write-Host "[*] Lead Machine server is already online for your account on port $activeUserPort." -ForegroundColor Green
-                Write-Host "[*] Launching dashboard in your browser..." -ForegroundColor Cyan
-                Start-Process "http://localhost:$activeUserPort"
-                Start-Sleep -Seconds 2
-                exit 0
+                Write-Host "[*] Active Lead Machine process detected on port $activeUserPort." -ForegroundColor Yellow
+                Write-Host "    Closing existing background instance to launch fresh engine..." -ForegroundColor Cyan
+                try {
+                    Invoke-RestMethod -Uri "http://localhost:$activeUserPort/api/system/shutdown" -Method Post -TimeoutSec 2 -ErrorAction SilentlyContinue | Out-Null
+                    Start-Sleep -Milliseconds 800
+                } catch {}
+
+                # Force stop any lingering node process owned by current user running Lead Machine
+                try {
+                    $userProcs = Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" -ErrorAction SilentlyContinue | Where-Object {
+                        $cmd = $_.CommandLine
+                        if ($cmd -and ($cmd -like "*lead-machine*" -or $cmd -like "*server.mjs*" -or $cmd -like "*LeadMachine*")) {
+                            $owner = (Invoke-CimMethod -InputObject $_ -MethodName GetOwner -ErrorAction SilentlyContinue).User
+                            return ($owner -eq $env:USERNAME)
+                        }
+                        return $false
+                    }
+                    foreach ($p in $userProcs) {
+                        Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
+                    }
+                    Start-Sleep -Milliseconds 500
+                } catch {}
             }
         }
     }
