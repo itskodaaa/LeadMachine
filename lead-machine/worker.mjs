@@ -1,3 +1,4 @@
+import dns from 'dns';
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import Database from 'better-sqlite3';
@@ -9,8 +10,24 @@ import { execSync } from 'child_process';
 import { checkWebsite } from './reachability.mjs';
 import { migrateDatabase } from './db_migration.mjs';
 
+// Rule 2 Invariant: Priority IPv4 networking to prevent IPv6 timeout hangs
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch (_) {}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 puppeteer.use(StealthPlugin());
+
+const STEALTH_LAUNCH_ARGS = [
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-dev-shm-usage',
+  '--disable-gpu',
+  '--ignore-certificate-errors',
+  '--disable-blink-features=AutomationControlled',
+  '--dns-result-order=ipv4first',
+  '--window-size=1366,768'
+];
 
 // Resolve database path
 const dbPath = path.resolve(__dirname, '../data/leads.db');
@@ -248,34 +265,27 @@ async function captureFailureScreenshot(page, leadId) {
   }
 }
 
-async function detectCaptchaOrSecurityBlock(page) {
+async function detectInterstitialSecurityWall(page) {
   try {
     return await page.evaluate(() => {
       const text = (document.body ? document.body.innerText.toLowerCase() : '');
       const title = (document.title || '').toLowerCase();
 
-      // Cloudflare / Turnstile
-      if (text.includes('checking your browser') ||
-          (text.includes('cloudflare') && (text.includes('ray id') || text.includes('turnstile') || text.includes('please wait') || text.includes('security check'))) ||
-          text.includes('verify you are human') ||
-          text.includes('verify that you are human') ||
+      // Check if page has legitimate content or form inputs
+      const hasInputs = Boolean(document.querySelector('input:not([type="hidden"]), textarea'));
+
+      // Cloudflare Interstitial Wall (5-second challenge or Ray ID block page with no site content)
+      if (!hasInputs && (
           title.includes('just a moment...') ||
           title.includes('attention required! | cloudflare') ||
-          document.querySelector('iframe[src*="challenges.cloudflare.com"]') ||
-          document.querySelector('.cf-turnstile, input[name="cf-turnstile-response"]')) {
-        return { isBlocked: true, reason: 'Cloudflare / Turnstile Challenge' };
+          text.includes('checking your browser before accessing') ||
+          text.includes('please enable javascript and cookies') ||
+          (text.includes('cloudflare') && text.includes('ray id') && (text.includes('error') || text.includes('block'))))) {
+        return { isBlocked: true, reason: 'Cloudflare Interstitial Challenge Wall' };
       }
 
-      // reCAPTCHA / hCaptcha / generic bot challenge
-      if (document.querySelector('iframe[src*="recaptcha"]') ||
-          document.querySelector('.g-recaptcha') ||
-          document.querySelector('iframe[src*="hcaptcha"]') ||
-          document.querySelector('.h-captcha')) {
-        return { isBlocked: true, reason: 'CAPTCHA Challenge (reCAPTCHA / hCaptcha)' };
-      }
-
-      // WAF access denied
-      if (text.includes('access denied') && (text.includes('waf') || text.includes('firewall') || text.includes('403 forbidden') || text.includes('perimeterx') || text.includes('ddos-guard'))) {
+      // WAF 403 Access Denied
+      if (!hasInputs && text.includes('access denied') && (text.includes('waf') || text.includes('firewall') || text.includes('403 forbidden') || text.includes('perimeterx') || text.includes('ddos-guard'))) {
         return { isBlocked: true, reason: 'Security Firewall / WAF Block' };
       }
 
@@ -284,6 +294,40 @@ async function detectCaptchaOrSecurityBlock(page) {
   } catch (_) {
     return { isBlocked: false, reason: null };
   }
+}
+
+async function handleFormSecurity(page) {
+  try {
+    // 1. Cloudflare Turnstile checkbox auto-interaction
+    const turnstileIframe = await page.$('iframe[src*="challenges.cloudflare.com"]');
+    if (turnstileIframe) {
+      const box = await turnstileIframe.boundingBox();
+      if (box && box.width > 20 && box.height > 20) {
+        const clickX = box.x + 30;
+        const clickY = box.y + (box.height / 2);
+        await page.mouse.move(clickX - 10, clickY - 10);
+        await new Promise(r => setTimeout(r, 150));
+        await page.mouse.click(clickX, clickY);
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+
+    // 2. Google reCAPTCHA v2 checkbox auto-interaction
+    const recaptchaIframe = await page.$('iframe[title="reCAPTCHA"], iframe[src*="recaptcha/api2/anchor"]');
+    if (recaptchaIframe) {
+      const frame = await recaptchaIframe.contentFrame();
+      if (frame) {
+        const anchor = await frame.$('#recaptcha-anchor');
+        if (anchor) {
+          const isChecked = await frame.evaluate(el => el.getAttribute('aria-checked') === 'true', anchor);
+          if (!isChecked) {
+            await anchor.click();
+            await new Promise(r => setTimeout(r, 2000));
+          }
+        }
+      }
+    }
+  } catch (_) {}
 }
 
 function saveLeadResult(id, status, note, isSandbox = false, failureReason = null, debugScreenshot = null) {
@@ -314,9 +358,10 @@ async function safeClose(page) {
 async function processLead(browser, lead, agentName, isSandbox = false) {
   const startTime = Date.now();
   const page = await browser.newPage();
+  await page.setViewport({ width: 1366, height: 768 });
   page.on('dialog', async dialog => { try { await dialog.dismiss(); } catch (_) {} });
   await page.setRequestInterception(true);
-  const BLOCKED_TYPES = new Set(['image', 'media', 'font', 'stylesheet', 'imageset']);
+  const BLOCKED_TYPES = new Set(['image', 'media', 'imageset']);
   const BLOCKED_DOMAINS = [
     'googletagmanager.com',
     'google-analytics.com',
@@ -338,11 +383,15 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
   page.on('request', req => {
     const url = req.url().toLowerCase();
     const type = req.resourceType();
+    const isSecurityDomain = url.includes('challenges.cloudflare.com') ||
+                             url.includes('recaptcha') ||
+                             url.includes('hcaptcha') ||
+                             url.includes('gstatic.com');
     if (url.includes('mailto:') || url.includes('tel:') || url.includes('127.0.0.1:12345')) {
       req.abort().catch(() => {});
-    } else if (BLOCKED_TYPES.has(type)) {
+    } else if (!isSecurityDomain && BLOCKED_TYPES.has(type)) {
       req.abort().catch(() => {});
-    } else if (BLOCKED_DOMAINS.some(d => url.includes(d))) {
+    } else if (!isSecurityDomain && BLOCKED_DOMAINS.some(d => url.includes(d))) {
       req.abort().catch(() => {});
     } else {
       req.continue().catch(() => {});
@@ -392,8 +441,8 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
       }
     }
 
-    // Check for CAPTCHA or WAF block
-    const initialSecurity = await detectCaptchaOrSecurityBlock(page);
+    // Check for hard interstitial security wall
+    const initialSecurity = await detectInterstitialSecurityWall(page);
     if (initialSecurity.isBlocked) {
       const shot = await captureFailureScreenshot(page, lead.id);
       saveLeadResult(lead.id, 'captcha_blocked', `Blocked by ${initialSecurity.reason}`, isSandbox, initialSecurity.reason, shot);
@@ -425,7 +474,7 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
           contactPageUrl = page.url();
         } catch (_) {}
 
-        const contactSecurity = await detectCaptchaOrSecurityBlock(page);
+        const contactSecurity = await detectInterstitialSecurityWall(page);
         if (contactSecurity.isBlocked) {
           const shot = await captureFailureScreenshot(page, lead.id);
           saveLeadResult(lead.id, 'captcha_blocked', `Blocked on contact page by ${contactSecurity.reason}`, isSandbox, contactSecurity.reason, shot);
@@ -558,6 +607,9 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
       return { id: lead.id, company: lead.company_name, status: 'no_form_found', result: 'No web form found' };
     }
 
+    // Auto-resolve any interactive form security (Turnstile / reCAPTCHA checkbox)
+    await handleFormSecurity(page);
+
     // Human-like pause before submit
     await new Promise(r => setTimeout(r, 2000));
 
@@ -571,6 +623,9 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
       await safeClose(page);
       return { id: lead.id, company: lead.company_name, status: 'contacted', time: elapsed, result: 'Confirmed: [Sandbox simulated submission]' };
     }
+
+    // Resolve form security again right before clicking submit
+    await handleFormSecurity(page);
 
     // Submit form
     const initUrl = page.url();
@@ -694,14 +749,7 @@ async function runWorker() {
     userDataDir: instProfile,
     timeout: 60000,
     ignoreHTTPSErrors: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--ignore-certificate-errors',
-      '--window-size=1280,800'
-    ]
+    args: STEALTH_LAUNCH_ARGS
   });
 
   const placeholders = leadIds.map(() => '?').join(',');
@@ -715,7 +763,8 @@ async function runWorker() {
         headless: isHeaded ? false : 'new',
         userDataDir: instProfile,
         timeout: 60000,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        ignoreHTTPSErrors: true,
+        args: STEALTH_LAUNCH_ARGS
       });
     }
     try {

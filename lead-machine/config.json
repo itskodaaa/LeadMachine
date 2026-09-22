@@ -19,7 +19,7 @@
   },
   "settings": {
     "version": "2.4.0",
-    "buildCommit": "0dbd16c",
+    "buildCommit": "cb7e063",
     "defaultSpeedMode": "recommended",
     "sandboxMode": false,
     "concurrency": 8,
@@ -35,7 +35,7 @@
     "tier": "Enterprise",
     "expires": null,
     "active": true,
-    "lastVerified": "2026-09-22T06:58:38.233Z",
+    "lastVerified": "2026-09-22T07:55:09.643Z",
     "vaultHash": "da94f34d13a4b248d7c1a80e6bff3a7df99b0d8a906c37bc4b6c36e3262684d9",
     "boundHardwareId": "HW-7E444DCD5B6C91BB6989CD05B9C67CDD"
   }
