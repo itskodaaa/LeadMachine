@@ -201,14 +201,27 @@ if (Test-Path $portFile) {
     if ($activeUserPort -match '^\d+$') {
         $tcpActive = Get-NetTCPConnection -LocalPort $activeUserPort -State Listen -ErrorAction SilentlyContinue
         if ($tcpActive) {
-            Write-Host ""
-            Write-Host "[*] Lead Machine server is already online for your account on port $activeUserPort." -ForegroundColor Green
-            Write-Host "[*] Launching dashboard in your browser..." -ForegroundColor Cyan
-            Start-Process "http://localhost:$activeUserPort"
-            Start-Sleep -Seconds 2
-            exit 0
+            # Verify that the server on this port is actually running under THIS Windows user account
+            $isOwnInstance = $false
+            try {
+                $diag = Invoke-RestMethod -Uri "http://localhost:$activeUserPort/api/workspace/diagnostics" -TimeoutSec 2 -ErrorAction Stop
+                if ($diag -and $diag.systemUser -eq $env:USERNAME) {
+                    $isOwnInstance = $true
+                }
+            } catch {}
+
+            if ($isOwnInstance) {
+                Write-Host ""
+                Write-Host "[*] Lead Machine server is already online for your account on port $activeUserPort." -ForegroundColor Green
+                Write-Host "[*] Launching dashboard in your browser..." -ForegroundColor Cyan
+                Start-Process "http://localhost:$activeUserPort"
+                Start-Sleep -Seconds 2
+                exit 0
+            }
         }
     }
+    # Clean up stale or foreign port file
+    Remove-Item $portFile -Force -ErrorAction SilentlyContinue
 }
 
 Write-Host ""
@@ -218,22 +231,31 @@ Write-Host "  Keep this window open while Lead Machine is active." -ForegroundCo
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host ""
 
+# Ensure port file is clean before launching so background opener only picks up the new port
+if (Test-Path $portFile) {
+    Remove-Item $portFile -Force -ErrorAction SilentlyContinue
+}
+
 # Background browser opener once server dynamically binds its port
 Start-Job -ScriptBlock {
-    param($pFile)
-    for ($i = 0; $i -lt 30; $i++) {
+    param($pFile, $targetUser)
+    for ($i = 0; $i -lt 40; $i++) {
         Start-Sleep -Milliseconds 400
         if (Test-Path $pFile) {
             try {
                 $p = (Get-Content $pFile -ErrorAction SilentlyContinue).Trim()
                 if ($p -match '^\d+$') {
-                    Start-Process "http://localhost:$p"
-                    break
+                    # Verify instance belongs to this user before opening
+                    $diag = Invoke-RestMethod -Uri "http://localhost:$p/api/workspace/diagnostics" -TimeoutSec 2 -ErrorAction Stop
+                    if ($diag -and $diag.systemUser -eq $targetUser) {
+                        Start-Process "http://localhost:$p"
+                        break
+                    }
                 }
             } catch {}
         }
     }
-} -ArgumentList $portFile | Out-Null
+} -ArgumentList $portFile, $env:USERNAME | Out-Null
 
 # Start Node server with IPv4 priority
 $serverScript = Join-Path $appRoot "lead-machine\server.mjs"
