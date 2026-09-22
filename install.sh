@@ -10,7 +10,7 @@
 set -e
 
 APP_NAME="Lead Machine"
-APP_VERSION="2.2.3"
+APP_VERSION="2.4.4"
 INSTALL_DIR="${HOME}/.leadmachine"
 
 echo "======================================================================"
@@ -19,6 +19,19 @@ echo "                           Version ${APP_VERSION}                     "
 echo "======================================================================"
 echo ""
 echo "[*] Target Installation Directory: ${INSTALL_DIR}"
+
+# 0. Cleanly close any running dashboard processes for current user only
+echo "[0/4] Checking for running dashboard processes for user '${USER}'..."
+PORT_FILE="${INSTALL_DIR}/leadmachine.port"
+if [ -f "$PORT_FILE" ]; then
+  ACTIVE_PORT=$(cat "$PORT_FILE" 2>/dev/null | tr -d '[:space:]')
+  if [ -n "$ACTIVE_PORT" ]; then
+    curl -s -X POST "http://127.0.0.1:${ACTIVE_PORT}/api/system/shutdown" >/dev/null 2>&1 || true
+    sleep 0.5
+  fi
+  rm -f "$PORT_FILE" 2>/dev/null || true
+fi
+pkill -u "$USER" -f "node.*server\.mjs" 2>/dev/null || true
 
 mkdir -p "${INSTALL_DIR}/data"
 

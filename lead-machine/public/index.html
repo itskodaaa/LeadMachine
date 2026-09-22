@@ -726,6 +726,10 @@ I am reaching out to express our interest in your services and would appreciate 
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2 stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
                   <span>Repair / Re-sync</span>
                 </button>
+                <button type="button" id="restartEngineBtn" class="btn-restart btn-sm" title="Gracefully restart the Node engine and reload state">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                  <span>Restart</span>
+                </button>
                 <button type="button" id="shutdownEngineBtn" class="btn-shutdown btn-sm" title="Stop Node engine and release memory">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
@@ -938,6 +942,46 @@ I am reaching out to express our interest in your services and would appreciate 
                 <input type="checkbox" id="debugModeToggle">
                 <span class="toggle-slider"></span>
               </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Engine Lifecycle & Power Management -->
+        <div class="card" id="enginePowerCard">
+          <div class="card-head">
+            <div>
+              <h2 class="card-title">Engine Lifecycle & Power Controls</h2>
+              <p class="card-subtitle">Restart the background Node service or shut down the application to release all memory.</p>
+            </div>
+            <span class="badge-status active" id="enginePowerStatusBadge">Active Service</span>
+          </div>
+
+          <div class="pref-row">
+            <div class="pref-info">
+              <span class="pref-title">Restart Engine</span>
+              <span class="pref-desc">Checkpoints SQLite database, flushes WAL, terminates active child workers, and restarts the backend server cleanly.</span>
+            </div>
+            <div class="pref-control">
+              <button type="button" id="cardRestartBtn" class="btn-restart" title="Restart engine and reload cockpit">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                <span>Restart Engine</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="pref-row">
+            <div class="pref-info">
+              <span class="pref-title">Shut Down Lead Machine</span>
+              <span class="pref-desc">Halts all automation processes, checkpoints database to disk, removes port locks, and exits the runtime completely.</span>
+            </div>
+            <div class="pref-control">
+              <button type="button" id="cardShutdownBtn" class="btn-shutdown" title="Stop Node engine and release memory">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                  <line x1="12" y1="2" x2="12" y2="12"></line>
+                </svg>
+                <span>Shut Down</span>
+              </button>
             </div>
           </div>
         </div>

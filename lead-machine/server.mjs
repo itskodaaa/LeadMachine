@@ -375,10 +375,11 @@ const server = http.createServer(async (req, res) => {
   }
 
   // 2. ZERO-TRUST GLOBAL AUTH GUARD FOR ALL OTHER API ROUTES & SSE STREAMS
-  // (Permits /api/system/version, /api/system/update, /api/system/shutdown, /api/migration/*, and /api/workspace/* so instances can inspect/migrate/exit)
+  // (Permits /api/system/version, /api/system/update, /api/system/shutdown, /api/system/restart, /api/migration/*, and /api/workspace/* so instances can inspect/migrate/exit)
   const isPublicApi = pathname === '/api/system/version' || 
                       pathname === '/api/system/update' || 
                       pathname === '/api/system/shutdown' || 
+                      pathname === '/api/system/restart' || 
                       pathname.startsWith('/api/migration/') ||
                       pathname.startsWith('/api/workspace/');
   if ((pathname.startsWith('/api/') || pathname === '/api/stream' || pathname === '/events') && !isPublicApi) {
@@ -840,45 +841,21 @@ const server = http.createServer(async (req, res) => {
       }));
 
       // Automatically release resources, checkpoint WAL, and spawn replacement process
-      setTimeout(async () => {
-        try {
-          console.log('[System] Gracefully releasing resources and restarting Lead Machine engine...');
-          // 1. Release database locks & checkpoint WAL
-          try { orchestrator.closeDb(); } catch (_) {}
-          // 2. Terminate active SSE clients cleanly
-          clients.forEach(c => { try { c.res.end(); } catch(_) {} });
-          clients.clear();
-          // 3. Remove port file so replacement process can claim cleanly
-          try {
-            const portFile = getPortFilePath();
-            if (fs.existsSync(portFile)) fs.unlinkSync(portFile);
-          } catch (_) {}
-
-          // 4. Respawn process with low-memory bounds
-          if (process.platform === 'win32') {
-            const { exec } = await import('child_process');
-            exec(`cmd.exe /c start "" "${process.execPath}" --max-old-space-size=384 --dns-result-order=ipv4first "${process.argv[1]}"`, {
-              cwd: path.dirname(process.argv[1]),
-              windowsHide: false
-            });
-          } else {
-            const { spawn } = await import('child_process');
-            const child = spawn(process.execPath, ['--max-old-space-size=384', '--dns-result-order=ipv4first', process.argv[1]], {
-              detached: true,
-              stdio: 'ignore',
-              cwd: path.dirname(process.argv[1])
-            });
-            child.unref();
-          }
-        } catch (spawnErr) {
-          console.error('[System] Failed to auto-restart process:', spawnErr.message);
-        }
-        process.exit(0);
+      setTimeout(() => {
+        restartGracefully();
       }, 1000);
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: err.message }));
     }
+    return;
+  }
+
+  // Graceful System Restart
+  if (pathname === '/api/system/restart' && req.method === 'POST') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, message: 'Restarting Lead Machine cleanly...' }));
+    setTimeout(() => restartGracefully(), 200);
     return;
   }
 
@@ -1315,6 +1292,69 @@ export function shutdownGracefully(code = 0) {
   setTimeout(() => process.exit(code), 150);
 }
 
+// Graceful Engine Restart Pipeline
+let isRestarting = false;
+export async function restartGracefully() {
+  if (isRestarting || isShuttingDown) return;
+  isRestarting = true;
+  console.log('\n[System] Initiating graceful restart of Lead Machine engine...');
+
+  // 1. Broadcast restart event and close all SSE streams
+  try {
+    broadcastSSE({ type: 'server_restarting', message: 'Engine restarting cleanly.' });
+    for (const client of sseClients) {
+      try { client.end(); } catch (_) {}
+    }
+    sseClients.clear();
+  } catch (_) {}
+
+  // 2. Stop orchestrator & child worker processes
+  try {
+    orchestrator.stop();
+  } catch (_) {}
+
+  // 3. Flush and checkpoint SQLite database, releasing all locks
+  try {
+    orchestrator.closeDb();
+  } catch (_) {}
+
+  // 4. Remove active port file so replacement process can claim cleanly
+  try {
+    const portFile = getPortFilePath();
+    if (fs.existsSync(portFile)) fs.unlinkSync(portFile);
+  } catch (_) {}
+
+  // 5. Close HTTP server
+  try {
+    server.close();
+  } catch (_) {}
+
+  // 6. Respawn replacement engine process
+  try {
+    console.log('[System] Spawning replacement Lead Machine engine...');
+    if (process.platform === 'win32') {
+      const { exec } = await import('child_process');
+      exec(`cmd.exe /c start "" "${process.execPath}" --max-old-space-size=384 --dns-result-order=ipv4first "${process.argv[1]}"`, {
+        cwd: path.dirname(process.argv[1]),
+        windowsHide: false
+      });
+    } else {
+      const { spawn } = await import('child_process');
+      const child = spawn(process.execPath, ['--max-old-space-size=384', '--dns-result-order=ipv4first', process.argv[1]], {
+        detached: true,
+        stdio: 'ignore',
+        cwd: path.dirname(process.argv[1])
+      });
+      child.unref();
+    }
+    console.log('[System] Replacement engine process spawned successfully.');
+  } catch (spawnErr) {
+    console.error('[System] Failed to restart process:', spawnErr.message);
+  }
+
+  setTimeout(() => process.exit(0), 200);
+}
+
 // Hook process signals for clean shutdown
 process.on('SIGINT', () => shutdownGracefully(0));
 process.on('SIGTERM', () => shutdownGracefully(0));
@@ -1326,7 +1366,7 @@ process.on('exit', () => {
   try { orchestrator.closeDb(); } catch (_) {}
 });
 
-// Interactive terminal key handling: allow typing 'q' or 'exit'
+// Interactive terminal key handling: allow typing 'q', 'exit', 'r', or 'restart'
 if (process.stdin && process.stdin.isTTY) {
   try {
     process.stdin.setEncoding('utf8');
@@ -1334,6 +1374,8 @@ if (process.stdin && process.stdin.isTTY) {
       const input = (chunk || '').toString().trim().toLowerCase();
       if (input === 'q' || input === 'exit' || input === 'quit') {
         shutdownGracefully(0);
+      } else if (input === 'r' || input === 'restart') {
+        restartGracefully();
       }
     });
   } catch (_) {}

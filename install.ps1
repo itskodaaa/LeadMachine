@@ -22,7 +22,7 @@ $ErrorActionPreference = "Continue"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $APP_NAME = "Lead Machine"
-$APP_VERSION = "2.2.3"
+$APP_VERSION = "2.4.4"
 $TARGET_DIR = $TargetDir
 $REPO_URL = "https://github.com/$Repo"
 $ZIP_URL = "https://raw.githubusercontent.com/leadmachine-core/installer/main/leadmachine.zip"
@@ -37,6 +37,63 @@ Write-Host ""
 Write-Host "[*] Initializing automated enterprise deployment..." -ForegroundColor Gray
 Write-Host "[*] Target Installation Directory: $TARGET_DIR" -ForegroundColor Gray
 Write-Host ""
+
+# ------------------------------------------------------------------------------
+# 0. Cleanly Terminate Any Running Dashboard Processes for Active User Only
+# ------------------------------------------------------------------------------
+$currentUser = $env:USERNAME
+Write-Host "[0/6] Checking for active Lead Machine processes for user '$currentUser'..." -ForegroundColor Yellow
+
+# Step A: Graceful HTTP shutdown via active port record
+$portFile = Join-Path $TARGET_DIR "leadmachine.port"
+if (Test-Path $portFile) {
+    try {
+        $activePort = (Get-Content $portFile -ErrorAction SilentlyContinue | Out-String).Trim()
+        if ($activePort -match '^\d+$') {
+            try {
+                $diag = Invoke-RestMethod -Uri "http://127.0.0.1:$activePort/api/workspace/diagnostics" -TimeoutSec 2 -ErrorAction Stop
+                if ($diag.systemUser -eq $currentUser) {
+                    Write-Host "  [*] Sending graceful shutdown signal to running dashboard on port $activePort..." -ForegroundColor Yellow
+                    Invoke-RestMethod -Uri "http://127.0.0.1:$activePort/api/system/shutdown" -Method Post -TimeoutSec 2 -ErrorAction SilentlyContinue | Out-Null
+                    Start-Sleep -Milliseconds 800
+                }
+            } catch {}
+        }
+    } catch {}
+}
+
+# Step B: Close any remaining node.exe processes owned strictly by current user running Lead Machine
+try {
+    $userNodeProcs = Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" -ErrorAction SilentlyContinue | Where-Object {
+        $proc = $_
+        $cmd = $proc.CommandLine
+        if ($cmd -and ($cmd -like "*lead-machine*" -or $cmd -like "*server.mjs*" -or $cmd -like "*LeadMachine*")) {
+            $owner = (Invoke-CimMethod -InputObject $proc -MethodName GetOwner -ErrorAction SilentlyContinue).User
+            return ($owner -eq $currentUser)
+        }
+        return $false
+    }
+
+    if ($userNodeProcs) {
+        foreach ($p in $userNodeProcs) {
+            Write-Host "  [*] Halting running dashboard engine (PID $($p.ProcessId)) for user '$currentUser'..." -ForegroundColor Yellow
+            Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
+        }
+        Start-Sleep -Milliseconds 500
+    }
+} catch {
+    # Fallback if CIM permissions are restricted
+    try {
+        Get-Process node -ErrorAction SilentlyContinue | Where-Object {
+            $_.Path -like "*LeadMachine*" -or $_.Path -like "*$currentUser*"
+        } | Stop-Process -Force -ErrorAction SilentlyContinue
+    } catch {}
+}
+
+# Step C: Clean up stale port file if still present
+if (Test-Path $portFile) {
+    Remove-Item -Path $portFile -Force -ErrorAction SilentlyContinue
+}
 
 # ------------------------------------------------------------------------------
 # 1. Determine Source & Prepare Destination

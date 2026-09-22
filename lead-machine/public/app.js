@@ -1229,6 +1229,8 @@ function handleTelemetryEvent(event) {
     loadInitialSpecs();
   } else if (event.type === 'server_shutdown') {
     renderShutdownOverlay();
+  } else if (event.type === 'server_restarting') {
+    renderRestartOverlay();
   }
 }
 
@@ -1242,6 +1244,36 @@ function renderShutdownOverlay() {
       <p style="color:#8b949e;margin:0 0 20px 0;max-width:420px;font-size:14px;line-height:1.5;">The background engine process has shut down cleanly and released all SQLite database locks and system memory. You can safely close this browser window.</p>
     </div>
   `;
+}
+
+function renderRestartOverlay() {
+  document.body.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;text-align:center;padding:24px;">
+      <div style="width:52px;height:52px;border-radius:50%;background:rgba(59,130,246,0.15);color:#60a5fa;display:flex;align-items:center;justify-content:center;margin-bottom:16px;">
+        <svg class="spin" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+      </div>
+      <h2 style="margin:0 0 8px 0;font-size:22px;font-weight:600;">Restarting Lead Machine...</h2>
+      <p style="color:#8b949e;margin:0 0 20px 0;max-width:440px;font-size:14px;line-height:1.5;">The background engine process is restarting cleanly and reloading services. Reconnecting to cockpit...</p>
+      <div id="restartCountdown" style="font-family:var(--font-mono, monospace);font-size:13px;color:#58a6ff;">Connecting to engine...</div>
+    </div>
+  `;
+
+  let attempts = 0;
+  const pollInterval = setInterval(async () => {
+    attempts++;
+    try {
+      const res = await fetch('/api/system-specs');
+      if (res.ok) {
+        clearInterval(pollInterval);
+        const countdownEl = document.getElementById('restartCountdown');
+        if (countdownEl) countdownEl.textContent = 'Engine online! Reloading cockpit...';
+        setTimeout(() => window.location.reload(), 500);
+      }
+    } catch (_) {
+      const countdownEl = document.getElementById('restartCountdown');
+      if (countdownEl) countdownEl.textContent = `Connecting to engine (${attempts}s)...`;
+    }
+  }, 1000);
 }
 
 function setupShutdownHandlers() {
@@ -1258,11 +1290,32 @@ function setupShutdownHandlers() {
     }
   };
 
+  const triggerRestart = async () => {
+    if (!confirm('Are you sure you want to restart the Lead Machine engine?')) return;
+    try {
+      renderRestartOverlay();
+      await fetch('/api/system/restart', { method: 'POST' });
+    } catch (_) {
+      // renderRestartOverlay is already running and polling for engine recovery
+    }
+  };
+
+  // Header and Settings Shutdown buttons
   const headerBtn = document.getElementById('headerShutdownBtn');
   if (headerBtn) headerBtn.addEventListener('click', triggerShutdown);
 
-  const settingsBtn = document.getElementById('shutdownEngineBtn');
-  if (settingsBtn) settingsBtn.addEventListener('click', triggerShutdown);
+  const settingsShutdownBtn = document.getElementById('shutdownEngineBtn');
+  if (settingsShutdownBtn) settingsShutdownBtn.addEventListener('click', triggerShutdown);
+
+  const cardShutdownBtn = document.getElementById('cardShutdownBtn');
+  if (cardShutdownBtn) cardShutdownBtn.addEventListener('click', triggerShutdown);
+
+  // Settings Restart buttons
+  const settingsRestartBtn = document.getElementById('restartEngineBtn');
+  if (settingsRestartBtn) settingsRestartBtn.addEventListener('click', triggerRestart);
+
+  const cardRestartBtn = document.getElementById('cardRestartBtn');
+  if (cardRestartBtn) cardRestartBtn.addEventListener('click', triggerRestart);
 }
 
 async function fetchStatusUpdate() {
