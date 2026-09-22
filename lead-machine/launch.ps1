@@ -2,6 +2,11 @@
 # Lead Machine - Windows Autonomous Launcher (PowerShell)
 # ==============================================================================
 
+param(
+    [switch]$Repair = $false,
+    [switch]$Update = $false
+)
+
 $ErrorActionPreference = "Continue"
 
 # Resolve script directory and project root
@@ -34,6 +39,69 @@ if (-not (Test-Path (Join-Path $appRoot "lead-machine\server.mjs"))) {
     Write-Host "Press Enter to exit..." -ForegroundColor Gray
     Read-Host
     exit 1
+}
+
+# 1b. Self-Healing & Auto-Update Engine
+$requiredCoreFiles = @(
+    "lead-machine\paths.mjs",
+    "lead-machine\server.mjs",
+    "lead-machine\migration.mjs",
+    "lead-machine\auth.mjs",
+    "lead-machine\hunter.mjs",
+    "lead-machine\orchestrator.mjs",
+    "lead-machine\worker.mjs",
+    "lead-machine\extractor_sync.mjs",
+    "lead-machine\reachability.mjs",
+    "lead-machine\url_importer.mjs",
+    "lead-machine\public\index.html",
+    "lead-machine\public\style.css",
+    "lead-machine\public\app.js"
+)
+
+function Repair-LeadMachineFiles {
+    param([string[]]$targetFiles)
+    Write-Host "[*] Automatically downloading runtime repairs from GitHub..." -ForegroundColor Cyan
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $rawBase = "https://raw.githubusercontent.com/leadmachine-core/installer/main"
+    $wc = New-Object System.Net.WebClient
+    foreach ($rf in $targetFiles) {
+        $destFile = Join-Path $appRoot $rf
+        $destFolder = Split-Path -Parent $destFile
+        if (-not (Test-Path $destFolder)) {
+            New-Item -ItemType Directory -Force -Path $destFolder | Out-Null
+        }
+        $cb = [int](Get-Date -UFormat %s)
+        $remoteUrl = "$rawBase/$($rf.Replace('\', '/'))?_cb=$cb"
+        try {
+            Write-Host "  -> Restoring $rf..." -ForegroundColor Gray
+            $wc.DownloadFile($remoteUrl, $destFile)
+        } catch {
+            Write-Host "  [!] Could not download $rf: $($_.Exception.Message)" -ForegroundColor Red
+        }
+    }
+}
+
+# Explicit repair flag triggered
+if ($Repair -or $Update) {
+    Write-Host "[*] Repair / Update flag active. Re-syncing all core engine files..." -ForegroundColor Yellow
+    Repair-LeadMachineFiles -targetFiles $requiredCoreFiles
+    Write-Host "[OK] Engine files refreshed." -ForegroundColor Green
+    Write-Host ""
+}
+
+# Pre-flight check: Detect missing core modules (e.g. paths.mjs) before launching Node
+$missingCoreFiles = @()
+foreach ($rf in $requiredCoreFiles) {
+    if (-not (Test-Path (Join-Path $appRoot $rf))) {
+        $missingCoreFiles += $rf
+    }
+}
+
+if ($missingCoreFiles.Count -gt 0) {
+    Write-Host "[!] Missing core runtime files detected: $($missingCoreFiles -join ', ')" -ForegroundColor Yellow
+    Repair-LeadMachineFiles -targetFiles $missingCoreFiles
+    Write-Host "[OK] Self-healing repair complete." -ForegroundColor Green
+    Write-Host ""
 }
 
 # 2. Check / Locate Node.js
@@ -259,7 +327,25 @@ Start-Job -ScriptBlock {
 
 # Start Node server with IPv4 priority
 $serverScript = Join-Path $appRoot "lead-machine\server.mjs"
+
+$bootTime = Get-Date
 & $nodeExe --dns-result-order=ipv4first $serverScript
+$exitCode = $LASTEXITCODE
+$bootDuration = (Get-Date) - $bootTime
+
+# If server crashed within 8 seconds on startup, run automatic self-healing repair and retry
+if ($exitCode -ne 0 -and $bootDuration.TotalSeconds -lt 8) {
+    Write-Host ""
+    Write-Host "======================================================================" -ForegroundColor Red
+    Write-Host "  [!] Server stopped unexpectedly during startup (Exit Code: $exitCode)." -ForegroundColor Red
+    Write-Host "  [*] Initiating automatic self-healing repair from GitHub release..." -ForegroundColor Yellow
+    Write-Host "======================================================================" -ForegroundColor Yellow
+    Write-Host ""
+    Repair-LeadMachineFiles -targetFiles $requiredCoreFiles
+    Write-Host ""
+    Write-Host "[*] Retrying Lead Machine engine startup..." -ForegroundColor Cyan
+    & $nodeExe --dns-result-order=ipv4first $serverScript
+}
 
 Write-Host ""
 Write-Host "======================================================================" -ForegroundColor Yellow
