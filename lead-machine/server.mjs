@@ -599,7 +599,7 @@ const server = http.createServer(async (req, res) => {
     if (fs.existsSync(cfgPath)) {
       try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
     }
-    const currentVer = cfg.settings?.version || '2.5.2';
+    const currentVer = cfg.settings?.version || '2.5.3';
     const currentCommit = cfg.settings?.buildCommit || 'master';
     const repo = 'leadmachine-core/installer';
     const branch = 'main';
@@ -734,7 +734,7 @@ const server = http.createServer(async (req, res) => {
 
     try {
       let latestCommit = '';
-      let remoteVer = '2.5.2';
+      let remoteVer = '2.5.3';
 
       // 1. Resolve absolute latest HEAD of master branch (bypasses any intermediate commit)
       try {

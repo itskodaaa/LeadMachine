@@ -91,9 +91,19 @@ async function runTests() {
     env: { ...process.env, PORT: String(TEST_PORT), LEADMACHINE_DATA_DIR: testDataDir },
     stdio: ['ignore', 'pipe', 'pipe']
   });
+  serverProc.stderr.on('data', d => console.error('SERVER STDERR:', d.toString()));
+  serverProc.on('exit', (code, sig) => console.log(`SERVER PROCESS EXITED: code=${code}, signal=${sig}`));
 
   // Wait for server to start
-  await new Promise(r => setTimeout(r, 1200));
+  await new Promise(r => setTimeout(r, 1500));
+
+  // Authenticate test server with dev master override
+  const authRes = await request('/api/auth/activate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: { key: 'LM-MASTER-DEV-OVERRIDE' }
+  });
+  assert(authRes.status === 200 && authRes.json?.success, 'POST /api/auth/activate with Master Dev Override');
 
   // --- TEST 3: Static Assets & Web Dashboard ---
   console.log('\n[3/5] Testing Web Dashboard Endpoints...');

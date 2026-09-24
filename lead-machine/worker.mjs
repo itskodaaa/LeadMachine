@@ -29,6 +29,9 @@ const STEALTH_LAUNCH_ARGS = [
   '--ignore-certificate-errors',
   '--disable-blink-features=AutomationControlled',
   '--dns-result-order=ipv4first',
+  '--no-first-run',
+  '--no-default-browser-check',
+  '--disable-background-networking',
   '--window-size=1366,768'
 ];
 
@@ -489,12 +492,179 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
     // Ensure fresh profile per lead
     const currentProfile = getFreshSenderProfile();
 
-    // Search and fill form
+    // High-Precision Multi-Stage Form Search & Autofill
     const formFilled = await page.evaluate((profile, leadData) => {
-      const inputs = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea, select'));
-      if (inputs.length === 0) return { filled: false, reason: 'No inputs found' };
+      // 1. Identify and score all forms on the page to target the real contact form
+      const allForms = Array.from(document.querySelectorAll('form'));
+      let targetForm = null;
 
-      // Dynamic message variable substitution
+      if (allForms.length > 0) {
+        let bestScore = -999;
+        for (const form of allForms) {
+          let score = 0;
+          const formText = (form.id + ' ' + form.className + ' ' + (form.getAttribute('action') || '')).toLowerCase();
+          
+          if (formText.includes('search') || formText.includes('newsletter') || formText.includes('subscribe')) score -= 50;
+          
+          const formInputs = Array.from(form.querySelectorAll('input:not([type="hidden"]), textarea, select'));
+          if (formInputs.length <= 1) score -= 30;
+
+          if (formText.includes('contact') || formText.includes('inquiry') || formText.includes('quote') || formText.includes('lead') || formText.includes('reach')) score += 50;
+          if (formText.includes('wpforms') || formText.includes('gform') || formText.includes('elementor-form') || formText.includes('frm_pro_form') || formText.includes('cf7') || formText.includes('ninja-form')) score += 40;
+
+          for (const inp of formInputs) {
+            const type = (inp.getAttribute('type') || inp.type || 'text').toLowerCase();
+            const desc = (inp.name + ' ' + inp.id + ' ' + inp.placeholder).toLowerCase();
+            if (inp.tagName.toLowerCase() === 'textarea') score += 20;
+            if (type === 'email' || desc.includes('email')) score += 15;
+            if (type === 'tel' || desc.includes('phone') || desc.includes('tel')) score += 15;
+            if (desc.includes('name')) score += 10;
+            if (desc.includes('message') || desc.includes('comment')) score += 15;
+          }
+
+          if (score > bestScore) {
+            bestScore = score;
+            targetForm = form;
+          }
+        }
+        if (bestScore < 0 && allForms.length > 1) {
+          targetForm = null;
+        }
+      }
+
+      // 2. Strict Input Eligibility & Anti-Honeypot Filter
+      function isEligibleInput(input) {
+        if (!input) return false;
+        const type = (input.getAttribute('type') || input.type || 'text').toLowerCase();
+        if (type === 'hidden' || type === 'submit' || type === 'button' || type === 'reset' || type === 'image') return false;
+        if (type === 'search' || type === 'password' || type === 'file') return false;
+
+        const name = (input.getAttribute('name') || '').toLowerCase();
+        const id = (input.getAttribute('id') || '').toLowerCase();
+        const className = (input.className || '').toLowerCase();
+
+        // Spam traps & honeypot identifiers (Elementor, Akismet, Ninja Forms, reCAPTCHA hidden tokens)
+        const honeypotTokens = [
+          'ak_hp', 'honeypot', 'hp_', '_hp', 'ninja_forms_honeypot', 'trap', 'bot_check', 'leave_blank',
+          'g-recaptcha-response', 'h-captcha-response', 'cf-turnstile-response', 'recaptcha', 'turnstile',
+          'antispam', 'anti-spam', 'timestamp'
+        ];
+        if (honeypotTokens.some(tok => name.includes(tok) || id.includes(tok) || className.includes(tok))) {
+          return false;
+        }
+
+        // Tabindex -1 without required is a classic honeypot marker
+        if (input.getAttribute('tabindex') === '-1' && !input.hasAttribute('required')) {
+          return false;
+        }
+
+        // Check CSS visibility
+        const style = window.getComputedStyle(input);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+
+        // Check bounding dimensions
+        const rect = input.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0 && !input.getClientRects().length) return false;
+        if (rect.left < -300 || rect.top < -300) return false;
+
+        // Check parent container visibility (e.g. elementor-field-type-honeypot or hidden wrapper)
+        let parent = input.parentElement;
+        let depth = 0;
+        while (parent && parent !== document.body && depth < 6) {
+          const pStyle = window.getComputedStyle(parent);
+          if (pStyle.display === 'none' || pStyle.visibility === 'hidden' || pStyle.opacity === '0') return false;
+          if (pStyle.position === 'absolute' && (pStyle.left?.includes('-999') || pStyle.top?.includes('-999'))) return false;
+          const pClass = (parent.className || '').toLowerCase();
+          if (pClass.includes('honeypot') || pClass.includes('ak_hp') || pClass.includes('ninja-forms-hp')) return false;
+          parent = parent.parentElement;
+          depth++;
+        }
+
+        return true;
+      }
+
+      // 3. Clean Descriptor Builder (Prioritizes explicit labels over broad ancestors)
+      function getInputDescriptor(input) {
+        const type = (input.getAttribute('type') || input.type || 'text').toLowerCase();
+        const name = (input.getAttribute('name') || '').toLowerCase();
+        const id = (input.getAttribute('id') || '').toLowerCase();
+        const placeholder = (input.getAttribute('placeholder') || '').toLowerCase();
+        const ariaLabel = (input.getAttribute('aria-label') || '').toLowerCase();
+        const autocomplete = (input.getAttribute('autocomplete') || '').toLowerCase();
+
+        let labelText = '';
+        if (input.labels && input.labels.length > 0) {
+          labelText = Array.from(input.labels).map(l => l.innerText || '').join(' ');
+        }
+        if (!labelText && input.getAttribute('aria-labelledby')) {
+          const labelledBy = document.getElementById(input.getAttribute('aria-labelledby'));
+          if (labelledBy) labelText = labelledBy.innerText || '';
+        }
+        if (!labelText && input.previousElementSibling && (input.previousElementSibling.tagName.toLowerCase() === 'label' || input.previousElementSibling.classList.contains('label'))) {
+          labelText = input.previousElementSibling.innerText || '';
+        }
+        if (!labelText && input.parentElement && input.parentElement.tagName.toLowerCase() === 'label') {
+          labelText = input.parentElement.innerText || '';
+        }
+        if (!labelText && input.parentElement && input.parentElement.innerText && input.parentElement.innerText.length < 80) {
+          labelText = input.parentElement.innerText;
+        }
+
+        labelText = labelText.toLowerCase().replace(/\s+/g, ' ').trim();
+        return {
+          type,
+          name,
+          id,
+          placeholder,
+          ariaLabel,
+          autocomplete,
+          labelText,
+          combined: `${name} ${id} ${placeholder} ${ariaLabel} ${autocomplete} ${labelText}`.toLowerCase()
+        };
+      }
+
+      // 4. Framework-Safe Native Value Setter (React, Vue, Webflow, Standard)
+      function setInputValue(input, value) {
+        if (value === null || value === undefined) return;
+        const strVal = String(value);
+        const proto = Object.getPrototypeOf(input);
+        const desc = Object.getOwnPropertyDescriptor(proto, 'value') ||
+                     Object.getOwnPropertyDescriptor(input.constructor.prototype, 'value') ||
+                     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value') ||
+                     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
+
+        input.focus();
+        if (desc && desc.set) {
+          desc.set.call(input, strVal);
+        } else {
+          input.value = strVal;
+        }
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.dispatchEvent(new Event('blur', { bubbles: true }));
+      }
+
+      // 5. Intelligent Phone Number Normalizer
+      function normalizePhone(input, desc, rawPhone) {
+        const digits = rawPhone.replace(/\D/g, '');
+        const hyphen = digits.length === 10 ? `${digits.slice(0,3)}-${digits.slice(3,6)}-${digits.slice(6)}` : rawPhone;
+        const paren = digits.length === 10 ? `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}` : rawPhone;
+
+        const maxLen = input.maxLength;
+        if (desc.combined.includes('area') || maxLen === 3) return digits.slice(0, 3);
+        if (desc.combined.includes('prefix')) return digits.slice(3, 6);
+        if (desc.combined.includes('line') || (desc.combined.includes('phone') && maxLen === 4)) return digits.slice(6);
+
+        const pattern = input.getAttribute('pattern') || '';
+        // If type="number", inputmode="numeric", digit-only pattern, or maxlength 10: pass pure digits!
+        if (desc.type === 'number' || input.getAttribute('inputmode') === 'numeric' || (pattern && !pattern.includes('-') && pattern.includes('[0-9]')) || maxLen === 10) {
+          return digits;
+        }
+        if (desc.placeholder.includes('(') || desc.placeholder.includes(')')) return paren;
+        return hyphen;
+      }
+
+      // 6. Dynamic Message Variable Substitution
       let dynamicMessage = profile.message || '';
       dynamicMessage = dynamicMessage.replace(/{company_name}/gi, leadData.company_name || 'your company');
       dynamicMessage = dynamicMessage.replace(/{first_name}/gi, (leadData.contact_person ? leadData.contact_person.split(' ')[0] : 'there'));
@@ -504,41 +674,40 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
       dynamicMessage = dynamicMessage.replace(/{job_title}/gi, profile.jobTitle || '');
       dynamicMessage = dynamicMessage.replace(/{company_sender}/gi, profile.company || '');
 
+      // Scope to targetForm or entire document if no clear form container
+      const scope = targetForm || document;
+      const allInputs = Array.from(scope.querySelectorAll('input:not([type="hidden"]), select, textarea'));
+      const eligibleInputs = allInputs.filter(isEligibleInput);
+
+      if (eligibleInputs.length === 0) return { filled: false, reason: 'No eligible inputs found' };
+
       let filledCount = 0;
       const filledDetails = [];
-      for (const input of inputs) {
-        const type = (input.getAttribute('type') || input.type || 'text').toLowerCase();
-        const name = (input.getAttribute('name') || '').toLowerCase();
-        const id = (input.getAttribute('id') || '').toLowerCase();
-        const placeholder = (input.getAttribute('placeholder') || '').toLowerCase();
-        const ariaLabel = (input.getAttribute('aria-label') || '').toLowerCase();
 
-        // Check associated label or parent text
-        let labelText = '';
-        if (input.labels && input.labels.length > 0) {
-          labelText = Array.from(input.labels).map(l => l.innerText || '').join(' ');
-        }
-        if (!labelText && input.parentElement) {
-          labelText = input.parentElement.innerText || '';
-        }
+      for (const input of eligibleInputs) {
+        const desc = getInputDescriptor(input);
+        const tag = input.tagName.toLowerCase();
 
-        const descriptor = `${name} ${id} ${placeholder} ${ariaLabel} ${labelText}`.toLowerCase();
-
-        if (type === 'submit' || type === 'button' || type === 'reset' || type === 'image') continue;
-
-        if (type === 'checkbox' || type === 'radio') {
-          if (input.hasAttribute('required') || descriptor.includes('agree') || descriptor.includes('consent') || descriptor.includes('term') || descriptor.includes('policy')) {
+        // Checkbox & Radio Buttons
+        if (desc.type === 'checkbox' || desc.type === 'radio') {
+          const isRequired = input.required || input.hasAttribute('required') || input.getAttribute('aria-required') === 'true';
+          const isConsent = desc.combined.includes('agree') || desc.combined.includes('consent') || desc.combined.includes('term') || desc.combined.includes('policy') || desc.combined.includes('opt-in') || desc.combined.includes('contact me');
+          if (isRequired || isConsent) {
             input.checked = true;
             input.dispatchEvent(new Event('change', { bubbles: true }));
+            filledCount++;
+            filledDetails.push({ field: desc.name || desc.id || desc.type, set: '[CHECKED]' });
           }
           continue;
         }
 
-        if (input.tagName.toLowerCase() === 'select') {
+        // Dropdown Select Elements
+        if (tag === 'select') {
           if (input.options && input.options.length > 1) {
             let matchedIdx = -1;
             const targetState = (profile.state || '').toLowerCase();
-            const targetStateFull = (profile.stateFull || '').toLowerCase();
+            const targetStateFull = (profile.stateFull || 'virginia').toLowerCase();
+
             for (let i = 0; i < input.options.length; i++) {
               const optText = (input.options[i].text || '').toLowerCase();
               const optVal = (input.options[i].value || '').toLowerCase();
@@ -546,61 +715,163 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
                 matchedIdx = i;
                 break;
               }
+              if (optVal.includes('us') || optText.includes('united states')) {
+                matchedIdx = i;
+                break;
+              }
+              if (optText.includes('quote') || optText.includes('inquiry') || optText.includes('service') || optText.includes('commercial') || optText.includes('other')) {
+                if (matchedIdx === -1) matchedIdx = i;
+              }
             }
-            input.selectedIndex = matchedIdx !== -1 ? matchedIdx : 1;
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-            filledCount++;
+
+            // Fallback: pick first valid option that has a non-empty value and is not disabled
+            if (matchedIdx === -1) {
+              for (let i = 0; i < input.options.length; i++) {
+                if (input.options[i].value && input.options[i].value !== '' && !input.options[i].disabled) {
+                  matchedIdx = i;
+                  break;
+                }
+              }
+            }
+
+            if (matchedIdx !== -1) {
+              input.selectedIndex = matchedIdx;
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+              filledCount++;
+              filledDetails.push({ field: desc.name || desc.id || 'select', set: input.options[matchedIdx].text });
+            }
           }
           continue;
         }
 
         let valToSet = null;
-        if (type === 'email' || descriptor.includes('email') || descriptor.includes('e-mail')) {
+
+        // EMAIL
+        if (desc.type === 'email' || desc.autocomplete.includes('email') || /\b(e-?mail)\b/i.test(desc.name) || /\b(e-?mail)\b/i.test(desc.id) || /\b(e-?mail)\b/i.test(desc.labelText) || /\b(e-?mail)\b/i.test(desc.placeholder)) {
           valToSet = profile.email;
-        } else if (type === 'tel' || descriptor.includes('phone') || descriptor.includes('tel') || descriptor.includes('mobile') || descriptor.includes('cell')) {
-          valToSet = profile.phone;
-        } else if ((descriptor.includes('first') && !descriptor.includes('last')) || descriptor.includes('fname') || descriptor.includes('given')) {
-          valToSet = profile.firstName;
-        } else if ((descriptor.includes('last') && !descriptor.includes('first')) || descriptor.includes('lname') || descriptor.includes('surname') || descriptor.includes('family name')) {
-          valToSet = profile.lastName;
-        } else if (descriptor.includes('your name') || descriptor.includes('contact name') || descriptor.includes('full name') || descriptor.includes('name')) {
-          valToSet = profile.fullName;
-        } else if (descriptor.includes('job') || descriptor.includes('position') || descriptor.includes('role') || (descriptor.includes('title') && !descriptor.includes('sub') && !descriptor.includes('topic'))) {
-          valToSet = profile.jobTitle;
-        } else if (descriptor.includes('company') || descriptor.includes('organization') || descriptor.includes('business') || descriptor.includes('firm')) {
+        }
+        // PHONE (Explicitly excludes fax)
+        else if (desc.type === 'tel' || desc.autocomplete.includes('tel') || (/\b(phone|telephone|mobile|cell|contact[_\s-]?number)\b/i.test(desc.combined) && !desc.combined.includes('fax'))) {
+          valToSet = normalizePhone(input, desc, profile.phone);
+        }
+        // COMPANY (Evaluated BEFORE generic name so company_name is never filled with personal name)
+        else if (/\b(company[_\s-]?name|company|organization|organisation|business[_\s-]?name|business|firm)\b/i.test(desc.name) || /\b(company|organization|business)\b/i.test(desc.id) || /\b(company|organization|business)\b/i.test(desc.labelText) || /\b(company|organization|business)\b/i.test(desc.placeholder)) {
           valToSet = profile.company;
-        } else if (descriptor.includes('website') || descriptor.includes('web site') || descriptor.includes('url') || descriptor.includes('domain')) {
+        }
+        // FIRST NAME
+        else if (/\b(first[_\s-]?name|fname|given[_\s-]?name|forename)\b/i.test(desc.combined) && !desc.combined.includes('last')) {
+          valToSet = profile.firstName;
+        }
+        // LAST NAME
+        else if (/\b(last[_\s-]?name|lname|surname|family[_\s-]?name)\b/i.test(desc.combined) && !desc.combined.includes('first')) {
+          valToSet = profile.lastName;
+        }
+        // FULL NAME / CONTACT NAME
+        else if (/\b(full[_\s-]?name|your[_\s-]?name|contact[_\s-]?name|name)\b/i.test(desc.name) || /\b(full[_\s-]?name|your[_\s-]?name|contact[_\s-]?name|name)\b/i.test(desc.id) || /\b(your[_\s-]?name|contact[_\s-]?name|name)\b/i.test(desc.labelText) || /\b(your[_\s-]?name|name)\b/i.test(desc.placeholder)) {
+          valToSet = profile.fullName;
+        }
+        // JOB TITLE
+        else if (/\b(job[_\s-]?title|title|role|position|designation)\b/i.test(desc.combined) && !desc.combined.includes('sub')) {
+          valToSet = profile.jobTitle;
+        }
+        // WEBSITE / URL
+        else if (/\b(website|web[_\s-]?site|url|domain)\b/i.test(desc.combined)) {
           valToSet = profile.website;
-        } else if (descriptor.includes('street') || descriptor.includes('address 1') || descriptor.includes('address line 1') || (descriptor.includes('address') && !descriptor.includes('email') && !descriptor.includes('ip') && !descriptor.includes('url'))) {
+        }
+        // STREET ADDRESS
+        else if (/\b(street[_\s-]?address|address[_\s-]?line[_\s-]?1|address1|street)\b/i.test(desc.combined) || (/\b(address)\b/i.test(desc.combined) && !desc.combined.includes('email') && !desc.combined.includes('ip') && !desc.combined.includes('web'))) {
           valToSet = profile.address;
-        } else if (descriptor.includes('suite') || descriptor.includes('apt') || descriptor.includes('unit') || descriptor.includes('address 2') || descriptor.includes('address line 2')) {
-          valToSet = profile.suite;
-        } else if (descriptor.includes('city') || descriptor.includes('town') || descriptor.includes('municipality')) {
+        }
+        // SUITE / APT
+        else if (/\b(suite|apt|apartment|unit|address[_\s-]?line[_\s-]?2|address2)\b/i.test(desc.combined)) {
+          valToSet = profile.suite || '';
+        }
+        // CITY
+        else if (/\b(city|town|municipality)\b/i.test(desc.combined)) {
           valToSet = profile.city;
-        } else if (descriptor.includes('zip') || descriptor.includes('postal') || descriptor.includes('postcode')) {
-          valToSet = profile.zip;
-        } else if (descriptor.includes('state') || descriptor.includes('province') || descriptor.includes('region')) {
+        }
+        // STATE
+        else if (/\b(state|province|region)\b/i.test(desc.combined)) {
           valToSet = profile.state;
-        } else if (descriptor.includes('country')) {
+        }
+        // ZIP / POSTAL CODE
+        else if (/\b(zip[_\s-]?code|zip|postal[_\s-]?code|postcode)\b/i.test(desc.combined)) {
+          valToSet = profile.zip;
+        }
+        // COUNTRY
+        else if (/\b(country|nation)\b/i.test(desc.combined)) {
           valToSet = profile.country;
-        } else if (descriptor.includes('subject') || descriptor.includes('topic') || descriptor.includes('regarding') || descriptor.includes('inquiry')) {
+        }
+        // REFERRAL / "HOW DID YOU HEAR ABOUT US"
+        else if (/\b(hear[_\s-]?about|referral|found[_\s-]?us|how[_\s-]?did[_\s-]?you)\b/i.test(desc.combined)) {
+          valToSet = 'Online Search / Directory';
+        }
+        // SUBJECT / REASON FOR INQUIRY
+        else if (/\b(subject|regarding|topic|inquiry[_\s-]?type|reason)\b/i.test(desc.combined)) {
           valToSet = profile.subject;
-        } else if (input.tagName.toLowerCase() === 'textarea' || descriptor.includes('message') || descriptor.includes('comment') || descriptor.includes('detail') || descriptor.includes('notes') || descriptor.includes('body')) {
+        }
+        // MESSAGE / TEXTAREA
+        else if (tag === 'textarea' || /\b(message|comment|detail|how[_\s-]?can[_\s-]?we[_\s-]?help|inquiry|body|note|request)\b/i.test(desc.combined)) {
           valToSet = dynamicMessage;
         }
 
-        if (valToSet) {
-          input.value = valToSet;
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
+        if (valToSet !== null && valToSet !== undefined) {
+          setInputValue(input, valToSet);
           filledCount++;
-          filledDetails.push({ field: descriptor.substring(0, 25), set: valToSet.length > 40 ? valToSet.substring(0, 37) + '...' : valToSet });
+          filledDetails.push({ field: desc.name || desc.id || desc.type, set: valToSet.length > 40 ? valToSet.substring(0, 37) + '...' : valToSet });
         }
       }
 
-      return { filled: filledCount >= 2, count: filledCount, details: filledDetails };
-    }, currentProfile, lead);
+      // 7. Pre-Submit Self-Healing Validation Sweep
+      for (const input of eligibleInputs) {
+        const isRequired = input.required || input.hasAttribute('required') || input.getAttribute('aria-required') === 'true';
+        const isValid = typeof input.checkValidity === 'function' ? input.checkValidity() : true;
 
+        if (isRequired && (!isValid || !input.value || input.value.trim() === '')) {
+          const desc = getInputDescriptor(input);
+          const tag = input.tagName.toLowerCase();
+
+          if (tag === 'select') {
+            const validOpt = Array.from(input.options).find(o => o.value && o.value !== '' && !o.disabled);
+            if (validOpt) {
+              input.value = validOpt.value;
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+              filledCount++;
+              filledDetails.push({ field: desc.name || desc.id, set: validOpt.text });
+            }
+          } else if (desc.type === 'checkbox' || desc.type === 'radio') {
+            input.checked = true;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            filledCount++;
+            filledDetails.push({ field: desc.name || desc.id, set: '[CHECKED]' });
+          } else if (desc.type === 'number') {
+            setInputValue(input, '1');
+            filledCount++;
+            filledDetails.push({ field: desc.name || desc.id, set: '1' });
+          } else if (desc.combined.includes('email')) {
+            setInputValue(input, profile.email);
+            filledCount++;
+            filledDetails.push({ field: desc.name || desc.id, set: profile.email });
+          } else if (desc.combined.includes('phone') || desc.combined.includes('tel')) {
+            const p = normalizePhone(input, desc, profile.phone);
+            setInputValue(input, p);
+            filledCount++;
+            filledDetails.push({ field: desc.name || desc.id, set: p });
+          } else {
+            setInputValue(input, profile.subject || 'Commercial Collaboration Inquiry');
+            filledCount++;
+            filledDetails.push({ field: desc.name || desc.id, set: profile.subject });
+          }
+        }
+      }
+
+      return {
+        filled: filledCount >= 2,
+        count: filledCount,
+        details: filledDetails,
+        targetFormId: targetForm?.id || targetForm?.className || null
+      };
+    }, currentProfile, lead);
 
     if (!formFilled.filled) {
       const shot = await captureFailureScreenshot(page, lead.id);
@@ -629,26 +900,42 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
     // Resolve form security again right before clicking submit
     await handleFormSecurity(page);
 
-    // Submit form
+    // Submit form (Targeted submit button inside active form container)
     const initUrl = page.url();
-    await page.evaluate(() => {
-      const submitKeywords = ['submit', 'send message', 'send inquiry', 'send request', 'send', 'request quote', 'get a quote'];
-      const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], a.btn, a.button'));
-      for (const btn of buttons) {
-        const text = (btn.innerText || btn.value || '').toLowerCase().trim();
-        const type = (btn.getAttribute('type') || '').toLowerCase();
-        if (type === 'submit' || submitKeywords.some(k => text === k || text.includes(k))) {
-          btn.scrollIntoView({ behavior: 'instant', block: 'center' });
-          btn.click();
-          return;
-        }
+    await page.evaluate((targetFormId) => {
+      let form = null;
+      if (targetFormId) {
+        form = document.getElementById(targetFormId) || document.querySelector(`form.${CSS.escape(targetFormId)}`) || document.querySelector(`.${CSS.escape(targetFormId)}`);
       }
-      const form = document.querySelector('form');
+      const scope = form || document;
+
+      // 1. Look for submit button inside active form scope
+      const submitBtn = scope.querySelector('button[type="submit"], input[type="submit"]') ||
+                        Array.from(scope.querySelectorAll('button, a.btn, a.button, input[type="button"]')).find(b => {
+                          const t = (b.innerText || b.value || '').toLowerCase().trim();
+                          return t.includes('submit') || t.includes('send') || t.includes('request') || t.includes('inquire') || t.includes('contact');
+                        });
+
+      if (submitBtn) {
+        submitBtn.scrollIntoView({ behavior: 'instant', block: 'center' });
+        submitBtn.focus();
+        submitBtn.click();
+        return;
+      }
+
+      // 2. Direct form programmatic submit
       if (form) {
         if (typeof form.requestSubmit === 'function') form.requestSubmit();
         else form.submit();
+        return;
       }
-    });
+
+      const anyForm = document.querySelector('form');
+      if (anyForm) {
+        if (typeof anyForm.requestSubmit === 'function') anyForm.requestSubmit();
+        else anyForm.submit();
+      }
+    }, formFilled.targetFormId);
 
     // Dynamic verification poller for slow connections (polls up to 15 seconds)
     let isSuccess = false;
@@ -677,6 +964,23 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
       }
       if (isSuccess) break;
 
+      // Check dedicated confirmation containers (WPForms, Elementor, Gravity Forms)
+      const containerSuccess = await page.evaluate(() => {
+        const confContainers = document.querySelectorAll('.wpforms-confirmation-container, .elementor-message-success, .gforms_confirmation_message, .frm_message');
+        for (const c of confContainers) {
+          if (c.offsetWidth > 0 && c.offsetHeight > 0 && c.innerText.trim().length > 5) {
+            return c.innerText.trim().slice(0, 100);
+          }
+        }
+        return null;
+      }).catch(() => null);
+
+      if (containerSuccess) {
+        isSuccess = true;
+        confirmationPhrase = containerSuccess;
+        break;
+      }
+
       // Check if form disappeared or was replaced with confirmation message
       const formStillExists = await page.evaluate(() => Boolean(document.querySelector('form, input[type="submit"], button[type="submit"]'))).catch(() => true);
       if (!formStillExists && bodyText.length > 20) {
@@ -701,11 +1005,26 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
       await safeClose(page);
       return { id: lead.id, company: lead.company_name, status: 'contacted', time: elapsed, result: `Confirmed: ${confirmationPhrase}` };
     } else {
-      console.log(`[${agentName}] ⚠️ #${lead.id} Unconfirmed (${elapsed}s)`);
+      // Check for explicit error messages on the page
+      const explicitError = await page.evaluate((errSignals) => {
+        const errorEls = Array.from(document.querySelectorAll('.error, .alert, .wpforms-error, .elementor-message-danger, .gform_validation_errors, .frm_error_style, [role="alert"]'));
+        for (const el of errorEls) {
+          const t = (el.innerText || '').trim();
+          if (t.length > 5 && t.length < 200) return t;
+        }
+        const body = (document.body ? document.body.innerText.toLowerCase() : '');
+        for (const sig of errSignals) {
+          if (body.includes(sig)) return `Page notice: "${sig}"`;
+        }
+        return null;
+      }, ERROR_SIGNALS).catch(() => null);
+
+      const failureNote = explicitError ? `Submission rejected: ${explicitError}` : 'Unconfirmed post-submission';
+      console.log(`[${agentName}] ⚠️ #${lead.id} ${failureNote} (${elapsed}s)`);
       const shot = await captureFailureScreenshot(page, lead.id);
-      saveLeadResult(lead.id, 'form_submit_error', `Contact form: ${contactPageUrl} (Unconfirmed post-submission)`, isSandbox, 'Submission unconfirmed or rejected', shot);
+      saveLeadResult(lead.id, 'form_submit_error', `Contact form: ${contactPageUrl} (${failureNote})`, isSandbox, explicitError || 'Submission unconfirmed or rejected', shot);
       await safeClose(page);
-      return { id: lead.id, company: lead.company_name, status: 'form_submit_error', time: elapsed, result: 'Unconfirmed post-submission' };
+      return { id: lead.id, company: lead.company_name, status: 'form_submit_error', time: elapsed, result: failureNote };
     }
 
   } catch (err) {
@@ -742,7 +1061,7 @@ async function runWorker() {
     } catch (_) {}
   }
 
-  const instProfile = path.join(os.tmpdir(), `leadmachine_w${workerId}_${Date.now()}`);
+  const instProfile = path.join(os.tmpdir(), `leadmachine_w${workerId}_${process.pid}_${Date.now()}_${Math.random().toString(36).slice(2)}`);
   fs.mkdirSync(instProfile, { recursive: true });
 
   let browser = await puppeteer.launch({

@@ -1,5 +1,6 @@
 import os from 'os';
 import EventEmitter from 'events';
+import { execSync } from 'child_process';
 
 /**
  * Autonomous System Resource Governor
@@ -20,7 +21,24 @@ export class SystemResourceGovernor extends EventEmitter {
    */
   getSnapshot() {
     const totalBytes = os.totalmem();
-    const freeBytes = os.freemem();
+    let freeBytes = os.freemem();
+
+    // On macOS / Darwin, os.freemem() only accounts for unallocated pages and excludes inactive + purgeable cache
+    if (process.platform === 'darwin') {
+      try {
+        const vmStat = execSync('vm_stat', { encoding: 'utf8' });
+        const pageSizeMatch = vmStat.match(/page size of (\d+) bytes/);
+        const pageSize = pageSizeMatch ? parseInt(pageSizeMatch[1], 10) : 16384;
+        const freePages = parseInt((vmStat.match(/Pages free:\s+(\d+)/) || [])[1] || '0', 10);
+        const inactivePages = parseInt((vmStat.match(/Pages inactive:\s+(\d+)/) || [])[1] || '0', 10);
+        const purgeablePages = parseInt((vmStat.match(/Pages purgeable:\s+(\d+)/) || [])[1] || '0', 10);
+        const darwinAvailableBytes = (freePages + inactivePages + purgeablePages) * pageSize;
+        if (darwinAvailableBytes > freeBytes) {
+          freeBytes = darwinAvailableBytes;
+        }
+      } catch (_) {}
+    }
+
     const totalMb = Math.round(totalBytes / (1024 * 1024));
     const freeMb = Math.round(freeBytes / (1024 * 1024));
     const usedMb = totalMb - freeMb;
