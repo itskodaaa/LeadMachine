@@ -218,7 +218,13 @@
                   <span class="active-subtitle" id="campaignStatusSub">Wave 1 in progress</span>
                 </div>
               </div>
-              <div class="timer-badge tabular" id="activeTimer">00:00</div>
+              <div class="active-head-right">
+                <span id="adaptiveConcurrencyBadge" class="adaptive-concurrency-badge optimal" title="Dynamic Worker Pool: Automatically scales browsers on the fly based on physical RAM headroom">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                  <span id="adaptiveConcurrencyText">Adaptive (RAM Safe)</span>
+                </span>
+                <div class="timer-badge tabular" id="activeTimer">00:00</div>
+              </div>
             </div>
 
             <!-- Waveform / Progress Bar -->
@@ -944,6 +950,38 @@ I am reaching out to express our interest in your services and would appreciate 
               </label>
             </div>
           </div>
+
+          <!-- Stored Failure Screenshots Gallery & Disk Manager -->
+          <div id="debugScreenshotsContainer" class="debug-screenshots-container">
+            <div class="screenshots-subhead">
+              <div class="screenshots-subhead-info">
+                <span class="screenshots-subhead-title">Stored Failure Screenshots</span>
+                <span class="screenshots-subhead-badge" id="screenshotsStorageBadge">0 captures • 0 KB</span>
+              </div>
+              <div class="screenshots-subhead-actions">
+                <button type="button" id="refreshScreenshotsBtn" class="btn-action-small" title="Refresh screenshots list">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                  <span>Refresh</span>
+                </button>
+                <button type="button" id="purgeScreenshotsBtn" class="btn-action-small btn-danger-subtle" title="Delete all diagnostic screenshots to free disk space" disabled>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>
+                  <span>Delete All</span>
+                </button>
+              </div>
+            </div>
+
+            <div id="screenshotsGrid" class="screenshots-grid">
+              <div class="screenshots-empty-state">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+                <p>No failure screenshots recorded on this computer.</p>
+                <span>Screenshots are automatically captured only when Debug Mode is turned on.</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Engine Lifecycle & Power Management -->
@@ -1446,6 +1484,33 @@ I am reaching out to express our interest in your services and would appreciate 
       <div class="dock-actions">
         <button type="button" id="dockUpdateBtn" class="btn-dock-update">Update Now</button>
         <button type="button" id="dockOpenModalBtn" class="btn-dock-view">Details</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- SCREENSHOT LIGHTBOX PREVIEW MODAL -->
+  <!-- ========================================== -->
+  <div id="screenshotLightboxModal" class="screenshot-lightbox-modal" style="display: none;">
+    <div class="screenshot-lightbox-backdrop" id="screenshotLightboxBackdrop"></div>
+    <div class="screenshot-lightbox-content">
+      <div class="screenshot-lightbox-header">
+        <div class="screenshot-lightbox-info">
+          <span class="screenshot-lightbox-title" id="lightboxTitle">Screenshot Preview</span>
+          <span class="screenshot-lightbox-sub" id="lightboxMeta"></span>
+        </div>
+        <div class="screenshot-lightbox-actions">
+          <a id="lightboxOpenNewTabBtn" href="#" target="_blank" class="btn-action-small" title="Open full resolution in new tab">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>
+            <span>Full Res</span>
+          </a>
+          <button type="button" id="lightboxCloseBtn" class="lightbox-close-btn" title="Close preview">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+      </div>
+      <div class="screenshot-lightbox-img-wrap">
+        <img id="lightboxImg" src="" alt="Failure diagnostic capture">
       </div>
     </div>
   </div>

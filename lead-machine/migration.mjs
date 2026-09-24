@@ -315,7 +315,7 @@ export function startFreshWorkspace() {
         autoUpdate: true,
         updateChannel: "stable",
         lastUpdated: new Date().toISOString(),
-        debugMode: true
+        debugMode: false
       },
       license: {
         key: null,

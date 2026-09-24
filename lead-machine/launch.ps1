@@ -50,6 +50,7 @@ $requiredCoreFiles = @(
     "lead-machine\auth.mjs",
     "lead-machine\hunter.mjs",
     "lead-machine\orchestrator.mjs",
+    "lead-machine\resource_governor.mjs",
     "lead-machine\worker.mjs",
     "lead-machine\extractor_sync.mjs",
     "lead-machine\reachability.mjs",

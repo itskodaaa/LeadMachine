@@ -7,6 +7,7 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import { leadHunter } from './hunter.mjs';
 import { migrateDatabase, applyPerformancePragmas } from './db_migration.mjs';
+import { resourceGovernor } from './resource_governor.mjs';
 
 import { getDbPath, getConfigPath } from './paths.mjs';
 
@@ -22,7 +23,10 @@ export class CampaignOrchestrator extends EventEmitter {
     this.contactedTotal = 0;
     this.unableTotal = 0;
     this.currentWave = 0;
-    this.numWorkers = 8;
+    this.numWorkers = 6;
+    this.configuredWorkers = 6;
+    this.targetWorkers = 4;
+    this.lastReportedTargetWorkers = null;
     this.isSandbox = false;
     this.isHeaded = false;
     this.startTime = null;
@@ -139,6 +143,8 @@ export class CampaignOrchestrator extends EventEmitter {
       db.close();
     } catch (_) {}
 
+    const gov = resourceGovernor.evaluateConcurrency(this.configuredWorkers || this.numWorkers || 6);
+
     return {
       status: this.status,
       targetTotal: this.targetTotal,
@@ -146,7 +152,21 @@ export class CampaignOrchestrator extends EventEmitter {
       contactedTotal: this.contactedTotal,
       unableTotal: this.unableTotal,
       currentWave: this.currentWave,
-      numWorkers: this.numWorkers,
+      numWorkers: Math.max(1, this.activeChildren.size || this.targetWorkers || this.numWorkers),
+      configuredWorkers: this.configuredWorkers || this.numWorkers,
+      adaptiveConcurrency: {
+        enabled: true,
+        activeWorkers: this.activeChildren.size,
+        targetWorkers: gov.targetWorkers,
+        configuredWorkers: this.configuredWorkers || this.numWorkers,
+        freeMb: gov.freeMb,
+        totalMb: gov.totalMb,
+        usagePct: gov.usagePct,
+        loadPerCore: gov.loadPerCore,
+        safetyBufferMb: gov.safetyBufferMb,
+        pressureLevel: gov.pressureLevel,
+        reason: gov.reason
+      },
       isSandbox: this.isSandbox,
       progressPercent,
       conversionRate,
@@ -202,7 +222,11 @@ export class CampaignOrchestrator extends EventEmitter {
     this.unableTotal = 0;
     this.currentWave = 0;
     this.isHeaded = Boolean(isHeaded);
-    this.numWorkers = this.isHeaded ? Math.min(2, Math.max(1, numWorkers)) : Math.max(1, Math.min(16, numWorkers));
+    this.configuredWorkers = this.isHeaded ? Math.min(2, Math.max(1, numWorkers)) : Math.max(1, Math.min(16, numWorkers));
+    const initialGov = resourceGovernor.evaluateConcurrency(this.configuredWorkers);
+    this.targetWorkers = initialGov.targetWorkers;
+    this.numWorkers = this.targetWorkers;
+    this.lastReportedTargetWorkers = this.targetWorkers;
     this.isSandbox = Boolean(isSandbox);
     this.startTime = Date.now();
     this.shouldStop = false;
@@ -211,7 +235,7 @@ export class CampaignOrchestrator extends EventEmitter {
 
     this.recordEvent({
       type: 'campaign_started',
-      message: `Campaign started for ${this.targetTotal} leads with ${this.numWorkers} workers (sandbox=${this.isSandbox}, headed=${this.isHeaded})`
+      message: `Campaign started for ${this.targetTotal} leads (Adaptive Governor: cap ${this.configuredWorkers}, initial ${this.targetWorkers} workers based on ${initialGov.freeMb}MB free RAM)`
     });
 
     // Check available uncontacted leads vs target volume
@@ -269,8 +293,7 @@ export class CampaignOrchestrator extends EventEmitter {
   }
 
   async runLoop(stateFilter, category) {
-    const BATCH_PER_WORKER = 10;
-    const WAVE_SIZE = this.numWorkers * BATCH_PER_WORKER;
+    const MICRO_BATCH_SIZE = 3; // Agile micro-batches release memory to OS continuously
 
     while (this.processedTotal < this.targetTotal && !this.shouldStop) {
       if (this.isPaused) {
@@ -280,6 +303,11 @@ export class CampaignOrchestrator extends EventEmitter {
 
       this.currentWave++;
       const needed = this.targetTotal - this.processedTotal;
+
+      // Evaluate system resource governor before starting wave
+      const gov = resourceGovernor.evaluateConcurrency(this.configuredWorkers);
+      this.targetWorkers = gov.targetWorkers;
+      const WAVE_SIZE = Math.max(MICRO_BATCH_SIZE, this.targetWorkers * MICRO_BATCH_SIZE * 2);
       const fetchLimit = Math.min(WAVE_SIZE, needed);
 
       const db = this.getDb();
@@ -339,77 +367,118 @@ export class CampaignOrchestrator extends EventEmitter {
         type: 'wave_started',
         wave: this.currentWave,
         leadsCount: leads.length,
-        message: `Starting Wave ${this.currentWave}: ${leads.length} leads across ${this.numWorkers} workers`
+        message: `Starting Wave ${this.currentWave}: ${leads.length} leads (Adaptive Concurrency Target: ${this.targetWorkers} browsers, ${gov.freeMb}MB free RAM)`
       });
 
       this.checkAndKillMail();
 
-      // Partition among workers
-      const numWorkersToUse = Math.min(this.numWorkers, Math.ceil(leads.length / BATCH_PER_WORKER));
-      const batchSize = Math.ceil(leads.length / numWorkersToUse);
-      const batches = [];
-      for (let i = 0; i < numWorkersToUse; i++) {
-        const b = leads.slice(i * batchSize, (i + 1) * batchSize);
-        if (b.length > 0) batches.push(b);
+      // Chunk wave into lean micro-batches
+      const queue = [];
+      for (let i = 0; i < leads.length; i += MICRO_BATCH_SIZE) {
+        queue.push(leads.slice(i, i + MICRO_BATCH_SIZE));
       }
 
-      const promises = batches.map((batch, idx) => {
-        const workerId = idx + 1;
-        const leadIds = batch.map(l => l.id).join(',');
-        const args = [path.join(__dirname, 'worker.mjs'), String(workerId), leadIds];
-        if (this.isSandbox) args.push('--sandbox');
-        if (this.isHeaded) args.push('--headed');
+      let workerSeq = 0;
+      const activeWorkerPromises = new Map();
 
-        return new Promise((resolve) => {
-          const child = spawn(process.execPath, args, {
-            stdio: ['ignore', 'pipe', 'pipe']
+      // Dynamic worker pool: adapts worker concurrency on the fly
+      while ((queue.length > 0 || activeWorkerPromises.size > 0) && !this.shouldStop) {
+        if (this.isPaused) {
+          await new Promise(r => setTimeout(r, 1000));
+          continue;
+        }
+
+        // Real-time resource evaluation on every dispatch
+        const liveGov = resourceGovernor.evaluateConcurrency(this.configuredWorkers);
+        this.targetWorkers = liveGov.targetWorkers;
+        this.numWorkers = Math.max(1, activeWorkerPromises.size || this.targetWorkers);
+
+        if (this.lastReportedTargetWorkers !== liveGov.targetWorkers) {
+          this.recordEvent({
+            type: 'concurrency_scaled',
+            activeWorkers: activeWorkerPromises.size,
+            targetWorkers: liveGov.targetWorkers,
+            freeMb: liveGov.freeMb,
+            pressureLevel: liveGov.pressureLevel,
+            reason: liveGov.reason,
+            message: `⚡ Adaptive Governor: Concurrency adjusted to ${liveGov.targetWorkers} browser(s) (${liveGov.freeMb}MB free RAM). ${liveGov.reason}`
           });
-          this.activeChildren.add(child);
+          this.lastReportedTargetWorkers = liveGov.targetWorkers;
+        }
 
-          child.stderr.on('data', (d) => {
-            const str = d.toString().trim();
-            if (str) {
-              console.error(`[Worker ${workerId} STDERR]`, str);
-            }
-          });
+        // Spawn workers up to live targetWorkers ceiling
+        while (activeWorkerPromises.size < this.targetWorkers && queue.length > 0 && !this.shouldStop) {
+          const batch = queue.shift();
+          workerSeq++;
+          const currentSeq = workerSeq;
+          const workerId = (currentSeq % 16) + 1;
+          const leadIds = batch.map(l => l.id).join(',');
+          const args = [path.join(__dirname, 'worker.mjs'), String(workerId), leadIds];
+          if (this.isSandbox) args.push('--sandbox');
+          if (this.isHeaded) args.push('--headed');
 
-          child.stdout.on('data', (d) => {
-            const lines = d.toString().split('\n');
-            for (const line of lines) {
-              if (line.startsWith('EVENT_LEAD_RESULT:')) {
-                try {
-                  const res = JSON.parse(line.substring('EVENT_LEAD_RESULT:'.length));
-                  this.processedTotal++;
-                  if (res.status === 'contacted') this.contactedTotal++;
-                  else this.unableTotal++;
+          const workerPromise = new Promise((resolve) => {
+            const child = spawn(process.execPath, args, {
+              stdio: ['ignore', 'pipe', 'pipe']
+            });
+            this.activeChildren.add(child);
 
-                  this.recordEvent({
-                    type: 'lead_result',
-                    leadId: res.id,
-                    company: res.company,
-                    status: res.status,
-                    result: res.result,
-                    time: res.time || '10.0'
-                  });
-                } catch (_) {}
+            child.stderr.on('data', (d) => {
+              const str = d.toString().trim();
+              if (str) console.error(`[Worker ${workerId} STDERR]`, str);
+            });
+
+            child.stdout.on('data', (d) => {
+              const lines = d.toString().split('\n');
+              for (const line of lines) {
+                if (line.startsWith('EVENT_LEAD_RESULT:')) {
+                  try {
+                    const res = JSON.parse(line.substring('EVENT_LEAD_RESULT:'.length));
+                    this.processedTotal++;
+                    if (res.status === 'contacted') this.contactedTotal++;
+                    else this.unableTotal++;
+
+                    this.recordEvent({
+                      type: 'lead_result',
+                      leadId: res.id,
+                      company: res.company,
+                      status: res.status,
+                      result: res.result,
+                      time: res.time || '10.0'
+                    });
+                  } catch (_) {}
+                }
               }
-            }
+            });
+
+            child.on('close', (code) => {
+              this.activeChildren.delete(child);
+              activeWorkerPromises.delete(currentSeq);
+              resolve({ workerId, code });
+            });
+
+            child.on('error', (err) => {
+              console.error(`[Worker ${workerId} ERROR]`, err);
+              this.activeChildren.delete(child);
+              activeWorkerPromises.delete(currentSeq);
+              resolve({ workerId, code: 1 });
+            });
           });
 
-          child.on('close', (code) => {
-            this.activeChildren.delete(child);
-            resolve({ workerId, code });
-          });
+          activeWorkerPromises.set(currentSeq, workerPromise);
+        }
 
-          child.on('error', (err) => {
-            console.error(`[Worker ${workerId} ERROR]`, err);
-            this.activeChildren.delete(child);
-            resolve({ workerId, code: 1 });
-          });
-        });
-      });
+        // Wait for at least one worker to finish if at ceiling or queue drained
+        if (activeWorkerPromises.size >= this.targetWorkers || (queue.length === 0 && activeWorkerPromises.size > 0)) {
+          await Promise.race(activeWorkerPromises.values());
+        }
 
-      await Promise.all(promises);
+        // Clean temp profiles periodically to free disk/RAM immediately
+        this.cleanTempProfiles();
+
+        // Brief yield
+        await new Promise(r => setTimeout(r, 100));
+      }
 
       this.checkAndKillMail();
       this.cleanTempProfiles();
@@ -421,7 +490,7 @@ export class CampaignOrchestrator extends EventEmitter {
       });
 
       if (this.processedTotal < this.targetTotal && !this.shouldStop) {
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise(r => setTimeout(r, 1500));
       }
     }
 

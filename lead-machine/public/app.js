@@ -140,6 +140,26 @@ const screenshotMetaLink = document.getElementById('screenshotMetaLink');
 
 const debugModeToggle = document.getElementById('debugModeToggle');
 
+// Adaptive Concurrency Badge DOM
+const adaptiveConcurrencyBadge = document.getElementById('adaptiveConcurrencyBadge');
+const adaptiveConcurrencyText = document.getElementById('adaptiveConcurrencyText');
+
+// Debug Screenshots Storage Manager DOM
+const debugScreenshotsContainer = document.getElementById('debugScreenshotsContainer');
+const screenshotsStorageBadge = document.getElementById('screenshotsStorageBadge');
+const refreshScreenshotsBtn = document.getElementById('refreshScreenshotsBtn');
+const purgeScreenshotsBtn = document.getElementById('purgeScreenshotsBtn');
+const screenshotsGrid = document.getElementById('screenshotsGrid');
+
+// Screenshot Lightbox Modal DOM
+const screenshotLightboxModal = document.getElementById('screenshotLightboxModal');
+const screenshotLightboxBackdrop = document.getElementById('screenshotLightboxBackdrop');
+const lightboxTitle = document.getElementById('lightboxTitle');
+const lightboxMeta = document.getElementById('lightboxMeta');
+const lightboxOpenNewTabBtn = document.getElementById('lightboxOpenNewTabBtn');
+const lightboxCloseBtn = document.getElementById('lightboxCloseBtn');
+const lightboxImg = document.getElementById('lightboxImg');
+
 
 // Corporate Profile DOM
 const pFullName = document.getElementById('pFullName');
@@ -934,6 +954,7 @@ function setupNavigation() {
           loadLeadsTable();
         }
       } else if (targetId === 'tab-settings') {
+        loadDebugScreenshots();
         if (now - lastDiagnosticsFetchTime > 15000) {
           lastDiagnosticsFetchTime = now;
           checkAuthStatus();
@@ -992,6 +1013,7 @@ async function loadInitialSpecs() {
     if (systemSpecs.settings && debugModeToggle) {
       debugModeToggle.checked = Boolean(systemSpecs.settings.debugMode);
     }
+    loadDebugScreenshots();
 
   } catch (err) {
     console.error('Specs loading failed:', err);
@@ -1235,6 +1257,8 @@ function handleTelemetryEvent(event) {
       hunterProgressFill.style.width = finalPct + '%';
     }
     loadInitialSpecs();
+  } else if (event.type === 'concurrency_scaled') {
+    updateAdaptiveConcurrencyUI(event);
   } else if (event.type === 'campaign_finished') {
     setCampaignRunningUI(false);
     addFeedItem('DONE', 'Campaign Finished', 'Complete', 'success');
@@ -1355,6 +1379,11 @@ function applyCampaignState(state) {
   } else if (state.status === 'completed') {
     setCampaignRunningUI(false);
     feedBadge.textContent = 'Finished';
+  }
+
+  // Dynamic adaptive concurrency metrics
+  if (state.adaptiveConcurrency) {
+    updateAdaptiveConcurrencyUI(state.adaptiveConcurrency);
   }
 
   // Progress Bar
@@ -2290,6 +2319,170 @@ function insertAtCursor(textarea, text) {
 }
 
 // ==========================================================================
+// Dynamic Adaptive Concurrency & Resource Governor UI
+// ==========================================================================
+function updateAdaptiveConcurrencyUI(data) {
+  if (!adaptiveConcurrencyBadge || !adaptiveConcurrencyText || !data) return;
+
+  const pressure = data.pressure || 'optimal';
+  const activeWorkers = data.activeWorkers !== undefined ? data.activeWorkers : (data.allocatedWorkers || data.numWorkers || 1);
+  const configured = data.configuredWorkers || (workerSlider ? workerSlider.value : 5);
+  const freeMem = data.freeMemMb !== undefined ? `${data.freeMemMb}MB Free` : '';
+
+  adaptiveConcurrencyBadge.className = `adaptive-concurrency-badge ${pressure}`;
+
+  if (pressure === 'critical') {
+    adaptiveConcurrencyText.textContent = `Safe Mode (${activeWorkers} Worker · Low RAM)`;
+    adaptiveConcurrencyBadge.title = `RAM Pressure Critical (${freeMem}): Restricting to 1 browser to protect host OS and avoid swap freezing.`;
+  } else if (pressure === 'moderate') {
+    adaptiveConcurrencyText.textContent = `Throttled (${activeWorkers}/${configured} Workers)`;
+    adaptiveConcurrencyBadge.title = `RAM Headroom Moderate (${freeMem}): Dynamically throttling browsers to maintain safe OS memory headroom.`;
+  } else {
+    adaptiveConcurrencyText.textContent = `Adaptive (${activeWorkers} Worker${activeWorkers > 1 ? 's' : ''})`;
+    adaptiveConcurrencyBadge.title = `RAM Optimal (${freeMem}): System memory headroom is healthy. Dynamic pool scaling automatically.`;
+  }
+}
+
+// ==========================================================================
+// Failure Diagnostics & Stored Screenshots Manager
+// ==========================================================================
+let currentScreenshots = [];
+
+async function loadDebugScreenshots() {
+  if (!screenshotsGrid) return;
+  try {
+    const res = await fetch('/api/debug/screenshots');
+    if (!res.ok) return;
+    const data = await res.json();
+    currentScreenshots = data.screenshots || [];
+    renderDebugScreenshots(data);
+  } catch (err) {
+    console.error('Failed to load debug screenshots:', err);
+  }
+}
+
+function renderDebugScreenshots(data) {
+  if (!screenshotsGrid) return;
+
+  const count = data.count || 0;
+  const sizeFormatted = data.totalSizeFormatted || '0 B';
+
+  if (screenshotsStorageBadge) {
+    screenshotsStorageBadge.textContent = `${count} capture${count === 1 ? '' : 's'} • ${sizeFormatted}`;
+  }
+
+  if (purgeScreenshotsBtn) {
+    purgeScreenshotsBtn.disabled = count === 0;
+  }
+
+  if (count === 0) {
+    screenshotsGrid.innerHTML = `
+      <div class="screenshots-empty-state">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <polyline points="21 15 16 10 5 21"/>
+        </svg>
+        <p>No failure screenshots recorded on this computer.</p>
+        <span>Screenshots are automatically captured only when Debug Mode is turned on.</span>
+      </div>
+    `;
+    return;
+  }
+
+  screenshotsGrid.innerHTML = '';
+  (data.screenshots || []).forEach(shot => {
+    const card = document.createElement('div');
+    card.className = 'screenshot-card';
+
+    const displayName = shot.leadCompany || shot.filename;
+    const displayReason = shot.leadReason || 'Form Error';
+    const displayMeta = `${shot.sizeFormatted} • ${shot.timeFormatted || ''}`;
+
+    card.innerHTML = `
+      <div class="screenshot-thumb-wrap" data-url="${shot.url}" data-title="${escapeHtml(displayName)}" data-meta="${escapeHtml(displayMeta)}" data-reason="${escapeHtml(displayReason)}">
+        <img src="${shot.url}" alt="${escapeHtml(displayName)}" loading="lazy" />
+        <div class="screenshot-thumb-overlay">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          <span>View</span>
+        </div>
+      </div>
+      <div class="screenshot-card-meta">
+        <span class="screenshot-card-title" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</span>
+        <div class="screenshot-card-sub">
+          <span>${escapeHtml(displayReason)}</span>
+          <span>${shot.sizeFormatted}</span>
+        </div>
+      </div>
+      <div class="screenshot-card-actions">
+        <button type="button" class="btn-card-del" data-filename="${shot.filename}" title="Delete this screenshot">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>
+          <span>Delete</span>
+        </button>
+      </div>
+    `;
+
+    screenshotsGrid.appendChild(card);
+  });
+}
+
+function openScreenshotLightbox(url, title, meta) {
+  if (!screenshotLightboxModal) return;
+  if (lightboxImg) lightboxImg.src = url;
+  if (lightboxTitle) lightboxTitle.textContent = title || 'Screenshot Preview';
+  if (lightboxMeta) lightboxMeta.textContent = meta || '';
+  if (lightboxOpenNewTabBtn) lightboxOpenNewTabBtn.href = url;
+  screenshotLightboxModal.style.display = 'flex';
+}
+
+function closeScreenshotLightbox() {
+  if (!screenshotLightboxModal) return;
+  screenshotLightboxModal.style.display = 'none';
+  if (lightboxImg) lightboxImg.src = '';
+}
+
+async function deleteDebugScreenshot(filename) {
+  if (!filename) return;
+  try {
+    const res = await fetch(`/api/debug/screenshot/${encodeURIComponent(filename)}`, {
+      method: 'DELETE'
+    });
+    if (res.ok) {
+      loadDebugScreenshots();
+    }
+  } catch (err) {
+    console.error('Failed to delete screenshot:', err);
+  }
+}
+
+async function purgeAllDebugScreenshots() {
+  if (!confirm('Are you sure you want to delete all diagnostic failure screenshots? This will free disk space immediately.')) {
+    return;
+  }
+  try {
+    if (purgeScreenshotsBtn) {
+      purgeScreenshotsBtn.disabled = true;
+      purgeScreenshotsBtn.textContent = 'Deleting...';
+    }
+    const res = await fetch('/api/debug/screenshots', {
+      method: 'DELETE'
+    });
+    if (res.ok) {
+      await loadDebugScreenshots();
+    }
+  } catch (err) {
+    console.error('Failed to purge screenshots:', err);
+  } finally {
+    if (purgeScreenshotsBtn) {
+      purgeScreenshotsBtn.innerHTML = `
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>
+        <span>Delete All</span>
+      `;
+    }
+  }
+}
+
+// ==========================================================================
 // Settings & Updates Controller
 // ==========================================================================
 function setupSettingsHandlers() {
@@ -2321,11 +2514,57 @@ function setupSettingsHandlers() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ debugMode: debugModeToggle.checked })
         });
+        loadDebugScreenshots();
       } catch (err) {
         console.error('Failed to save debugMode:', err);
       }
     });
   }
+
+  if (refreshScreenshotsBtn) {
+    refreshScreenshotsBtn.addEventListener('click', () => {
+      loadDebugScreenshots();
+    });
+  }
+
+  if (purgeScreenshotsBtn) {
+    purgeScreenshotsBtn.addEventListener('click', () => {
+      purgeAllDebugScreenshots();
+    });
+  }
+
+  if (screenshotsGrid) {
+    screenshotsGrid.addEventListener('click', (e) => {
+      const delBtn = e.target.closest('.btn-card-del');
+      if (delBtn) {
+        const filename = delBtn.dataset.filename;
+        if (filename && confirm(`Delete screenshot "${filename}"?`)) {
+          deleteDebugScreenshot(filename);
+        }
+        return;
+      }
+
+      const thumbWrap = e.target.closest('.screenshot-thumb-wrap');
+      if (thumbWrap) {
+        const url = thumbWrap.dataset.url;
+        const title = thumbWrap.dataset.title;
+        const meta = thumbWrap.dataset.meta;
+        openScreenshotLightbox(url, title, meta);
+      }
+    });
+  }
+
+  if (lightboxCloseBtn) {
+    lightboxCloseBtn.addEventListener('click', closeScreenshotLightbox);
+  }
+  if (screenshotLightboxBackdrop) {
+    screenshotLightboxBackdrop.addEventListener('click', closeScreenshotLightbox);
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && screenshotLightboxModal && screenshotLightboxModal.style.display !== 'none') {
+      closeScreenshotLightbox();
+    }
+  });
 
   const ICON_REFRESH = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>';
   const ICON_SPIN = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>';

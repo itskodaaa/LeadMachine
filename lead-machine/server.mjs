@@ -13,6 +13,7 @@ import { leadHunter } from './hunter.mjs';
 import { parseRawWebsites, importWebsitesToDb, crawlDirectoryPage } from './url_importer.mjs';
 import { getConfigPath, getScreenshotsDir, getPortFilePath } from './paths.mjs';
 import { getMigrationStatus, claimLegacyData, startFreshWorkspace, getWorkspaceDiagnostics, recoverLegacyData } from './migration.mjs';
+import { resourceGovernor } from './resource_governor.mjs';
 
 // Prioritize IPv4 on virtualized / VM networks (fixes UTM/QEMU/Hyper-V IPv6 timeout)
 try {
@@ -172,31 +173,33 @@ function getSystemSpecs() {
   const totalMemGb = Number((totalMemBytes / (1024 ** 3)).toFixed(1));
   const freeMemGb = Number((freeMemBytes / (1024 ** 3)).toFixed(1));
 
-  // Recommendation logic:
-  // RAM is the primary constraint for headless Chromium (~200MB per worker)
-  let recommendedWorkers = 6;
+  // Recommendation logic powered by System Resource Governor
   let maxWorkers = 12;
   let hardwareTier = 'Standard';
 
   if (totalMemGb >= 16 && cpuCount >= 8) {
-    recommendedWorkers = 10;
     maxWorkers = 16;
     hardwareTier = 'High Performance';
   } else if (totalMemGb >= 8 && cpuCount >= 6) {
-    recommendedWorkers = 8;
     maxWorkers = 10;
     hardwareTier = 'Balanced';
   } else if (totalMemGb <= 4 || cpuCount <= 4) {
-    recommendedWorkers = 3;
     maxWorkers = 6;
-    hardwareTier = 'Lightweight';
+    hardwareTier = 'Lightweight (4GB)';
   }
+
+  const govSnap = resourceGovernor.getSnapshot();
+  const govEval = resourceGovernor.evaluateConcurrency(maxWorkers);
+  const recommendedWorkers = govEval.targetWorkers;
 
   let config = {};
   try {
     const cfgPath = getConfigPath();
     if (fs.existsSync(cfgPath)) config = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
   } catch (_) {}
+
+  const settings = config.settings || {};
+  if (settings.debugMode === undefined) settings.debugMode = false;
 
   const db = orchestrator.getDb();
   const counts = db.prepare(`
@@ -223,8 +226,16 @@ function getSystemSpecs() {
     hardwareTier,
     recommendedWorkers,
     maxWorkers,
+    resourceGovernor: {
+      freeMb: govSnap.freeMb,
+      totalMb: govSnap.totalMb,
+      safetyBufferMb: govSnap.safetyBufferMb,
+      pressureLevel: govEval.pressureLevel,
+      reason: govEval.reason,
+      targetWorkers: govEval.targetWorkers
+    },
     senderProfile: config.sender || null,
-    settings: config.settings || {},
+    settings,
     extractor: checkExtractorStatus(),
     dbStats: {
       notContacted,
@@ -587,7 +598,7 @@ const server = http.createServer(async (req, res) => {
     if (fs.existsSync(cfgPath)) {
       try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
     }
-    const currentVer = cfg.settings?.version || '2.5.0';
+    const currentVer = cfg.settings?.version || '2.5.1';
     const currentCommit = cfg.settings?.buildCommit || 'master';
     const repo = 'leadmachine-core/installer';
     const branch = 'main';
@@ -722,7 +733,7 @@ const server = http.createServer(async (req, res) => {
 
     try {
       let latestCommit = '';
-      let remoteVer = '2.5.0';
+      let remoteVer = '2.5.1';
 
       // 1. Resolve absolute latest HEAD of master branch (bypasses any intermediate commit)
       try {
@@ -986,6 +997,136 @@ const server = http.createServer(async (req, res) => {
         'Cache-Control': 'public, max-age=86400'
       });
       fs.createReadStream(shotPath).pipe(res);
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  // List Stored Debug Screenshots
+  if (pathname === '/api/debug/screenshots' && req.method === 'GET') {
+    try {
+      const shotsDir = getScreenshotsDir();
+      const files = fs.existsSync(shotsDir) ? fs.readdirSync(shotsDir).filter(f => f.endsWith('.png')) : [];
+      let totalBytes = 0;
+
+      const db = orchestrator.getDb();
+      const screenshots = files.map(file => {
+        const filePath = path.join(shotsDir, file);
+        let stat = { size: 0, mtime: new Date() };
+        try { stat = fs.statSync(filePath); } catch (_) {}
+        totalBytes += stat.size;
+
+        let leadId = null;
+        let company = null;
+        let website = null;
+        const match = file.match(/^lead_(\d+)_/);
+        if (match) {
+          leadId = parseInt(match[1], 10);
+          try {
+            const row = db.prepare('SELECT company_name, website FROM leads WHERE id = ?').get(leadId);
+            if (row) {
+              company = row.company_name;
+              website = row.website;
+            }
+          } catch (_) {}
+        }
+
+        const sizeKb = Number((stat.size / 1024).toFixed(1));
+        const sizeFormatted = sizeKb >= 1024 ? `${(sizeKb / 1024).toFixed(2)} MB` : `${sizeKb} KB`;
+
+        return {
+          filename: file,
+          leadId,
+          company,
+          website,
+          sizeBytes: stat.size,
+          sizeFormatted,
+          createdAt: stat.mtime ? stat.mtime.toISOString() : null,
+          url: `/api/debug/screenshot/${encodeURIComponent(file)}`
+        };
+      }).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+      db.close();
+
+      const totalKb = Number((totalBytes / 1024).toFixed(1));
+      const totalFormatted = totalKb >= 1024 ? `${(totalKb / 1024).toFixed(2)} MB` : `${totalKb} KB`;
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        count: screenshots.length,
+        totalBytes,
+        totalFormatted,
+        screenshots
+      }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  // Delete Individual Debug Screenshot
+  if (pathname.startsWith('/api/debug/screenshot/') && req.method === 'DELETE') {
+    const rawFile = pathname.replace('/api/debug/screenshot/', '');
+    const filename = path.basename(rawFile);
+    try {
+      const shotPath = path.join(getScreenshotsDir(), filename);
+      if (fs.existsSync(shotPath)) {
+        fs.unlinkSync(shotPath);
+      }
+      try {
+        const db = orchestrator.getDb();
+        db.prepare('UPDATE leads SET debug_screenshot = NULL WHERE debug_screenshot = ?').run(filename);
+        db.close();
+      } catch (_) {}
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, filename, message: 'Screenshot deleted successfully.' }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  // Purge All Debug Screenshots
+  if (pathname === '/api/debug/screenshots' && req.method === 'DELETE') {
+    try {
+      const shotsDir = getScreenshotsDir();
+      const files = fs.existsSync(shotsDir) ? fs.readdirSync(shotsDir).filter(f => f.endsWith('.png')) : [];
+      let freedBytes = 0;
+      let deletedCount = 0;
+
+      for (const file of files) {
+        try {
+          const filePath = path.join(shotsDir, file);
+          const stat = fs.statSync(filePath);
+          freedBytes += stat.size;
+          fs.unlinkSync(filePath);
+          deletedCount++;
+        } catch (_) {}
+      }
+
+      try {
+        const db = orchestrator.getDb();
+        db.prepare('UPDATE leads SET debug_screenshot = NULL WHERE debug_screenshot IS NOT NULL').run();
+        db.close();
+      } catch (_) {}
+
+      const freedKb = Number((freedBytes / 1024).toFixed(1));
+      const freedFormatted = freedKb >= 1024 ? `${(freedKb / 1024).toFixed(2)} MB` : `${freedKb} KB`;
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        deletedCount,
+        freedBytes,
+        freedFormatted,
+        message: `Purged ${deletedCount} diagnostic screenshots (${freedFormatted} freed).`
+      }));
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: err.message }));

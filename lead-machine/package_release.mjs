@@ -38,6 +38,7 @@ const lmFilesToCopy = [
   'paths.mjs',
   'migration.mjs',
   'orchestrator.mjs',
+  'resource_governor.mjs',
   'worker.mjs',
   'reachability.mjs',
   'hunter.mjs',
@@ -102,7 +103,7 @@ for (const f of launchers) {
 // Write streamlined, bloat-free package.json (fast npm install)
 const cleanPkg = {
   name: 'lead-machine',
-  version: '2.5.0',
+  version: '2.5.1',
   private: true,
   type: 'module',
   dependencies: {
