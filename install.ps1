@@ -22,7 +22,7 @@ $ErrorActionPreference = "Continue"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $APP_NAME = "Lead Machine"
-$APP_VERSION = "2.5.5"
+$APP_VERSION = "2.5.6"
 $TARGET_DIR = $TargetDir
 $REPO_URL = "https://github.com/$Repo"
 $ZIP_URL = "https://raw.githubusercontent.com/leadmachine-core/installer/main/leadmachine.zip"
