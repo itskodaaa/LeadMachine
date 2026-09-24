@@ -599,7 +599,7 @@ const server = http.createServer(async (req, res) => {
     if (fs.existsSync(cfgPath)) {
       try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
     }
-    const currentVer = cfg.settings?.version || '2.5.5';
+    const currentVer = cfg.settings?.version || '2.5.6';
     const currentCommit = cfg.settings?.buildCommit || 'master';
     const repo = 'leadmachine-core/installer';
     const branch = 'main';
@@ -691,13 +691,31 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    const isRemoteVerNewer = (rVer, cVer) => {
+      try {
+        const rParts = (rVer || '0').split('.').map(p => parseInt(p, 10) || 0);
+        const cParts = (cVer || '0').split('.').map(p => parseInt(p, 10) || 0);
+        for (let i = 0; i < Math.max(rParts.length, cParts.length); i++) {
+          const r = rParts[i] || 0;
+          const c = cParts[i] || 0;
+          if (r > c) return true;
+          if (r < c) return false;
+        }
+        return false;
+      } catch (_) {
+        return false;
+      }
+    };
+
     if (remoteShort) {
       if (currentCommit && remoteShort && !remoteCommit.startsWith(currentCommit) && !currentCommit.startsWith(remoteShort)) {
-        updateAvailable = true;
-      } else if (remoteVer !== currentVer) {
+        if (!isRemoteVerNewer(currentVer, remoteVer)) {
+          updateAvailable = true;
+        }
+      } else if (isRemoteVerNewer(remoteVer, currentVer)) {
         updateAvailable = true;
       }
-    } else if (remoteVer && remoteVer !== currentVer) {
+    } else if (isRemoteVerNewer(remoteVer, currentVer)) {
       updateAvailable = true;
     }
 

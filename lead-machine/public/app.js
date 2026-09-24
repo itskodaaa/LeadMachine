@@ -1268,6 +1268,20 @@ function handleTelemetryEvent(event) {
     addFeedItem('DONE', 'Campaign Finished', 'Complete', 'success');
     fetchStatusUpdate();
     loadInitialSpecs();
+  } else if (event.type === 'campaign_stopped') {
+    setCampaignRunningUI(false);
+    addFeedItem('STOP', 'Campaign Stopped', 'Stopped', 'muted');
+    fetchStatusUpdate();
+    loadInitialSpecs();
+  } else if (event.type === 'campaign_error') {
+    setCampaignRunningUI(false);
+    addFeedItem('ERR', 'Campaign Error', event.message || 'Error occurred', 'danger');
+    fetchStatusUpdate();
+    loadInitialSpecs();
+  } else if (event.type === 'campaign_paused') {
+    fetchStatusUpdate();
+  } else if (event.type === 'campaign_resumed') {
+    fetchStatusUpdate();
   } else if (event.type === 'server_shutdown') {
     renderShutdownOverlay();
   } else if (event.type === 'server_restarting') {
@@ -1383,6 +1397,12 @@ function applyCampaignState(state) {
   } else if (state.status === 'completed') {
     setCampaignRunningUI(false);
     feedBadge.textContent = 'Finished';
+  } else if (state.status === 'stopped') {
+    setCampaignRunningUI(false);
+    feedBadge.textContent = 'Stopped';
+  } else {
+    setCampaignRunningUI(false);
+    feedBadge.textContent = 'Idle';
   }
 
   // Dynamic adaptive concurrency metrics
@@ -2339,7 +2359,8 @@ function updateAdaptiveConcurrencyUI(data) {
   }
 
   const pressure = data.pressure || data.pressureLevel || 'optimal';
-  const activeWorkers = data.activeWorkers !== undefined ? data.activeWorkers : (data.allocatedWorkers || data.numWorkers || 1);
+  const targetWorkers = data.targetWorkers || data.allocatedWorkers || 1;
+  const activeWorkers = (data.activeWorkers !== undefined && data.activeWorkers > 0) ? data.activeWorkers : targetWorkers;
   const configured = data.configuredWorkers || (workerSlider ? workerSlider.value : 5);
   const freeMem = data.freeMemMb !== undefined ? `${data.freeMemMb}MB Free` : (data.freeMb !== undefined ? `${data.freeMb}MB Free` : '');
 

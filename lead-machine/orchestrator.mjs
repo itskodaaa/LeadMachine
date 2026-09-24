@@ -128,6 +128,14 @@ export class CampaignOrchestrator extends EventEmitter {
     this.emit('telemetry', event);
   }
 
+  emitTelemetry(type, data = {}) {
+    this.recordEvent({ type, ...data });
+  }
+
+  stop() {
+    this.stopCampaign();
+  }
+
   getStatus() {
     const elapsedSec = this.startTime ? (Date.now() - this.startTime) / 1000 : 0;
     const speed = elapsedSec > 5 ? Number(((this.processedTotal / elapsedSec) * 60).toFixed(1)) : 0;
@@ -436,21 +444,17 @@ export class CampaignOrchestrator extends EventEmitter {
           if (this.lastReportedTargetWorkers !== liveGov.targetWorkers) {
             this.recordEvent({
               type: 'concurrency_scaled',
-              activeWorkers: activeWorkerPromises.size,
-              targetWorkers: liveGov.targetWorkers,
-              freeMb: liveGov.freeMb,
-              pressureLevel: liveGov.pressureLevel,
-              reason: liveGov.reason,
-              message: `⚡ Adaptive Governor: Concurrency adjusted to ${liveGov.targetWorkers} browser(s) (${liveGov.freeMb}MB free RAM). ${liveGov.reason}`
-            });
-            this.emitTelemetry('concurrency_scaled', {
               enabled: true,
               activeWorkers: activeWorkerPromises.size,
               allocatedWorkers: liveGov.targetWorkers,
+              targetWorkers: liveGov.targetWorkers,
               configuredWorkers: this.configuredWorkers,
+              freeMb: liveGov.freeMb,
               freeMemMb: liveGov.freeMb,
               pressure: liveGov.pressureLevel,
-              reason: liveGov.reason
+              pressureLevel: liveGov.pressureLevel,
+              reason: liveGov.reason,
+              message: `⚡ Adaptive Governor: Concurrency adjusted to ${liveGov.targetWorkers} browser(s) (${liveGov.freeMb}MB free RAM). ${liveGov.reason}`
             });
             this.lastReportedTargetWorkers = liveGov.targetWorkers;
           }
@@ -471,10 +475,30 @@ export class CampaignOrchestrator extends EventEmitter {
           if (this.isHeaded) args.push('--headed');
 
           const workerPromise = new Promise((resolve) => {
+            let isResolved = false;
+            let watchdog = null;
+
+            const finish = (res) => {
+              if (isResolved) return;
+              isResolved = true;
+              if (watchdog) clearTimeout(watchdog);
+              this.activeChildren.delete(child);
+              activeWorkerPromises.delete(currentSeq);
+              resolve(res);
+            };
+
             const child = spawn(process.execPath, args, {
               stdio: ['ignore', 'pipe', 'pipe']
             });
             this.activeChildren.add(child);
+
+            // Hard watchdog: 75s per lead + 30s buffer, min 120s
+            const timeoutMs = Math.max(120000, batch.length * 75000 + 30000);
+            watchdog = setTimeout(() => {
+              console.warn(`[Orchestrator] Worker ${workerId} timed out after ${timeoutMs / 1000}s. Terminating child process...`);
+              try { child.kill('SIGKILL'); } catch (_) {}
+              finish({ workerId, code: 124, error: 'Watchdog timeout' });
+            }, timeoutMs);
 
             child.stderr.on('data', (d) => {
               const str = d.toString().trim();
@@ -505,16 +529,12 @@ export class CampaignOrchestrator extends EventEmitter {
             });
 
             child.on('close', (code) => {
-              this.activeChildren.delete(child);
-              activeWorkerPromises.delete(currentSeq);
-              resolve({ workerId, code });
+              finish({ workerId, code });
             });
 
             child.on('error', (err) => {
               console.error(`[Worker ${workerId} ERROR]`, err);
-              this.activeChildren.delete(child);
-              activeWorkerPromises.delete(currentSeq);
-              resolve({ workerId, code: 1 });
+              finish({ workerId, code: 1 });
             });
           });
 
@@ -574,7 +594,12 @@ export class CampaignOrchestrator extends EventEmitter {
     this.shouldStop = true;
     this.status = 'stopped';
     for (const child of this.activeChildren) {
-      try { child.kill('SIGTERM'); } catch (_) {}
+      try {
+        child.kill('SIGTERM');
+        setTimeout(() => {
+          try { child.kill('SIGKILL'); } catch (_) {}
+        }, 1500);
+      } catch (_) {}
     }
     this.activeChildren.clear();
     this.recordEvent({ type: 'campaign_stopped', message: 'Campaign stopped by user.' });
