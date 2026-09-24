@@ -139,6 +139,7 @@ const screenshotMetaReason = document.getElementById('screenshotMetaReason');
 const screenshotMetaLink = document.getElementById('screenshotMetaLink');
 
 const debugModeToggle = document.getElementById('debugModeToggle');
+const adaptiveModeToggle = document.getElementById('adaptiveModeToggle');
 
 // Adaptive Concurrency Badge DOM
 const adaptiveConcurrencyBadge = document.getElementById('adaptiveConcurrencyBadge');
@@ -1009,9 +1010,10 @@ async function loadInitialSpecs() {
       populateProfileForm(systemSpecs.senderProfile);
     }
 
-    // Debug Mode setting
-    if (systemSpecs.settings && debugModeToggle) {
-      debugModeToggle.checked = Boolean(systemSpecs.settings.debugMode);
+    // Settings
+    if (systemSpecs.settings) {
+      if (debugModeToggle) debugModeToggle.checked = Boolean(systemSpecs.settings.debugMode);
+      if (adaptiveModeToggle) adaptiveModeToggle.checked = systemSpecs.settings.adaptiveMode !== false;
     }
     loadDebugScreenshots();
 
@@ -1112,6 +1114,7 @@ function setupOutreachHandlers() {
     const stateFilter = regionSelect.value === 'all' ? null : regionSelect.value;
     const isSandbox = sandboxToggle ? sandboxToggle.checked : false;
     const isHeaded = headedToggle ? headedToggle.checked : false;
+    const isAdaptive = adaptiveModeToggle ? adaptiveModeToggle.checked : true;
     const workers = workerSlider ? parseInt(workerSlider.value, 10) : 8;
     const category = campaignCategory ? campaignCategory.value.trim() : 'Manufacturing';
 
@@ -1124,6 +1127,7 @@ function setupOutreachHandlers() {
           numWorkers: workers,
           isSandbox,
           isHeaded,
+          adaptiveMode: isAdaptive,
           stateFilter,
           category,
           autoScrape: true
@@ -2324,10 +2328,20 @@ function insertAtCursor(textarea, text) {
 function updateAdaptiveConcurrencyUI(data) {
   if (!adaptiveConcurrencyBadge || !adaptiveConcurrencyText || !data) return;
 
-  const pressure = data.pressure || 'optimal';
+  const isEnabled = data.enabled !== false;
+  if (!isEnabled) {
+    adaptiveConcurrencyBadge.className = 'adaptive-concurrency-badge manual';
+    const activeWorkers = data.activeWorkers !== undefined ? data.activeWorkers : (data.allocatedWorkers || data.numWorkers || 0);
+    const configured = data.configuredWorkers || (workerSlider ? workerSlider.value : 8);
+    adaptiveConcurrencyText.textContent = `Manual (${activeWorkers}/${configured} Workers)`;
+    adaptiveConcurrencyBadge.title = `Adaptive Mode disabled: Fixed ${configured} browser concurrency. Memory governor is paused.`;
+    return;
+  }
+
+  const pressure = data.pressure || data.pressureLevel || 'optimal';
   const activeWorkers = data.activeWorkers !== undefined ? data.activeWorkers : (data.allocatedWorkers || data.numWorkers || 1);
   const configured = data.configuredWorkers || (workerSlider ? workerSlider.value : 5);
-  const freeMem = data.freeMemMb !== undefined ? `${data.freeMemMb}MB Free` : '';
+  const freeMem = data.freeMemMb !== undefined ? `${data.freeMemMb}MB Free` : (data.freeMb !== undefined ? `${data.freeMb}MB Free` : '');
 
   adaptiveConcurrencyBadge.className = `adaptive-concurrency-badge ${pressure}`;
 
@@ -2503,6 +2517,21 @@ function setupSettingsHandlers() {
   if (workerSlider) {
     workerSlider.addEventListener('input', () => {
       workerSliderVal.textContent = `${workerSlider.value} Workers`;
+    });
+  }
+
+  if (adaptiveModeToggle) {
+    adaptiveModeToggle.addEventListener('change', async () => {
+      try {
+        await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adaptiveMode: adaptiveModeToggle.checked })
+        });
+        fetchStatusUpdate();
+      } catch (err) {
+        console.error('Failed to save adaptiveMode:', err);
+      }
     });
   }
 

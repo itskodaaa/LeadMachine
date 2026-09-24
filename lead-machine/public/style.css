@@ -3044,6 +3044,12 @@ body {
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
+.adaptive-concurrency-badge.manual {
+  background: rgba(148, 163, 184, 0.12);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
 /* Stored Screenshots Manager */
 .debug-screenshots-container {
   margin-top: 14px;

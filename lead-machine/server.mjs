@@ -200,6 +200,7 @@ function getSystemSpecs() {
 
   const settings = config.settings || {};
   if (settings.debugMode === undefined) settings.debugMode = false;
+  if (settings.adaptiveMode === undefined) settings.adaptiveMode = true;
 
   const db = orchestrator.getDb();
   const counts = db.prepare(`
@@ -598,7 +599,7 @@ const server = http.createServer(async (req, res) => {
     if (fs.existsSync(cfgPath)) {
       try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
     }
-    const currentVer = cfg.settings?.version || '2.5.1';
+    const currentVer = cfg.settings?.version || '2.5.2';
     const currentCommit = cfg.settings?.buildCommit || 'master';
     const repo = 'leadmachine-core/installer';
     const branch = 'main';
@@ -733,7 +734,7 @@ const server = http.createServer(async (req, res) => {
 
     try {
       let latestCommit = '';
-      let remoteVer = '2.5.1';
+      let remoteVer = '2.5.2';
 
       // 1. Resolve absolute latest HEAD of master branch (bypasses any intermediate commit)
       try {
@@ -1159,6 +1160,7 @@ const server = http.createServer(async (req, res) => {
         }
         if (!cfg.settings) cfg.settings = {};
         if (payload.debugMode !== undefined) cfg.settings.debugMode = Boolean(payload.debugMode);
+        if (payload.adaptiveMode !== undefined) cfg.settings.adaptiveMode = Boolean(payload.adaptiveMode);
         if (payload.defaultSpeedMode !== undefined) cfg.settings.defaultSpeedMode = payload.defaultSpeedMode;
         if (payload.sandboxMode !== undefined) cfg.settings.sandboxMode = Boolean(payload.sandboxMode);
         if (payload.concurrency !== undefined) cfg.settings.concurrency = Number(payload.concurrency);

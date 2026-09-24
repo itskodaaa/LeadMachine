@@ -143,6 +143,17 @@ export class CampaignOrchestrator extends EventEmitter {
       db.close();
     } catch (_) {}
 
+    let isAdaptive = this.adaptiveMode !== false;
+    if (this.status === 'idle') {
+      try {
+        const cfgPath = getConfigPath();
+        if (fs.existsSync(cfgPath)) {
+          const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+          if (cfg.settings?.adaptiveMode !== undefined) isAdaptive = Boolean(cfg.settings.adaptiveMode);
+        }
+      } catch (_) {}
+    }
+
     const gov = resourceGovernor.evaluateConcurrency(this.configuredWorkers || this.numWorkers || 6);
 
     return {
@@ -155,9 +166,9 @@ export class CampaignOrchestrator extends EventEmitter {
       numWorkers: Math.max(1, this.activeChildren.size || this.targetWorkers || this.numWorkers),
       configuredWorkers: this.configuredWorkers || this.numWorkers,
       adaptiveConcurrency: {
-        enabled: true,
+        enabled: isAdaptive,
         activeWorkers: this.activeChildren.size,
-        targetWorkers: gov.targetWorkers,
+        targetWorkers: isAdaptive ? gov.targetWorkers : (this.configuredWorkers || this.numWorkers),
         configuredWorkers: this.configuredWorkers || this.numWorkers,
         freeMb: gov.freeMb,
         totalMb: gov.totalMb,
@@ -165,7 +176,7 @@ export class CampaignOrchestrator extends EventEmitter {
         loadPerCore: gov.loadPerCore,
         safetyBufferMb: gov.safetyBufferMb,
         pressureLevel: gov.pressureLevel,
-        reason: gov.reason
+        reason: isAdaptive ? gov.reason : `Adaptive Mode disabled: Running at fixed concurrency (${this.configuredWorkers || this.numWorkers} workers).`
       },
       isSandbox: this.isSandbox,
       progressPercent,
@@ -194,7 +205,8 @@ export class CampaignOrchestrator extends EventEmitter {
       stateFilter = null,
       profile = null,
       category = 'Manufacturing',
-      autoScrape = true
+      autoScrape = true,
+      adaptiveMode = undefined
     } = options;
 
     if (isHeaded && targetLeads > 10) {
@@ -223,8 +235,27 @@ export class CampaignOrchestrator extends EventEmitter {
     this.currentWave = 0;
     this.isHeaded = Boolean(isHeaded);
     this.configuredWorkers = this.isHeaded ? Math.min(2, Math.max(1, numWorkers)) : Math.max(1, Math.min(16, numWorkers));
-    const initialGov = resourceGovernor.evaluateConcurrency(this.configuredWorkers);
-    this.targetWorkers = initialGov.targetWorkers;
+
+    let isAdaptive = true;
+    if (adaptiveMode !== undefined) {
+      isAdaptive = Boolean(adaptiveMode);
+    } else {
+      try {
+        const cfgPath = getConfigPath();
+        if (fs.existsSync(cfgPath)) {
+          const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+          if (cfg.settings?.adaptiveMode !== undefined) isAdaptive = Boolean(cfg.settings.adaptiveMode);
+        }
+      } catch (_) {}
+    }
+    this.adaptiveMode = isAdaptive;
+
+    if (this.adaptiveMode) {
+      const initialGov = resourceGovernor.evaluateConcurrency(this.configuredWorkers);
+      this.targetWorkers = initialGov.targetWorkers;
+    } else {
+      this.targetWorkers = this.configuredWorkers;
+    }
     this.numWorkers = this.targetWorkers;
     this.lastReportedTargetWorkers = this.targetWorkers;
     this.isSandbox = Boolean(isSandbox);
@@ -235,7 +266,9 @@ export class CampaignOrchestrator extends EventEmitter {
 
     this.recordEvent({
       type: 'campaign_started',
-      message: `Campaign started for ${this.targetTotal} leads (Adaptive Governor: cap ${this.configuredWorkers}, initial ${this.targetWorkers} workers based on ${initialGov.freeMb}MB free RAM)`
+      message: this.adaptiveMode 
+        ? `Campaign started for ${this.targetTotal} leads (Adaptive Governor: cap ${this.configuredWorkers}, initial ${this.targetWorkers} workers)`
+        : `Campaign started for ${this.targetTotal} leads (Fixed manual worker count: ${this.configuredWorkers} workers)`
     });
 
     // Check available uncontacted leads vs target volume
@@ -304,9 +337,13 @@ export class CampaignOrchestrator extends EventEmitter {
       this.currentWave++;
       const needed = this.targetTotal - this.processedTotal;
 
-      // Evaluate system resource governor before starting wave
-      const gov = resourceGovernor.evaluateConcurrency(this.configuredWorkers);
-      this.targetWorkers = gov.targetWorkers;
+      // Evaluate concurrency before starting wave
+      if (this.adaptiveMode) {
+        const gov = resourceGovernor.evaluateConcurrency(this.configuredWorkers);
+        this.targetWorkers = gov.targetWorkers;
+      } else {
+        this.targetWorkers = this.configuredWorkers;
+      }
       const WAVE_SIZE = Math.max(MICRO_BATCH_SIZE, this.targetWorkers * MICRO_BATCH_SIZE * 2);
       const fetchLimit = Math.min(WAVE_SIZE, needed);
 
@@ -388,22 +425,36 @@ export class CampaignOrchestrator extends EventEmitter {
           continue;
         }
 
-        // Real-time resource evaluation on every dispatch
-        const liveGov = resourceGovernor.evaluateConcurrency(this.configuredWorkers);
-        this.targetWorkers = liveGov.targetWorkers;
-        this.numWorkers = Math.max(1, activeWorkerPromises.size || this.targetWorkers);
+        if (this.adaptiveMode) {
+          // Real-time resource evaluation on every dispatch
+          const liveGov = resourceGovernor.evaluateConcurrency(this.configuredWorkers);
+          this.targetWorkers = liveGov.targetWorkers;
+          this.numWorkers = Math.max(1, activeWorkerPromises.size || this.targetWorkers);
 
-        if (this.lastReportedTargetWorkers !== liveGov.targetWorkers) {
-          this.recordEvent({
-            type: 'concurrency_scaled',
-            activeWorkers: activeWorkerPromises.size,
-            targetWorkers: liveGov.targetWorkers,
-            freeMb: liveGov.freeMb,
-            pressureLevel: liveGov.pressureLevel,
-            reason: liveGov.reason,
-            message: `⚡ Adaptive Governor: Concurrency adjusted to ${liveGov.targetWorkers} browser(s) (${liveGov.freeMb}MB free RAM). ${liveGov.reason}`
-          });
-          this.lastReportedTargetWorkers = liveGov.targetWorkers;
+          if (this.lastReportedTargetWorkers !== liveGov.targetWorkers) {
+            this.recordEvent({
+              type: 'concurrency_scaled',
+              activeWorkers: activeWorkerPromises.size,
+              targetWorkers: liveGov.targetWorkers,
+              freeMb: liveGov.freeMb,
+              pressureLevel: liveGov.pressureLevel,
+              reason: liveGov.reason,
+              message: `⚡ Adaptive Governor: Concurrency adjusted to ${liveGov.targetWorkers} browser(s) (${liveGov.freeMb}MB free RAM). ${liveGov.reason}`
+            });
+            this.emitTelemetry('concurrency_scaled', {
+              enabled: true,
+              activeWorkers: activeWorkerPromises.size,
+              allocatedWorkers: liveGov.targetWorkers,
+              configuredWorkers: this.configuredWorkers,
+              freeMemMb: liveGov.freeMb,
+              pressure: liveGov.pressureLevel,
+              reason: liveGov.reason
+            });
+            this.lastReportedTargetWorkers = liveGov.targetWorkers;
+          }
+        } else {
+          this.targetWorkers = this.configuredWorkers;
+          this.numWorkers = Math.max(1, activeWorkerPromises.size || this.targetWorkers);
         }
 
         // Spawn workers up to live targetWorkers ceiling
