@@ -338,8 +338,9 @@ export class CampaignOrchestrator extends EventEmitter {
       const needed = this.targetTotal - this.processedTotal;
 
       // Evaluate concurrency before starting wave
+      let gov = null;
       if (this.adaptiveMode) {
-        const gov = resourceGovernor.evaluateConcurrency(this.configuredWorkers);
+        gov = resourceGovernor.evaluateConcurrency(this.configuredWorkers);
         this.targetWorkers = gov.targetWorkers;
       } else {
         this.targetWorkers = this.configuredWorkers;
@@ -400,11 +401,12 @@ export class CampaignOrchestrator extends EventEmitter {
         }
       }
 
+      const ramInfo = gov ? `, ${gov.freeMb}MB free RAM` : '';
       this.recordEvent({
         type: 'wave_started',
         wave: this.currentWave,
         leadsCount: leads.length,
-        message: `Starting Wave ${this.currentWave}: ${leads.length} leads (Adaptive Concurrency Target: ${this.targetWorkers} browsers, ${gov.freeMb}MB free RAM)`
+        message: `Starting Wave ${this.currentWave}: ${leads.length} leads (${this.adaptiveMode ? 'Adaptive' : 'Manual'} Target: ${this.targetWorkers} browsers${ramInfo})`
       });
 
       this.checkAndKillMail();
