@@ -214,7 +214,16 @@ const SUCCESS_SIGNALS = [
   'quote request sent',
   'we\'ve received your message',
   'will contact you shortly',
-  'in touch shortly'
+  'in touch shortly',
+  'your submission has been received',
+  'submission has been received',
+  'has been received',
+  'thank you for submitting',
+  'thank you for your submission',
+  'thank you for your request',
+  'we will respond shortly',
+  'message sent',
+  'sent successfully'
 ];
 
 const ERROR_SIGNALS = [
@@ -228,7 +237,16 @@ const ERROR_SIGNALS = [
   'invalid email',
   'correct errors',
   'validation error',
-  'there was a problem'
+  'there was a problem',
+  'invalid selection',
+  'please review the fields below',
+  'suspected as abusive usage',
+  'the captcha field cannot be blank',
+  'please enter your name',
+  'please enter your message',
+  'oops, there was an error sending your message',
+  'one or more fields have an error',
+  'could you please try again'
 ];
 
 const updateStmt = db.prepare(`
@@ -262,12 +280,73 @@ async function captureFailureScreenshot(page, leadId) {
     if (!fs.existsSync(shotsDir)) fs.mkdirSync(shotsDir, { recursive: true });
     const filename = `lead_${leadId}_${Date.now()}.png`;
     const fullPath = path.join(shotsDir, filename);
-    await page.screenshot({ path: fullPath, fullPage: false });
+
+    // Optimized full-page screenshot with safe height clamping (max 5000px) and timeout protection
+    await Promise.race([
+      (async () => {
+        try {
+          const dims = await page.evaluate(() => {
+            const body = document.body;
+            const doc = document.documentElement;
+            const scrollH = Math.max(
+              body ? body.scrollHeight : 768,
+              body ? body.offsetHeight : 768,
+              doc ? doc.clientHeight : 768,
+              doc ? doc.scrollHeight : 768,
+              doc ? doc.offsetHeight : 768
+            );
+            return {
+              width: 1366,
+              height: Math.min(5000, Math.max(768, scrollH))
+            };
+          }).catch(() => ({ width: 1366, height: 768 }));
+
+          await page.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
+          await page.setViewport({ width: dims.width, height: dims.height });
+          await new Promise(r => setTimeout(r, 200));
+          await page.screenshot({ path: fullPath, fullPage: false, type: 'png' });
+        } catch (_) {
+          await page.screenshot({ path: fullPath, fullPage: false });
+        }
+      })(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Screenshot timeout')), 5000))
+    ]);
+
     return `/api/debug/screenshot/${filename}`;
   } catch (err) {
     console.error(`[Worker] Screenshot capture failed: ${err.message}`);
     return null;
   }
+}
+
+async function dismissCookieBanners(page) {
+  try {
+    if (!page || page.isClosed()) return;
+    await page.evaluate(() => {
+      const cookieKeywords = ['accept', 'accept all', 'agree', 'i agree', 'allow all', 'got it', 'close', 'decline'];
+      const candidates = Array.from(document.querySelectorAll('button, a, div[role="button"], span[role="button"]'));
+      for (const btn of candidates) {
+        const text = (btn.innerText || btn.textContent || '').trim().toLowerCase();
+        const id = (btn.id || '').toLowerCase();
+        const className = (btn.className || '').toString().toLowerCase();
+        const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
+
+        const isCookieContext = id.includes('cookie') || className.includes('cookie') || ariaLabel.includes('cookie') ||
+                                id.includes('consent') || className.includes('consent') || id.includes('notice') || className.includes('banner');
+
+        if (isCookieContext || cookieKeywords.includes(text)) {
+          if (cookieKeywords.some(k => text === k || text.startsWith(k + ' ') || text.endsWith(' ' + k))) {
+            const style = window.getComputedStyle(btn);
+            if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0' && btn.offsetHeight > 0) {
+              btn.click();
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    });
+  } catch (_) {}
 }
 
 async function detectInterstitialSecurityWall(page) {
@@ -455,11 +534,24 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
       return { id: lead.id, company: lead.company_name, status: 'captcha_blocked', result: initialSecurity.reason };
     }
 
-    // Find contact link if not already on contact page
+    // Auto-dismiss cookie overlays on landing
+    await dismissCookieBanners(page);
+
+    // Check if current page already hosts an eligible contact or quote form
+    const hasFormAlready = await page.evaluate(() => {
+      const inputs = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea, select'));
+      const visible = inputs.filter(i => {
+        const t = (i.getAttribute('type') || i.type || 'text').toLowerCase();
+        return t !== 'submit' && t !== 'button' && t !== 'reset' && t !== 'search' && (i.offsetWidth > 0 || i.offsetHeight > 0);
+      });
+      return visible.length >= 3;
+    }).catch(() => false);
+
+    // Find contact link if not already on contact page and current page lacks a form
     const currentUrl = page.url().toLowerCase();
     let contactPageUrl = currentUrl;
 
-    if (!currentUrl.includes('contact') && !currentUrl.includes('quote') && !currentUrl.includes('inquiry')) {
+    if (!hasFormAlready && !currentUrl.includes('contact') && !currentUrl.includes('quote') && !currentUrl.includes('inquiry')) {
       const contactHref = await page.evaluate(() => {
         const links = Array.from(document.querySelectorAll('a[href]'));
         for (const l of links) {
@@ -488,6 +580,13 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
         }
       }
     }
+
+    // Dismiss any cookie banner on the target page and gentle scroll to activate deferred scripts & reCAPTCHA
+    await dismissCookieBanners(page);
+    await page.evaluate(() => {
+      window.scrollBy({ top: 300, behavior: 'smooth' });
+    }).catch(() => {});
+    await new Promise(r => setTimeout(r, 600));
 
     // Ensure fresh profile per lead
     const currentProfile = getFreshSenderProfile();
@@ -567,15 +666,15 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
         if (rect.width === 0 && rect.height === 0 && !input.getClientRects().length) return false;
         if (rect.left < -300 || rect.top < -300) return false;
 
-        // Check parent container visibility (e.g. elementor-field-type-honeypot or hidden wrapper)
+        // Check parent container visibility (e.g. elementor-field-type-honeypot, gfield--type-honeypot, or hidden wrapper)
         let parent = input.parentElement;
         let depth = 0;
-        while (parent && parent !== document.body && depth < 6) {
+        while (parent && parent !== document.body && depth < 8) {
           const pStyle = window.getComputedStyle(parent);
-          if (pStyle.display === 'none' || pStyle.visibility === 'hidden' || pStyle.opacity === '0') return false;
+          if (pStyle.display === 'none' || pStyle.visibility === 'hidden') return false;
           if (pStyle.position === 'absolute' && (pStyle.left?.includes('-999') || pStyle.top?.includes('-999'))) return false;
           const pClass = (parent.className || '').toLowerCase();
-          if (pClass.includes('honeypot') || pClass.includes('ak_hp') || pClass.includes('ninja-forms-hp')) return false;
+          if (pClass.includes('honeypot') || pClass.includes('ak_hp') || pClass.includes('ninja-forms-hp') || pClass.includes('gform_validation_container') || pClass.includes('gfield--type-honeypot')) return false;
           parent = parent.parentElement;
           depth++;
         }
@@ -623,15 +722,12 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
         };
       }
 
-      // 4. Framework-Safe Native Value Setter (React, Vue, Webflow, Standard)
+      // 4. Framework-Safe Native Value Setter (React 16-19, Vue, Wix, Webflow, Standard)
       function setInputValue(input, value) {
         if (value === null || value === undefined) return;
         const strVal = String(value);
-        const proto = Object.getPrototypeOf(input);
-        const desc = Object.getOwnPropertyDescriptor(proto, 'value') ||
-                     Object.getOwnPropertyDescriptor(input.constructor.prototype, 'value') ||
-                     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value') ||
-                     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
+        const proto = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        const desc = Object.getOwnPropertyDescriptor(proto, 'value');
 
         input.focus();
         if (desc && desc.set) {
@@ -691,8 +787,11 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
         // Checkbox & Radio Buttons
         if (desc.type === 'checkbox' || desc.type === 'radio') {
           const isRequired = input.required || input.hasAttribute('required') || input.getAttribute('aria-required') === 'true';
-          const isConsent = desc.combined.includes('agree') || desc.combined.includes('consent') || desc.combined.includes('term') || desc.combined.includes('policy') || desc.combined.includes('opt-in') || desc.combined.includes('contact me');
+          const isConsent = desc.combined.includes('agree') || desc.combined.includes('consent') || desc.combined.includes('term') || desc.combined.includes('policy') || desc.combined.includes('opt-in') || desc.combined.includes('contact me') || desc.combined.includes('text') || desc.combined.includes('sms');
           if (isRequired || isConsent) {
+            if (!input.checked) {
+              try { input.click(); } catch (_) { input.checked = true; }
+            }
             input.checked = true;
             input.dispatchEvent(new Event('change', { bubbles: true }));
             filledCount++;
@@ -707,20 +806,28 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
             let matchedIdx = -1;
             const targetState = (profile.state || '').toLowerCase();
             const targetStateFull = (profile.stateFull || 'virginia').toLowerCase();
+            const isCountry = desc.combined.includes('country') || desc.combined.includes('nation');
 
-            for (let i = 0; i < input.options.length; i++) {
-              const optText = (input.options[i].text || '').toLowerCase();
-              const optVal = (input.options[i].value || '').toLowerCase();
-              if (optVal === targetState || optText === targetState || optText.includes(targetStateFull)) {
-                matchedIdx = i;
-                break;
+            if (isCountry) {
+              for (let i = 0; i < input.options.length; i++) {
+                const optText = (input.options[i].text || '').toLowerCase();
+                const optVal = (input.options[i].value || '').toLowerCase();
+                if (optVal === 'us' || optVal === 'usa' || optVal === '+1' || optText.includes('united states') || optText.includes('usa')) {
+                  matchedIdx = i;
+                  break;
+                }
               }
-              if (optVal.includes('us') || optText.includes('united states')) {
-                matchedIdx = i;
-                break;
-              }
-              if (optText.includes('quote') || optText.includes('inquiry') || optText.includes('service') || optText.includes('commercial') || optText.includes('other')) {
-                if (matchedIdx === -1) matchedIdx = i;
+            } else {
+              for (let i = 0; i < input.options.length; i++) {
+                const optText = (input.options[i].text || '').toLowerCase();
+                const optVal = (input.options[i].value || '').toLowerCase();
+                if (optVal === targetState || optText === targetState || optText.includes(targetStateFull)) {
+                  matchedIdx = i;
+                  break;
+                }
+                if (optText.includes('commercial') || optText.includes('quote') || optText.includes('inquiry') || optText.includes('service') || optText.includes('other')) {
+                  if (matchedIdx === -1) matchedIdx = i;
+                }
               }
             }
 
@@ -736,6 +843,7 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
 
             if (matchedIdx !== -1) {
               input.selectedIndex = matchedIdx;
+              input.value = input.options[matchedIdx].value;
               input.dispatchEvent(new Event('change', { bubbles: true }));
               filledCount++;
               filledDetails.push({ field: desc.name || desc.id || 'select', set: input.options[matchedIdx].text });
@@ -778,12 +886,12 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
         else if (/\b(website|web[_\s-]?site|url|domain)\b/i.test(desc.combined)) {
           valToSet = profile.website;
         }
-        // STREET ADDRESS
-        else if (/\b(street[_\s-]?address|address[_\s-]?line[_\s-]?1|address1|street)\b/i.test(desc.combined) || (/\b(address)\b/i.test(desc.combined) && !desc.combined.includes('email') && !desc.combined.includes('ip') && !desc.combined.includes('web'))) {
+        // STREET ADDRESS / ADDRESS LINE 1
+        else if (/\b(street[_\s-]?address|address[_\s-]?line[_\s-]?1|address1|street|line[_\s-]?1)\b/i.test(desc.combined) || (/\b(address)\b/i.test(desc.combined) && !desc.combined.includes('email') && !desc.combined.includes('ip') && !desc.combined.includes('web'))) {
           valToSet = profile.address;
         }
-        // SUITE / APT
-        else if (/\b(suite|apt|apartment|unit|address[_\s-]?line[_\s-]?2|address2)\b/i.test(desc.combined)) {
+        // SUITE / APT / ADDRESS LINE 2
+        else if (/\b(suite|apt|apartment|unit|address[_\s-]?line[_\s-]?2|address2|line[_\s-]?2)\b/i.test(desc.combined)) {
           valToSet = profile.suite || '';
         }
         // CITY
@@ -811,8 +919,22 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
           valToSet = profile.subject;
         }
         // MESSAGE / TEXTAREA
-        else if (tag === 'textarea' || /\b(message|comment|detail|how[_\s-]?can[_\s-]?we[_\s-]?help|inquiry|body|note|request)\b/i.test(desc.combined)) {
+        else if (tag === 'textarea' || /\b(message|comment|detail|description|describe|brief[_\s-]?description|how[_\s-]?can[_\s-]?we[_\s-]?help|inquiry|body|note|request)\b/i.test(desc.combined)) {
           valToSet = dynamicMessage;
+        }
+        // SIMPLE ARITHMETIC CAPTCHA SOLVER
+        else if (/\b(captcha|human[_\s-]?verification|math|security[_\s-]?question)\b/i.test(desc.combined)) {
+          const mathMatch = desc.combined.match(/(\d+)\s*([\+\-\*])\s*(\d+)/);
+          if (mathMatch) {
+            const num1 = parseInt(mathMatch[1], 10);
+            const op = mathMatch[2];
+            const num2 = parseInt(mathMatch[3], 10);
+            let ans = 0;
+            if (op === '+') ans = num1 + num2;
+            else if (op === '-') ans = num1 - num2;
+            else if (op === '*') ans = num1 * num2;
+            valToSet = String(ans);
+          }
         }
 
         if (valToSet !== null && valToSet !== undefined) {
@@ -900,42 +1022,109 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
     // Resolve form security again right before clicking submit
     await handleFormSecurity(page);
 
-    // Submit form (Targeted submit button inside active form container)
+    // Submit form (Targeted submit button inside active form container with trusted mouse interaction)
     const initUrl = page.url();
-    await page.evaluate((targetFormId) => {
+
+    // 1. Advance Multi-Step Form if Next button exists
+    const advancedStep = await page.evaluate((targetFormId) => {
       let form = null;
       if (targetFormId) {
         form = document.getElementById(targetFormId) || document.querySelector(`form.${CSS.escape(targetFormId)}`) || document.querySelector(`.${CSS.escape(targetFormId)}`);
       }
       const scope = form || document;
+      const nextBtn = Array.from(scope.querySelectorAll('button, a.btn, a.button, input[type="button"]')).find(b => {
+        const t = (b.innerText || b.value || '').toLowerCase().trim();
+        return (t === 'next' || t.startsWith('next ') || t === 'continue' || t.startsWith('continue ') || t === 'proceed') && b.offsetWidth > 0 && b.offsetHeight > 0;
+      });
+      if (nextBtn) {
+        nextBtn.click();
+        return true;
+      }
+      return false;
+    }, formFilled.targetFormId).catch(() => false);
 
-      // 1. Look for submit button inside active form scope
+    if (advancedStep) {
+      await new Promise(r => setTimeout(r, 1000));
+      // Populate step 2 inputs if any
+      await page.evaluate((profile, leadData) => {
+        const stepInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea, select')).filter(i => (i.offsetWidth > 0 || i.offsetHeight > 0) && (!i.value || i.value.trim() === ''));
+        for (const input of stepInputs) {
+          const type = (input.getAttribute('type') || input.type || 'text').toLowerCase();
+          const desc = `${input.name} ${input.id} ${input.placeholder}`.toLowerCase();
+          if (type === 'checkbox' || type === 'radio') {
+            if (!input.checked) try { input.click(); } catch (_) { input.checked = true; }
+          } else if (input.tagName.toLowerCase() === 'textarea' || desc.includes('message') || desc.includes('detail') || desc.includes('description')) {
+            const proto = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+            const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+            if (setter) setter.call(input, profile.message);
+            else input.value = profile.message;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        }
+      }, currentProfile, lead).catch(() => {});
+    }
+
+    // 2. Resolve button coordinates and click with trusted mouse events
+    const btnCoords = await page.evaluate((targetFormId) => {
+      let form = null;
+      if (targetFormId) {
+        form = document.getElementById(targetFormId) || document.querySelector(`form.${CSS.escape(targetFormId)}`) || document.querySelector(`.${CSS.escape(targetFormId)}`);
+      }
+      const scope = form || document;
       const submitBtn = scope.querySelector('button[type="submit"], input[type="submit"]') ||
                         Array.from(scope.querySelectorAll('button, a.btn, a.button, input[type="button"]')).find(b => {
                           const t = (b.innerText || b.value || '').toLowerCase().trim();
-                          return t.includes('submit') || t.includes('send') || t.includes('request') || t.includes('inquire') || t.includes('contact');
+                          return (t.includes('submit') || t.includes('send') || t.includes('request') || t.includes('inquire') || t.includes('contact')) && (b.offsetWidth > 0 || b.offsetHeight > 0);
                         });
 
       if (submitBtn) {
         submitBtn.scrollIntoView({ behavior: 'instant', block: 'center' });
-        submitBtn.focus();
-        submitBtn.click();
-        return;
+        const rect = submitBtn.getBoundingClientRect();
+        return { found: true, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
       }
+      return { found: false };
+    }, formFilled.targetFormId).catch(() => ({ found: false }));
 
-      // 2. Direct form programmatic submit
-      if (form) {
-        if (typeof form.requestSubmit === 'function') form.requestSubmit();
-        else form.submit();
-        return;
-      }
+    if (btnCoords && btnCoords.found && btnCoords.x > 0 && btnCoords.y > 0) {
+      // Natural mouse movement curve to satisfy reCAPTCHA v3 & Turnstile bot heuristics
+      await page.mouse.move(btnCoords.x, btnCoords.y, { steps: 8 }).catch(() => {});
+      await new Promise(r => setTimeout(r, 200));
+      await page.mouse.click(btnCoords.x, btnCoords.y).catch(() => {});
+    } else {
+      // Programmatic fallback
+      await page.evaluate((targetFormId) => {
+        let form = null;
+        if (targetFormId) {
+          form = document.getElementById(targetFormId) || document.querySelector(`form.${CSS.escape(targetFormId)}`) || document.querySelector(`.${CSS.escape(targetFormId)}`);
+        }
+        const scope = form || document;
+        const submitBtn = scope.querySelector('button[type="submit"], input[type="submit"]') ||
+                          Array.from(scope.querySelectorAll('button, a.btn, a.button, input[type="button"]')).find(b => {
+                            const t = (b.innerText || b.value || '').toLowerCase().trim();
+                            return t.includes('submit') || t.includes('send') || t.includes('request') || t.includes('inquire') || t.includes('contact');
+                          });
 
-      const anyForm = document.querySelector('form');
-      if (anyForm) {
-        if (typeof anyForm.requestSubmit === 'function') anyForm.requestSubmit();
-        else anyForm.submit();
-      }
-    }, formFilled.targetFormId);
+        if (submitBtn) {
+          submitBtn.scrollIntoView({ behavior: 'instant', block: 'center' });
+          submitBtn.focus();
+          submitBtn.click();
+          return;
+        }
+
+        if (form) {
+          if (typeof form.requestSubmit === 'function') form.requestSubmit();
+          else form.submit();
+          return;
+        }
+
+        const anyForm = document.querySelector('form');
+        if (anyForm) {
+          if (typeof anyForm.requestSubmit === 'function') anyForm.requestSubmit();
+          else anyForm.submit();
+        }
+      }, formFilled.targetFormId).catch(() => {});
+    }
 
     // Dynamic verification poller for slow connections (polls up to 15 seconds)
     let isSuccess = false;
@@ -964,11 +1153,12 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
       }
       if (isSuccess) break;
 
-      // Check dedicated confirmation containers (WPForms, Elementor, Gravity Forms)
+      // Check dedicated confirmation containers (WPForms, Elementor, Gravity Forms, Webflow, Wix, Fluent Forms)
       const containerSuccess = await page.evaluate(() => {
-        const confContainers = document.querySelectorAll('.wpforms-confirmation-container, .elementor-message-success, .gforms_confirmation_message, .frm_message');
+        const confContainers = document.querySelectorAll('.wpforms-confirmation-container, .elementor-message-success, .gforms_confirmation_message, .frm_message, .w-form-done, .ff-message-success, [data-testid="rich-text-confirmation"]');
         for (const c of confContainers) {
-          if (c.offsetWidth > 0 && c.offsetHeight > 0 && c.innerText.trim().length > 5) {
+          const style = window.getComputedStyle(c);
+          if (style.display !== 'none' && style.visibility !== 'hidden' && c.innerText.trim().length > 5) {
             return c.innerText.trim().slice(0, 100);
           }
         }

@@ -443,6 +443,15 @@ export class CampaignOrchestrator extends EventEmitter {
               reason: liveGov.reason,
               message: `⚡ Adaptive Governor: Concurrency adjusted to ${liveGov.targetWorkers} browser(s) (${liveGov.freeMb}MB free RAM). ${liveGov.reason}`
             });
+            this.emitTelemetry('concurrency_scaled', {
+              enabled: true,
+              activeWorkers: activeWorkerPromises.size,
+              allocatedWorkers: liveGov.targetWorkers,
+              configuredWorkers: this.configuredWorkers,
+              freeMemMb: liveGov.freeMb,
+              pressure: liveGov.pressureLevel,
+              reason: liveGov.reason
+            });
             this.lastReportedTargetWorkers = liveGov.targetWorkers;
           }
         } else {
