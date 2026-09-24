@@ -537,6 +537,11 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
     // Auto-dismiss cookie overlays on landing
     await dismissCookieBanners(page);
 
+    // Wait for any SPA / Wix / Next.js scripts to finish hydrating
+    try {
+      await page.waitForNetworkIdle({ idleTime: 500, timeout: 3000 });
+    } catch (_) {}
+
     // Check if current page already hosts an eligible contact or quote form
     const hasFormAlready = await page.evaluate(() => {
       const inputs = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea, select'));
@@ -581,12 +586,33 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
       }
     }
 
-    // Dismiss any cookie banner on the target page and gentle scroll to activate deferred scripts & reCAPTCHA
+    // Dismiss any cookie banner on the target page
     await dismissCookieBanners(page);
+
+    // Wait for SPA / dynamic forms to hydrate on the contact page
+    try {
+      await page.waitForNetworkIdle({ idleTime: 500, timeout: 3000 });
+    } catch (_) {}
+
+    // Scroll through the page and activate deferred / custom dropdowns (Wix ComboBox, Choices.js)
     await page.evaluate(() => {
-      window.scrollBy({ top: 300, behavior: 'smooth' });
+      window.scrollBy({ top: 400, behavior: 'smooth' });
+      const formEl = document.querySelector('form, [data-testid="form"], select, input');
+      if (formEl) formEl.scrollIntoView({ behavior: 'instant', block: 'center' });
     }).catch(() => {});
     await new Promise(r => setTimeout(r, 600));
+
+    // Wake up and populate options in dynamic select dropdowns
+    try {
+      const selectElements = await page.$$('select, [data-testid="select-trigger"], .wixui-dropdown__input');
+      for (const sel of selectElements) {
+        const optCount = await page.evaluate(el => el.options ? el.options.length : 0, sel).catch(() => 0);
+        if (optCount <= 1) {
+          await sel.click().catch(() => {});
+          await new Promise(r => setTimeout(r, 150));
+        }
+      }
+    } catch (_) {}
 
     // Ensure fresh profile per lead
     const currentProfile = getFreshSenderProfile();
@@ -787,8 +813,30 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
         // Checkbox & Radio Buttons
         if (desc.type === 'checkbox' || desc.type === 'radio') {
           const isRequired = input.required || input.hasAttribute('required') || input.getAttribute('aria-required') === 'true';
+          const isGender = /\b(gender|sex|salutation|title)\b/i.test(desc.combined);
           const isConsent = desc.combined.includes('agree') || desc.combined.includes('consent') || desc.combined.includes('term') || desc.combined.includes('policy') || desc.combined.includes('opt-in') || desc.combined.includes('contact me') || desc.combined.includes('text') || desc.combined.includes('sms');
-          if (isRequired || isConsent) {
+          
+          if (desc.type === 'radio') {
+            const name = input.name;
+            const group = name ? Array.from(scope.querySelectorAll(`input[type="radio"][name="${CSS.escape(name)}"]`)) : [input];
+            const hasChecked = group.some(r => r.checked);
+            if (!hasChecked && (isRequired || isGender)) {
+              let targetRadio = null;
+              if (isGender) {
+                targetRadio = group.find(r => /\b(female|woman|ms|mrs|f)\b/i.test(r.value) || /\b(female|woman|ms|mrs|f)\b/i.test(getInputDescriptor(r).combined));
+              }
+              if (!targetRadio) {
+                targetRadio = group[Math.floor(Math.random() * group.length)];
+              }
+              if (targetRadio) {
+                try { targetRadio.click(); } catch (_) { targetRadio.checked = true; }
+                targetRadio.checked = true;
+                targetRadio.dispatchEvent(new Event('change', { bubbles: true }));
+                filledCount++;
+                filledDetails.push({ field: name || 'radio', set: targetRadio.value || '[CHECKED]' });
+              }
+            }
+          } else if (isRequired || isConsent) {
             if (!input.checked) {
               try { input.click(); } catch (_) { input.checked = true; }
             }
@@ -802,51 +850,64 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
 
         // Dropdown Select Elements
         if (tag === 'select') {
-          if (input.options && input.options.length > 1) {
-            let matchedIdx = -1;
+          if (input.options && input.options.length > 0) {
+            const isGender = /\b(gender|sex|salutation|title|honorific|prefix)\b/i.test(desc.combined);
+            const isCountry = /\b(country|nation)\b/i.test(desc.combined);
+            const isState = /\b(state|province|region)\b/i.test(desc.combined);
             const targetState = (profile.state || '').toLowerCase();
             const targetStateFull = (profile.stateFull || 'virginia').toLowerCase();
-            const isCountry = desc.combined.includes('country') || desc.combined.includes('nation');
 
-            if (isCountry) {
-              for (let i = 0; i < input.options.length; i++) {
-                const optText = (input.options[i].text || '').toLowerCase();
-                const optVal = (input.options[i].value || '').toLowerCase();
-                if (optVal === 'us' || optVal === 'usa' || optVal === '+1' || optText.includes('united states') || optText.includes('usa')) {
-                  matchedIdx = i;
-                  break;
-                }
-              }
-            } else {
-              for (let i = 0; i < input.options.length; i++) {
-                const optText = (input.options[i].text || '').toLowerCase();
-                const optVal = (input.options[i].value || '').toLowerCase();
-                if (optVal === targetState || optText === targetState || optText.includes(targetStateFull)) {
-                  matchedIdx = i;
-                  break;
-                }
-                if (optText.includes('commercial') || optText.includes('quote') || optText.includes('inquiry') || optText.includes('service') || optText.includes('other')) {
-                  if (matchedIdx === -1) matchedIdx = i;
-                }
-              }
+            // Filter out empty placeholder options
+            const validOptions = Array.from(input.options).filter(o => {
+              if (o.disabled) return false;
+              const val = (o.value || '').trim();
+              const txt = (o.text || '').trim().toLowerCase();
+              if (val === '' && (/\b(choose|select|pick|none|--|\.\.\.)\b/i.test(txt) || txt === '')) return false;
+              return true;
+            });
+
+            let chosenOpt = null;
+
+            if (isGender) {
+              // User explicit instruction: "when it comes to gender, it should fill in female"
+              chosenOpt = validOptions.find(o => /\b(female|woman|ms|mrs|miss|f)\b/i.test(o.text) || /\b(female|woman|ms|mrs|miss|f)\b/i.test(o.value));
+            } else if (isCountry) {
+              chosenOpt = validOptions.find(o => {
+                const txt = (o.text || '').toLowerCase();
+                const val = (o.value || '').toLowerCase();
+                return val === 'us' || val === 'usa' || val === '+1' || txt.includes('united states') || txt.includes('usa');
+              });
+            } else if (isState) {
+              chosenOpt = validOptions.find(o => {
+                const txt = (o.text || '').toLowerCase();
+                const val = (o.value || '').toLowerCase();
+                return val === targetState || txt === targetState || txt.includes(targetStateFull);
+              });
             }
 
-            // Fallback: pick first valid option that has a non-empty value and is not disabled
-            if (matchedIdx === -1) {
-              for (let i = 0; i < input.options.length; i++) {
-                if (input.options[i].value && input.options[i].value !== '' && !input.options[i].disabled) {
-                  matchedIdx = i;
-                  break;
-                }
-              }
+            // Keyword match for services/inquiries
+            if (!chosenOpt) {
+              chosenOpt = validOptions.find(o => {
+                const txt = (o.text || '').toLowerCase();
+                return /\b(commercial|quote|estimate|inquiry|service|general|repair|inspection|consultation)\b/i.test(txt);
+              });
             }
 
-            if (matchedIdx !== -1) {
-              input.selectedIndex = matchedIdx;
-              input.value = input.options[matchedIdx].value;
+            // User explicit instruction: fill random valid option to pass required option field
+            if (!chosenOpt && validOptions.length > 0) {
+              chosenOpt = validOptions[Math.floor(Math.random() * validOptions.length)];
+            }
+
+            if (chosenOpt) {
+              // Select across single and multi-select formats
+              chosenOpt.selected = true;
+              input.selectedIndex = chosenOpt.index;
+              try { input.value = chosenOpt.value; } catch (_) {}
+              input.dispatchEvent(new Event('input', { bubbles: true }));
               input.dispatchEvent(new Event('change', { bubbles: true }));
+              input.dispatchEvent(new Event('blur', { bubbles: true }));
               filledCount++;
-              filledDetails.push({ field: desc.name || desc.id || 'select', set: input.options[matchedIdx].text });
+              filledDetails.push({ field: desc.name || desc.id || 'select', set: chosenOpt.text });
             }
           }
           continue;
@@ -946,20 +1007,31 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
 
       // 7. Pre-Submit Self-Healing Validation Sweep
       for (const input of eligibleInputs) {
-        const isRequired = input.required || input.hasAttribute('required') || input.getAttribute('aria-required') === 'true';
+        const isRequired = input.required || input.hasAttribute('required') || input.getAttribute('aria-required') === 'true' || input.classList.contains('required') || input.getAttribute('aria-invalid') === 'true';
         const isValid = typeof input.checkValidity === 'function' ? input.checkValidity() : true;
 
         if (isRequired && (!isValid || !input.value || input.value.trim() === '')) {
           const desc = getInputDescriptor(input);
           const tag = input.tagName.toLowerCase();
+          const isGender = /\b(gender|sex|salutation|title|honorific)\b/i.test(desc.combined);
 
           if (tag === 'select') {
-            const validOpt = Array.from(input.options).find(o => o.value && o.value !== '' && !o.disabled);
-            if (validOpt) {
-              input.value = validOpt.value;
+            const validOptions = Array.from(input.options).filter(o => !o.disabled && (o.value || '').trim() !== '' && !/\b(choose|select|pick|none|--)\b/i.test((o.text || '').toLowerCase()));
+            let chosen = null;
+            if (isGender) {
+              chosen = validOptions.find(o => /\b(female|woman|ms|mrs|f)\b/i.test(o.text) || /\b(female|woman|f)\b/i.test(o.value));
+            }
+            if (!chosen && validOptions.length > 0) {
+              chosen = validOptions[Math.floor(Math.random() * validOptions.length)];
+            }
+            if (chosen) {
+              chosen.selected = true;
+              input.selectedIndex = chosen.index;
+              try { input.value = chosen.value; } catch (_) {}
+              input.dispatchEvent(new Event('input', { bubbles: true }));
               input.dispatchEvent(new Event('change', { bubbles: true }));
               filledCount++;
-              filledDetails.push({ field: desc.name || desc.id, set: validOpt.text });
+              filledDetails.push({ field: desc.name || desc.id, set: chosen.text });
             }
           } else if (desc.type === 'checkbox' || desc.type === 'radio') {
             input.checked = true;
@@ -967,9 +1039,19 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
             filledCount++;
             filledDetails.push({ field: desc.name || desc.id, set: '[CHECKED]' });
           } else if (desc.type === 'number') {
-            setInputValue(input, '1');
+            const randNum = String(Math.floor(Math.random() * 5) + 1);
+            setInputValue(input, randNum);
             filledCount++;
-            filledDetails.push({ field: desc.name || desc.id, set: '1' });
+            filledDetails.push({ field: desc.name || desc.id, set: randNum });
+          } else if (desc.type === 'date') {
+            const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+            setInputValue(input, tomorrow);
+            filledCount++;
+            filledDetails.push({ field: desc.name || desc.id, set: tomorrow });
+          } else if (isGender) {
+            setInputValue(input, 'Female');
+            filledCount++;
+            filledDetails.push({ field: desc.name || desc.id, set: 'Female' });
           } else if (desc.combined.includes('email')) {
             setInputValue(input, profile.email);
             filledCount++;
@@ -979,6 +1061,27 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
             setInputValue(input, p);
             filledCount++;
             filledDetails.push({ field: desc.name || desc.id, set: p });
+          } else if (desc.combined.includes('city')) {
+            setInputValue(input, profile.city);
+            filledCount++;
+          } else if (desc.combined.includes('state')) {
+            setInputValue(input, profile.state);
+            filledCount++;
+          } else if (desc.combined.includes('zip')) {
+            setInputValue(input, profile.zip);
+            filledCount++;
+          } else if (desc.combined.includes('address')) {
+            setInputValue(input, profile.address);
+            filledCount++;
+          } else if (desc.combined.includes('time') || desc.combined.includes('when')) {
+            setInputValue(input, '1-2 weeks');
+            filledCount++;
+          } else if (desc.combined.includes('budget')) {
+            setInputValue(input, '$5,000 - $10,000');
+            filledCount++;
+          } else if (desc.combined.includes('service') || desc.combined.includes('project') || desc.combined.includes('work')) {
+            setInputValue(input, 'Commercial Services / Inspection');
+            filledCount++;
           } else {
             setInputValue(input, profile.subject || 'Commercial Collaboration Inquiry');
             filledCount++;
@@ -1126,6 +1229,127 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
       }, formFilled.targetFormId).catch(() => {});
     }
 
+    // 3. Post-Submit Adaptive Recovery Loop
+    // User instruction: If rejected because a field is required, fill random options/values (gender=female) and retry submit
+    await new Promise(r => setTimeout(r, 1500));
+    const adaptiveRecovery = await page.evaluate((profile) => {
+      // Check for HTML5 invalid inputs, empty required fields, or validation error blocks
+      const invalidEls = Array.from(document.querySelectorAll(':invalid, [aria-invalid="true"]'));
+      const emptyRequired = Array.from(document.querySelectorAll('input[required], select[required], textarea[required], [aria-required="true"], .required input, .required select'))
+        .filter(el => {
+          const type = (el.getAttribute('type') || el.type || 'text').toLowerCase();
+          if (type === 'checkbox' || type === 'radio') return !el.checked;
+          if (el.tagName.toLowerCase() === 'select') return !el.value || el.value === '' || (el.selectedIndex <= 0 && el.options[0]?.disabled);
+          return !el.value || el.value.trim() === '';
+        });
+
+      const bodyText = (document.body ? document.body.innerText.toLowerCase() : '');
+      const hasErrorNotice = [
+        'this field is required',
+        'please select an item',
+        'please fill out this field',
+        'please fill in all required fields',
+        'required field',
+        'cannot be blank',
+        'invalid selection'
+      ].some(sig => bodyText.includes(sig));
+
+      const targets = Array.from(new Set([...invalidEls, ...emptyRequired]));
+      if (targets.length === 0 && !hasErrorNotice) return { recovered: false, count: 0 };
+
+      let recoveredCount = 0;
+      const details = [];
+
+      for (const input of targets) {
+        const tag = input.tagName.toLowerCase();
+        const type = (input.getAttribute('type') || input.type || 'text').toLowerCase();
+        const desc = `${input.name} ${input.id} ${input.placeholder} ${input.className} ${input.getAttribute('aria-label') || ''}`.toLowerCase();
+        const isGender = /\b(gender|sex|salutation|title|honorific)\b/i.test(desc);
+
+        if (tag === 'select') {
+          const validOptions = Array.from(input.options).filter(o => {
+            if (o.disabled) return false;
+            const val = (o.value || '').trim();
+            const txt = (o.text || '').trim().toLowerCase();
+            if (val === '' && (/\b(choose|select|pick|none|--|\.\.\.)\b/i.test(txt) || txt === '')) return false;
+            return true;
+          });
+
+          if (validOptions.length > 0) {
+            let chosen = null;
+            if (isGender) {
+              chosen = validOptions.find(o => /\b(female|woman|ms|mrs|miss|f)\b/i.test(o.text) || /\b(female|woman|ms|mrs|miss|f)\b/i.test(o.value));
+            }
+            if (!chosen) {
+              chosen = validOptions[Math.floor(Math.random() * validOptions.length)];
+            }
+            chosen.selected = true;
+            input.selectedIndex = chosen.index;
+            try { input.value = chosen.value; } catch (_) {}
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            recoveredCount++;
+            details.push({ field: input.name || input.id || 'select', set: chosen.text });
+          }
+        } else if (type === 'checkbox' || type === 'radio') {
+          if (isGender) {
+            if (/\b(female|woman|ms|mrs|f)\b/i.test(desc) || /\b(female|woman|f)\b/i.test(input.value)) {
+              input.checked = true;
+            }
+          } else {
+            input.checked = true;
+          }
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          recoveredCount++;
+          details.push({ field: input.name || input.id, set: '[CHECKED]' });
+        } else if (type === 'number') {
+          const randNum = String(Math.floor(Math.random() * 5) + 1);
+          input.value = randNum;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          recoveredCount++;
+          details.push({ field: input.name || input.id, set: randNum });
+        } else if (type === 'date') {
+          const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+          input.value = tomorrow;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          recoveredCount++;
+          details.push({ field: input.name || input.id, set: tomorrow });
+        } else {
+          let randomVal = profile.subject || 'Commercial Collaboration Inquiry';
+          if (isGender) randomVal = 'Female';
+          else if (desc.includes('time') || desc.includes('frame') || desc.includes('when')) randomVal = '1-2 weeks';
+          else if (desc.includes('budget') || desc.includes('amount')) randomVal = '$5,000 - $10,000';
+          else if (desc.includes('service') || desc.includes('project') || desc.includes('work')) randomVal = 'Commercial Services / Inspection';
+
+          input.value = randomVal;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          recoveredCount++;
+          details.push({ field: input.name || input.id, set: randomVal });
+        }
+      }
+
+      return { recovered: recoveredCount > 0, count: recoveredCount, details };
+    }, currentProfile).catch(() => ({ recovered: false, count: 0 }));
+
+    if (adaptiveRecovery.recovered) {
+      console.log(`[${agentName}] 🔄 Adaptive recovery activated for #${lead.id}: filled ${adaptiveRecovery.count} required fields/options:`, adaptiveRecovery.details);
+      await new Promise(r => setTimeout(r, 600));
+      // Re-click submit
+      if (btnCoords && btnCoords.found && btnCoords.x > 0 && btnCoords.y > 0) {
+        await page.mouse.click(btnCoords.x, btnCoords.y).catch(() => {});
+      } else {
+        await page.evaluate((targetFormId) => {
+          const form = targetFormId ? document.getElementById(targetFormId) || document.querySelector(`form.${CSS.escape(targetFormId)}`) : document.querySelector('form');
+          const submitBtn = form?.querySelector('button[type="submit"], input[type="submit"]') || document.querySelector('button[type="submit"], input[type="submit"]');
+          if (submitBtn) submitBtn.click();
+          else if (form) form.submit();
+        }, formFilled.targetFormId).catch(() => {});
+      }
+    }
+
     // Dynamic verification poller for slow connections (polls up to 15 seconds)
     let isSuccess = false;
     let confirmationPhrase = '';
@@ -1219,6 +1443,24 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
 
   } catch (err) {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+    // Check if error was caused by successful form submission navigation!
+    if (err.message && err.message.includes('Execution context was destroyed')) {
+      try {
+        await new Promise(r => setTimeout(r, 2000));
+        const postNavUrl = page.url();
+        const postNavBody = await page.evaluate(() => document.body ? document.body.innerText.toLowerCase() : '').catch(() => '');
+        const isSuccessNav = (postNavUrl && postNavUrl !== lead.website && (postNavUrl.includes('thank') || postNavUrl.includes('success') || postNavUrl.includes('confirm') || postNavUrl.includes('submitted'))) ||
+                             SUCCESS_SIGNALS.some(s => postNavBody.includes(s));
+        if (isSuccessNav) {
+          console.log(`[${agentName}] ✅ #${lead.id} SUBMISSION CONFIRMED AFTER NAVIGATION: ${postNavUrl} (${elapsed}s)`);
+          saveLeadResult(lead.id, 'contacted', `Contact form: ${contactPageUrl} (Submitted via page navigation: ${postNavUrl})`, isSandbox);
+          await safeClose(page);
+          return { id: lead.id, company: lead.company_name, status: 'contacted', time: elapsed, result: `Confirmed via navigation: ${postNavUrl}` };
+        }
+      } catch (_) {}
+    }
+
     console.log(`[${agentName}] ❌ #${lead.id} Error: ${err.message} (${elapsed}s)`);
     const isTimeout = (err.message || '').toLowerCase().includes('timeout') || (err.message || '').toLowerCase().includes('net::');
     const targetStatus = isTimeout ? 'unreachable' : 'form_submit_error';
