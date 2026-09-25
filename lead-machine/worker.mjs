@@ -1493,36 +1493,87 @@ async function runWorker() {
     } catch (_) {}
   }
 
-  const instProfile = path.join(os.tmpdir(), `leadmachine_w${workerId}_${process.pid}_${Date.now()}_${Math.random().toString(36).slice(2)}`);
-  fs.mkdirSync(instProfile, { recursive: true });
+  let currentBrowser = null;
+  let currentInstProfile = null;
 
-  let browser = await puppeteer.launch({
-    executablePath: CHROME_BIN,
-    headless: isHeaded ? false : 'new',
-    userDataDir: instProfile,
-    timeout: 60000,
-    ignoreHTTPSErrors: true,
-    args: STEALTH_LAUNCH_ARGS
+  const cleanupBrowser = async () => {
+    if (currentBrowser) {
+      const b = currentBrowser;
+      currentBrowser = null;
+      const browserPid = b.process() ? b.process().pid : null;
+      try {
+        const pages = await b.pages();
+        for (const p of pages) {
+          try { await p.close(); } catch (_) {}
+        }
+      } catch (_) {}
+      try { await b.close(); } catch (_) {}
+      if (browserPid) {
+        try {
+          if (process.platform === 'win32') {
+            execSync(`taskkill /pid ${browserPid} /T /F`, { stdio: 'ignore' });
+          } else {
+            execSync(`pkill -9 -P ${browserPid} 2>/dev/null || true`, { stdio: 'ignore' });
+            try { process.kill(browserPid, 'SIGKILL'); } catch (_) {}
+          }
+        } catch (_) {}
+      }
+    }
+    if (currentInstProfile) {
+      const prof = currentInstProfile;
+      currentInstProfile = null;
+      try {
+        if (process.platform !== 'win32') {
+          execSync(`pkill -9 -f "${path.basename(prof)}" 2>/dev/null || true`, { stdio: 'ignore' });
+        }
+        fs.rmSync(prof, { recursive: true, force: true });
+      } catch (_) {}
+    }
+  };
+
+  const handleShutdown = async (sigCode) => {
+    await cleanupBrowser();
+    try { db.close(); } catch (_) {}
+    process.exit(sigCode);
+  };
+
+  process.on('SIGTERM', () => handleShutdown(143));
+  process.on('SIGINT', () => handleShutdown(130));
+  process.on('exit', () => {
+    if (currentInstProfile && process.platform !== 'win32') {
+      try { execSync(`pkill -9 -f "${path.basename(currentInstProfile)}" 2>/dev/null || true`, { stdio: 'ignore' }); } catch (_) {}
+      try { fs.rmSync(currentInstProfile, { recursive: true, force: true }); } catch (_) {}
+    }
   });
+
+  const launchFreshBrowser = async () => {
+    await cleanupBrowser();
+    currentInstProfile = path.join(os.tmpdir(), `leadmachine_w${workerId}_${process.pid}_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+    fs.mkdirSync(currentInstProfile, { recursive: true });
+    currentBrowser = await puppeteer.launch({
+      executablePath: CHROME_BIN,
+      headless: isHeaded ? false : 'new',
+      userDataDir: currentInstProfile,
+      timeout: 60000,
+      ignoreHTTPSErrors: true,
+      args: STEALTH_LAUNCH_ARGS
+    });
+    return currentBrowser;
+  };
+
+  await launchFreshBrowser();
 
   const placeholders = leadIds.map(() => '?').join(',');
   const leads = db.prepare(`SELECT id, company_name, website FROM leads WHERE id IN (${placeholders}) ORDER BY id ASC`).all(...leadIds);
 
   const results = [];
   for (const lead of leads) {
-    if (!browser || !browser.connected) {
-      browser = await puppeteer.launch({
-        executablePath: CHROME_BIN,
-        headless: isHeaded ? false : 'new',
-        userDataDir: instProfile,
-        timeout: 60000,
-        ignoreHTTPSErrors: true,
-        args: STEALTH_LAUNCH_ARGS
-      });
+    if (!currentBrowser || !currentBrowser.connected) {
+      await launchFreshBrowser();
     }
     try {
       const res = await Promise.race([
-        processLead(browser, lead, agentName, isSandbox),
+        processLead(currentBrowser, lead, agentName, isSandbox),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout (75s)')), 75000))
       ]);
       results.push(res);
@@ -1534,11 +1585,17 @@ async function runWorker() {
       const errRes = { id: lead.id, company: lead.company_name, status: 'unable_to_reach', result: e.message };
       results.push(errRes);
       console.log(`EVENT_LEAD_RESULT:${JSON.stringify(errRes)}`);
+
+      // If a timeout occurred, the browser is likely hung/frozen with pending page tasks.
+      // Recycle browser immediately so next lead starts with a pristine session!
+      if (e.message && e.message.includes('Timeout')) {
+        console.log(`[${agentName}] ♻️ Recycling browser after timeout on #${lead.id} to prevent zombie renderers.`);
+        await launchFreshBrowser().catch(() => {});
+      }
     }
   }
 
-  try { await browser.close(); } catch (_) {}
-  try { fs.rmSync(instProfile, { recursive: true, force: true }); } catch (_) {}
+  await cleanupBrowser();
   try { db.close(); } catch (_) {}
 
   console.log(`🏁 [${agentName}] Completed batch of ${results.length} leads.`);

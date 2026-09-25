@@ -599,7 +599,7 @@ const server = http.createServer(async (req, res) => {
     if (fs.existsSync(cfgPath)) {
       try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
     }
-    const currentVer = cfg.settings?.version || '2.5.6';
+    const currentVer = cfg.settings?.version || '2.5.7';
     const currentCommit = cfg.settings?.buildCommit || 'master';
     const repo = 'leadmachine-core/installer';
     const branch = 'main';
