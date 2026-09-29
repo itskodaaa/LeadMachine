@@ -12,6 +12,79 @@ let hunterPollInterval = null;
 let allLeadsData = [];
 let activeTableFilter = 'all';
 
+// Audio Synthesizers & Feedback
+function playCaptchaBuzzer() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(587.33, ctx.currentTime);
+    osc1.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(440, ctx.currentTime);
+    osc2.frequency.exponentialRampToValueAtTime(659.25, ctx.currentTime + 0.15);
+
+    gainNode.gain.setValueAtTime(0.2, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+
+    osc1.connect(gainNode);
+    osc2.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    osc1.start();
+    osc2.start();
+    osc1.stop(ctx.currentTime + 0.35);
+    osc2.stop(ctx.currentTime + 0.35);
+  } catch (e) {}
+}
+
+function playSuccessChime() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1046.50, ctx.currentTime + 0.2);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
+  } catch (e) {}
+}
+
+function showToast(message, type = 'info') {
+  let toastContainer = document.getElementById('toastContainer');
+  if (!toastContainer) {
+    toastContainer = document.createElement('div');
+    toastContainer.id = 'toastContainer';
+    toastContainer.className = 'toast-container';
+    document.body.appendChild(toastContainer);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = `toast-message ${type}`;
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add('fade-out');
+    setTimeout(() => {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 300);
+  }, 3200);
+}
+
 // DOM Elements
 const engineStatusDot = document.getElementById('engineStatusDot');
 const engineStatusText = document.getElementById('engineStatusText');
@@ -98,6 +171,69 @@ const leadsTableBody = document.getElementById('leadsTableBody');
 const exportCsvBtn = document.getElementById('exportCsvBtn');
 const verifyReachabilityBtn = document.getElementById('verifyReachabilityBtn');
 const importWebsitesBtn = document.getElementById('importWebsitesBtn');
+const clearDatabaseBtn = document.getElementById('clearDatabaseBtn');
+
+// Batch Operations DOM
+const batchActionBar = document.getElementById('batchActionBar');
+const batchSelectedCount = document.getElementById('batchSelectedCount');
+const batchSelectAllVisibleBtn = document.getElementById('batchSelectAllVisibleBtn');
+const batchDeselectAllBtn = document.getElementById('batchDeselectAllBtn');
+const batchStatusSelect = document.getElementById('batchStatusSelect');
+const batchApplyStatusBtn = document.getElementById('batchApplyStatusBtn');
+const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+
+// Edit Lead Modal DOM
+const editLeadModal = document.getElementById('editLeadModal');
+const closeEditLeadModalBtn = document.getElementById('closeEditLeadModalBtn');
+const cancelEditLeadBtn = document.getElementById('cancelEditLeadBtn');
+const editLeadForm = document.getElementById('editLeadForm');
+const editLeadId = document.getElementById('editLeadId');
+const editLeadCompany = document.getElementById('editLeadCompany');
+const editLeadWebsite = document.getElementById('editLeadWebsite');
+const editLeadPhone = document.getElementById('editLeadPhone');
+const editLeadEmail = document.getElementById('editLeadEmail');
+const editLeadCity = document.getElementById('editLeadCity');
+const editLeadState = document.getElementById('editLeadState');
+const editLeadCountry = document.getElementById('editLeadCountry');
+const editLeadStatus = document.getElementById('editLeadStatus');
+const editLeadNotes = document.getElementById('editLeadNotes');
+
+// Clear Database Modal DOM
+const clearDbModal = document.getElementById('clearDbModal');
+const closeClearDbModalBtn = document.getElementById('closeClearDbModalBtn');
+const cancelClearDbBtn = document.getElementById('cancelClearDbBtn');
+const clearDbConfirmInput = document.getElementById('clearDbConfirmInput');
+const executeClearDbBtn = document.getElementById('executeClearDbBtn');
+
+// CAPTCHA Assist Dock DOM
+const captchaAssistDock = document.getElementById('captchaAssistDock');
+const dockExpandedContent = document.getElementById('dockExpandedContent');
+const dockMinimizedContent = document.getElementById('dockMinimizedContent');
+const dockQueueBadge = document.getElementById('dockQueueBadge');
+const dockMinCount = document.getElementById('dockMinCount');
+const dockMinimizeBtn = document.getElementById('dockMinimizeBtn');
+const dockExpandBtn = document.getElementById('dockExpandBtn');
+const dockCloseBtn = document.getElementById('dockCloseBtn');
+const dockCompanyName = document.getElementById('dockCompanyName');
+const dockOpenSiteBtn = document.getElementById('dockOpenSiteBtn');
+const dockFailureReason = document.getElementById('dockFailureReason');
+const dockLocation = document.getElementById('dockLocation');
+const dockCopyName = document.getElementById('dockCopyName');
+const dockCopyEmail = document.getElementById('dockCopyEmail');
+const dockCopyPhone = document.getElementById('dockCopyPhone');
+const dockCopyCompany = document.getElementById('dockCopyCompany');
+const dockCopySubject = document.getElementById('dockCopySubject');
+const dockCopyMessage = document.getElementById('dockCopyMessage');
+const dockMarkContactedBtn = document.getElementById('dockMarkContactedBtn');
+const dockSkipLeadBtn = document.getElementById('dockSkipLeadBtn');
+const dockMarkUnreachableBtn = document.getElementById('dockMarkUnreachableBtn');
+
+// Lead Management State
+let selectedLeadIds = new Set();
+let currentFilteredLeads = [];
+let captchaQueue = [];
+let currentCaptchaIndex = 0;
 
 // Bulk Importer Modal DOM
 const importWebsitesOverlay = document.getElementById('importWebsitesOverlay');
@@ -1697,6 +1833,11 @@ function setupLeadsHandlers() {
       pill.classList.add('active');
       activeTableFilter = pill.dataset.filter;
       filterAndRenderLeadsTable();
+
+      // Trigger CAPTCHA Assist Dock if entering CAPTCHA filter
+      if (activeTableFilter === 'captcha_blocked') {
+        initCaptchaAssistDock();
+      }
     });
   });
 
@@ -1721,24 +1862,104 @@ function setupLeadsHandlers() {
     }
   });
 
-  // Diagnostic screenshot preview click handler on leads table
+  // Table header select all checkbox
+  if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', () => {
+      const pageLeads = currentFilteredLeads.slice(0, 100);
+      if (selectAllCheckbox.checked) {
+        pageLeads.forEach(l => selectedLeadIds.add(l.id));
+      } else {
+        pageLeads.forEach(l => selectedLeadIds.delete(l.id));
+      }
+      filterAndRenderLeadsTable();
+      updateBatchBar();
+    });
+  }
+
+  // Batch action buttons
+  if (batchSelectAllVisibleBtn) {
+    batchSelectAllVisibleBtn.addEventListener('click', () => {
+      const pageLeads = currentFilteredLeads.slice(0, 100);
+      pageLeads.forEach(l => selectedLeadIds.add(l.id));
+      filterAndRenderLeadsTable();
+      updateBatchBar();
+    });
+  }
+
+  if (batchDeselectAllBtn) {
+    batchDeselectAllBtn.addEventListener('click', () => {
+      selectedLeadIds.clear();
+      filterAndRenderLeadsTable();
+      updateBatchBar();
+    });
+  }
+
+  if (batchApplyStatusBtn) {
+    batchApplyStatusBtn.addEventListener('click', executeBatchStatus);
+  }
+
+  if (batchDeleteBtn) {
+    batchDeleteBtn.addEventListener('click', executeBatchDelete);
+  }
+
+  // Table body delegated clicks (checkbox, screenshots, row actions)
   if (leadsTableBody) {
     leadsTableBody.addEventListener('click', (e) => {
-      const btn = e.target.closest('.btn-icon-screenshot');
-      if (!btn) return;
-      const shot = btn.dataset.shot;
-      const company = btn.dataset.company;
-      const reason = btn.dataset.reason;
-      const web = btn.dataset.web;
-
-      if (screenshotModalImg) screenshotModalImg.src = shot;
-      if (screenshotMetaCompany) screenshotMetaCompany.textContent = company;
-      if (screenshotMetaReason) screenshotMetaReason.textContent = reason;
-      if (screenshotMetaLink) {
-        screenshotMetaLink.href = web;
-        screenshotMetaLink.textContent = web.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      // 1. Checkbox toggle
+      const chk = e.target.closest('.lead-checkbox');
+      if (chk) {
+        const id = parseInt(chk.dataset.id, 10);
+        if (chk.checked) {
+          selectedLeadIds.add(id);
+        } else {
+          selectedLeadIds.delete(id);
+        }
+        updateBatchBar();
+        updateSelectAllCheckbox(currentFilteredLeads);
+        return;
       }
-      if (screenshotModal) screenshotModal.style.display = 'flex';
+
+      // 2. Row Action: Edit Lead
+      const editBtn = e.target.closest('.btn-row-action.edit');
+      if (editBtn) {
+        const id = parseInt(editBtn.dataset.id, 10);
+        openEditLeadModal(id);
+        return;
+      }
+
+      // 3. Row Action: Delete Lead
+      const delBtn = e.target.closest('.btn-row-action.delete');
+      if (delBtn) {
+        const id = parseInt(delBtn.dataset.id, 10);
+        deleteSingleLead(id);
+        return;
+      }
+
+      // 4. Row Action: Assist CAPTCHA
+      const assistBtn = e.target.closest('.btn-row-action.assist');
+      if (assistBtn) {
+        const id = parseInt(assistBtn.dataset.id, 10);
+        initCaptchaAssistDock(id);
+        return;
+      }
+
+      // 5. Diagnostic screenshot preview
+      const btn = e.target.closest('.btn-icon-screenshot');
+      if (btn) {
+        const shot = btn.dataset.shot;
+        const company = btn.dataset.company;
+        const reason = btn.dataset.reason;
+        const web = btn.dataset.web;
+
+        if (screenshotModalImg) screenshotModalImg.src = shot;
+        if (screenshotMetaCompany) screenshotMetaCompany.textContent = company;
+        if (screenshotMetaReason) screenshotMetaReason.textContent = reason;
+        if (screenshotMetaLink) {
+          screenshotMetaLink.href = web;
+          screenshotMetaLink.textContent = web.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        }
+        if (screenshotModal) screenshotModal.style.display = 'flex';
+      }
     });
   }
 
@@ -1752,6 +1973,159 @@ function setupLeadsHandlers() {
         screenshotModal.style.display = 'none';
         if (screenshotModalImg) screenshotModalImg.src = '';
       }
+    });
+  }
+
+  // Edit Lead Modal Handlers
+  const closeEditModal = () => {
+    if (editLeadModal) editLeadModal.style.display = 'none';
+  };
+  if (closeEditLeadModalBtn) closeEditLeadModalBtn.addEventListener('click', closeEditModal);
+  if (cancelEditLeadBtn) cancelEditLeadBtn.addEventListener('click', closeEditModal);
+
+  if (editLeadForm) {
+    editLeadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = parseInt(editLeadId.value, 10);
+      if (!id) return;
+
+      const payload = {
+        id,
+        company_name: editLeadCompany.value.trim(),
+        website: editLeadWebsite.value.trim(),
+        phone: editLeadPhone.value.trim(),
+        email: editLeadEmail.value.trim(),
+        city: editLeadCity.value.trim(),
+        state: editLeadState.value.trim(),
+        country: editLeadCountry.value.trim(),
+        status: editLeadStatus.value,
+        notes: editLeadNotes.value.trim()
+      };
+
+      try {
+        const res = await fetch('/api/leads/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeEditModal();
+          showToast('✓ Lead updated successfully', 'success');
+          const idx = allLeadsData.findIndex(l => l.id === id);
+          if (idx !== -1) {
+            allLeadsData[idx] = { ...allLeadsData[idx], ...payload };
+          }
+          filterAndRenderLeadsTable();
+          loadInitialSpecs();
+        } else {
+          alert(data.error || 'Failed to update lead');
+        }
+      } catch (err) {
+        alert('Update error: ' + err.message);
+      }
+    });
+  }
+
+  // Clear Database Modal Handlers
+  const closeClearModal = () => {
+    if (clearDbModal) clearDbModal.style.display = 'none';
+  };
+  if (closeClearDbModalBtn) closeClearDbModalBtn.addEventListener('click', closeClearModal);
+  if (cancelClearDbBtn) cancelClearDbBtn.addEventListener('click', closeClearModal);
+
+  if (clearDatabaseBtn && clearDbModal) {
+    clearDatabaseBtn.addEventListener('click', () => {
+      if (clearDbConfirmInput) clearDbConfirmInput.value = '';
+      if (executeClearDbBtn) executeClearDbBtn.disabled = true;
+      clearDbModal.style.display = 'flex';
+      setTimeout(() => clearDbConfirmInput && clearDbConfirmInput.focus(), 50);
+    });
+  }
+
+  if (clearDbConfirmInput && executeClearDbBtn) {
+    clearDbConfirmInput.addEventListener('input', () => {
+      executeClearDbBtn.disabled = clearDbConfirmInput.value.trim() !== 'CLEAR';
+    });
+  }
+
+  if (executeClearDbBtn) {
+    executeClearDbBtn.addEventListener('click', async () => {
+      if (!clearDbConfirmInput || clearDbConfirmInput.value.trim() !== 'CLEAR') return;
+      executeClearDbBtn.disabled = true;
+      executeClearDbBtn.innerHTML = '<span>Purging database...</span>';
+
+      try {
+        const res = await fetch('/api/leads/clear-db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirm: 'CLEAR' })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeClearModal();
+          showToast('✓ All leads database records purged successfully', 'success');
+          selectedLeadIds.clear();
+          await loadLeadsTable();
+          await loadInitialSpecs();
+          updateBatchBar();
+        } else {
+          alert(data.error || 'Failed to clear database');
+        }
+      } catch (err) {
+        alert('Clear database error: ' + err.message);
+      } finally {
+        executeClearDbBtn.disabled = false;
+        executeClearDbBtn.innerHTML = '<span>Permanently Delete All Leads</span>';
+      }
+    });
+  }
+
+  // CAPTCHA Assist Dock Controls
+  if (dockMinimizeBtn && dockExpandedContent && dockMinimizedContent) {
+    dockMinimizeBtn.addEventListener('click', () => {
+      dockExpandedContent.style.display = 'none';
+      dockMinimizedContent.style.display = 'flex';
+    });
+  }
+
+  if (dockExpandBtn && dockExpandedContent && dockMinimizedContent) {
+    dockExpandBtn.addEventListener('click', () => {
+      dockMinimizedContent.style.display = 'none';
+      dockExpandedContent.style.display = 'block';
+    });
+  }
+
+  if (dockCloseBtn && captchaAssistDock) {
+    dockCloseBtn.addEventListener('click', () => {
+      captchaAssistDock.style.display = 'none';
+    });
+  }
+
+  // Quick Copy Matrix
+  const copyButtons = document.querySelectorAll('.copy-badge-btn, .copy-cell');
+  copyButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const field = btn.dataset.copyField;
+      if (field) handleQuickCopy(field, btn);
+    });
+  });
+
+  if (dockMarkContactedBtn) {
+    dockMarkContactedBtn.addEventListener('click', () => {
+      advanceCaptchaLead('contacted', 'Manually submitted by operator via Assist Dock');
+    });
+  }
+
+  if (dockSkipLeadBtn) {
+    dockSkipLeadBtn.addEventListener('click', () => {
+      skipCaptchaLead();
+    });
+  }
+
+  if (dockMarkUnreachableBtn) {
+    dockMarkUnreachableBtn.addEventListener('click', () => {
+      advanceCaptchaLead('unreachable', 'Abandoned manual CAPTCHA submission');
     });
   }
 
@@ -2101,7 +2475,7 @@ async function loadLeadsTable() {
 function filterAndRenderLeadsTable() {
   const query = (leadSearchInput.value || '').toLowerCase().trim();
 
-  const filtered = allLeadsData.filter(lead => {
+  currentFilteredLeads = allLeadsData.filter(lead => {
     // Filter by Status
     if (activeTableFilter !== 'all') {
       if (activeTableFilter === 'unreachable') {
@@ -2112,24 +2486,25 @@ function filterAndRenderLeadsTable() {
     }
     // Filter by Search Query
     if (query) {
-      const text = `${lead.company_name || ''} ${lead.website || ''} ${lead.notes || ''} ${lead.failure_reason || ''} ${lead.phone || ''}`.toLowerCase();
+      const text = `${lead.company_name || ''} ${lead.website || ''} ${lead.city || ''} ${lead.state || ''} ${lead.country || ''} ${lead.notes || ''} ${lead.failure_reason || ''} ${lead.phone || ''}`.toLowerCase();
       return text.includes(query);
     }
     return true;
   });
 
-  renderTableRows(filtered);
+  renderTableRows(currentFilteredLeads);
 }
 
 function renderTableRows(leads) {
   if (leads.length === 0) {
     leadsTableBody.innerHTML = `
       <tr>
-        <td colspan="7" style="text-align: center; padding: 32px; color: var(--text-muted);">
+        <td colspan="10" style="text-align: center; padding: 32px; color: var(--text-muted);">
           No leads match your criteria.
         </td>
       </tr>
     `;
+    updateSelectAllCheckbox(leads);
     return;
   }
 
@@ -2138,7 +2513,9 @@ function renderTableRows(leads) {
 
   leads.slice(0, 100).forEach(lead => {
     const tr = document.createElement('tr');
-    
+    tr.dataset.id = lead.id;
+    const isSelected = selectedLeadIds.has(lead.id);
+
     let statusClass = 'ready';
     let statusText = 'Ready';
     if (lead.status === 'contacted') {
@@ -2182,21 +2559,360 @@ function renderTableRows(leads) {
       notesHtml = `<span style="color: var(--text-primary); font-weight: 500;">${escapeHtml(lead.failure_reason)}</span>${lead.notes && lead.notes !== lead.failure_reason ? ` — <span style="color: var(--text-muted);">${escapeHtml(lead.notes)}</span>` : ''}`;
     }
 
+    const locationParts = [lead.city, lead.state, lead.country].filter(Boolean);
+    const locationText = locationParts.join(', ') || '-';
+
+    const assistBtnHtml = (lead.status === 'captcha_blocked') ? `
+      <button type="button" class="btn-row-action assist" data-id="${lead.id}" title="Manual Assist Dock">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+      </button>
+    ` : '';
+
+    const actionsHtml = `
+      <div class="table-row-actions">
+        ${assistBtnHtml}
+        <button type="button" class="btn-row-action edit" data-id="${lead.id}" title="Edit Lead">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
+        <button type="button" class="btn-row-action delete" data-id="${lead.id}" title="Delete Lead">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+        </button>
+      </div>
+    `;
+
     tr.innerHTML = `
+      <td style="text-align: center;">
+        <input type="checkbox" class="lead-checkbox" data-id="${lead.id}" ${isSelected ? 'checked' : ''}>
+      </td>
       <td class="tabular" style="color: var(--text-muted);">${lead.id}</td>
       <td style="font-weight: 500; color: var(--text-primary);">${escapeHtml(lead.company_name)}</td>
       <td><a href="${web}" target="_blank" rel="noopener noreferrer">${escapeHtml(lead.website || '-')}</a></td>
+      <td style="color: var(--text-secondary); font-size: 11px;">${escapeHtml(locationText)}</td>
       <td class="tabular">${escapeHtml(lead.phone || '-')}</td>
       <td><span class="badge-tag ${statusClass}">${statusText}</span></td>
-      <td style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px;">${notesHtml}</td>
+      <td style="max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px;">${notesHtml}</td>
       <td style="text-align: center;">${shotBtnHtml}</td>
+      <td style="text-align: center;">${actionsHtml}</td>
     `;
     fragment.appendChild(tr);
   });
 
   leadsTableBody.innerHTML = '';
   leadsTableBody.appendChild(fragment);
+  updateSelectAllCheckbox(leads);
 }
+
+function updateBatchBar() {
+  if (!batchActionBar) return;
+  if (selectedLeadIds.size > 0) {
+    batchActionBar.style.display = 'flex';
+    if (batchSelectedCount) batchSelectedCount.textContent = selectedLeadIds.size;
+  } else {
+    batchActionBar.style.display = 'none';
+  }
+}
+
+function updateSelectAllCheckbox(visibleLeads) {
+  if (!selectAllCheckbox) return;
+  const pageLeads = (visibleLeads || []).slice(0, 100);
+  if (pageLeads.length === 0) {
+    selectAllCheckbox.checked = false;
+    selectAllCheckbox.indeterminate = false;
+    return;
+  }
+  const pageSelectedCount = pageLeads.filter(l => selectedLeadIds.has(l.id)).length;
+  selectAllCheckbox.checked = pageSelectedCount === pageLeads.length;
+  selectAllCheckbox.indeterminate = pageSelectedCount > 0 && pageSelectedCount < pageLeads.length;
+}
+
+async function executeBatchDelete() {
+  if (selectedLeadIds.size === 0) return;
+  const count = selectedLeadIds.size;
+  if (!confirm(`Are you sure you want to permanently delete ${count} selected lead(s)?`)) return;
+
+  try {
+    const ids = Array.from(selectedLeadIds);
+    const res = await fetch('/api/leads/batch-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✓ Deleted ${data.deleted} leads successfully`, 'success');
+      selectedLeadIds.clear();
+      await loadLeadsTable();
+      await loadInitialSpecs();
+      updateBatchBar();
+    } else {
+      alert(data.error || 'Batch delete failed');
+    }
+  } catch (err) {
+    alert('Batch delete error: ' + err.message);
+  }
+}
+
+async function executeBatchStatus() {
+  if (selectedLeadIds.size === 0) return;
+  const status = batchStatusSelect?.value;
+  if (!status) {
+    alert('Please select a target status to apply from the dropdown.');
+    return;
+  }
+  const count = selectedLeadIds.size;
+
+  try {
+    const ids = Array.from(selectedLeadIds);
+    const res = await fetch('/api/leads/batch-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, status })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✓ Updated status for ${data.updated} leads`, 'success');
+      selectedLeadIds.clear();
+      if (batchStatusSelect) batchStatusSelect.selectedIndex = 0;
+      await loadLeadsTable();
+      await loadInitialSpecs();
+      updateBatchBar();
+    } else {
+      alert(data.error || 'Batch status update failed');
+    }
+  } catch (err) {
+    alert('Batch status error: ' + err.message);
+  }
+}
+
+function openEditLeadModal(leadId) {
+  const lead = allLeadsData.find(l => l.id === leadId);
+  if (!lead) return;
+
+  if (editLeadId) editLeadId.value = lead.id;
+  if (editLeadCompany) editLeadCompany.value = lead.company_name || '';
+  if (editLeadWebsite) editLeadWebsite.value = lead.website || '';
+  if (editLeadPhone) editLeadPhone.value = lead.phone || '';
+  if (editLeadEmail) editLeadEmail.value = lead.email || '';
+  if (editLeadCity) editLeadCity.value = lead.city || '';
+  if (editLeadState) editLeadState.value = lead.state || '';
+  if (editLeadCountry) editLeadCountry.value = lead.country || 'United States';
+  if (editLeadStatus) editLeadStatus.value = lead.status || 'not_contacted';
+  if (editLeadNotes) editLeadNotes.value = lead.notes || '';
+
+  if (editLeadModal) editLeadModal.style.display = 'flex';
+}
+
+async function deleteSingleLead(leadId) {
+  const lead = allLeadsData.find(l => l.id === leadId);
+  const name = lead ? lead.company_name : `Lead #${leadId}`;
+  if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
+
+  try {
+    const res = await fetch('/api/leads/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: leadId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✓ Lead deleted successfully`, 'success');
+      allLeadsData = allLeadsData.filter(l => l.id !== leadId);
+      selectedLeadIds.delete(leadId);
+      filterAndRenderLeadsTable();
+      updateBatchBar();
+      loadInitialSpecs();
+    } else {
+      alert(data.error || 'Failed to delete lead');
+    }
+  } catch (err) {
+    alert('Delete error: ' + err.message);
+  }
+}
+
+// CAPTCHA Assist Dock Engine
+function getSenderPersona() {
+  return {
+    name: pFullName?.value?.trim() || 'Sender Representative',
+    email: pEmail?.value?.trim() || 'contact@business.com',
+    phone: pPhone?.value?.trim() || '',
+    company: pCompany?.value?.trim() || 'Our Company',
+    subject: pSubject?.value?.trim() || 'Partnership Inquiry',
+    message: pMessage?.value?.trim() || ''
+  };
+}
+
+function updateDockPersona() {
+  const p = getSenderPersona();
+  if (dockCopyName) dockCopyName.textContent = p.name;
+  if (dockCopyEmail) dockCopyEmail.textContent = p.email;
+  if (dockCopyPhone) dockCopyPhone.textContent = p.phone || 'N/A';
+  if (dockCopyCompany) dockCopyCompany.textContent = p.company;
+  if (dockCopySubject) dockCopySubject.textContent = p.subject;
+  if (dockCopyMessage) {
+    dockCopyMessage.textContent = p.message || 'Click to copy outreach message text...';
+  }
+}
+
+async function handleQuickCopy(field, btn) {
+  const p = getSenderPersona();
+  let textToCopy = '';
+  switch (field) {
+    case 'name': textToCopy = p.name; break;
+    case 'email': textToCopy = p.email; break;
+    case 'phone': textToCopy = p.phone; break;
+    case 'company': textToCopy = p.company; break;
+    case 'subject': textToCopy = p.subject; break;
+    case 'message': textToCopy = p.message; break;
+  }
+
+  if (!textToCopy) return;
+
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(textToCopy);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = textToCopy;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+
+    const hint = btn.querySelector('.copy-cell-badge') || btn.querySelector('.copy-hint');
+    const oldHint = hint ? hint.textContent : 'COPY';
+    btn.classList.add('copied');
+    if (hint) hint.textContent = 'COPIED';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      if (hint) hint.textContent = oldHint;
+    }, 1500);
+  } catch (err) {
+    console.error('Failed to copy to clipboard:', err);
+  }
+}
+
+function showCaptchaAssistLead(lead) {
+  if (!lead) return;
+  if (dockCompanyName) dockCompanyName.textContent = lead.company_name || 'Unknown Company';
+  if (dockOpenSiteBtn) {
+    const web = lead.website ? (lead.website.startsWith('http') ? lead.website : `https://${lead.website}`) : '#';
+    dockOpenSiteBtn.href = web;
+  }
+  if (dockFailureReason) {
+    dockFailureReason.textContent = lead.failure_reason || 'CAPTCHA Challenge';
+  }
+  if (dockLocation) {
+    const loc = [lead.city, lead.state, lead.country].filter(Boolean).join(', ');
+    dockLocation.textContent = loc || 'Location Unknown';
+  }
+  if (dockQueueBadge) {
+    dockQueueBadge.textContent = `${currentCaptchaIndex + 1} of ${captchaQueue.length}`;
+  }
+  if (dockMinCount) {
+    dockMinCount.textContent = `${captchaQueue.length}`;
+  }
+  updateDockPersona();
+}
+
+function initCaptchaAssistDock(leadId = null) {
+  const captchaLeads = allLeadsData.filter(l => l.status === 'captcha_blocked');
+  if (captchaLeads.length === 0 && !leadId) {
+    if (captchaAssistDock) captchaAssistDock.style.display = 'none';
+    return;
+  }
+
+  captchaQueue = captchaLeads.slice();
+  if (leadId) {
+    const idx = captchaQueue.findIndex(l => l.id === leadId);
+    if (idx !== -1) {
+      currentCaptchaIndex = idx;
+    } else {
+      const specificLead = allLeadsData.find(l => l.id === leadId);
+      if (specificLead) {
+        captchaQueue.unshift(specificLead);
+        currentCaptchaIndex = 0;
+      }
+    }
+  } else {
+    currentCaptchaIndex = 0;
+  }
+
+  if (captchaQueue.length === 0) return;
+
+  playCaptchaBuzzer();
+  if (navigator.vibrate) {
+    try { navigator.vibrate([100, 50, 100]); } catch (e) {}
+  }
+
+  showCaptchaAssistLead(captchaQueue[currentCaptchaIndex]);
+  if (captchaAssistDock) {
+    captchaAssistDock.style.display = 'block';
+    if (dockExpandedContent) dockExpandedContent.style.display = 'block';
+    if (dockMinimizedContent) dockMinimizedContent.style.display = 'none';
+  }
+}
+
+async function advanceCaptchaLead(newStatus = 'contacted', notes = 'Manually completed by operator') {
+  if (currentCaptchaIndex < 0 || currentCaptchaIndex >= captchaQueue.length) return;
+  const lead = captchaQueue[currentCaptchaIndex];
+
+  try {
+    const res = await fetch('/api/leads/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: lead.id,
+        status: newStatus,
+        notes: notes
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (newStatus === 'contacted') {
+        playSuccessChime();
+        showToast(`✓ Marked ${lead.company_name} as contacted`, 'success');
+      }
+
+      const target = allLeadsData.find(l => l.id === lead.id);
+      if (target) {
+        target.status = newStatus;
+        target.notes = notes;
+      }
+
+      captchaQueue.splice(currentCaptchaIndex, 1);
+      filterAndRenderLeadsTable();
+      loadInitialSpecs();
+
+      if (captchaQueue.length > 0) {
+        if (currentCaptchaIndex >= captchaQueue.length) currentCaptchaIndex = 0;
+        showCaptchaAssistLead(captchaQueue[currentCaptchaIndex]);
+      } else {
+        showToast('All CAPTCHA leads completed!', 'success');
+        if (captchaAssistDock) captchaAssistDock.style.display = 'none';
+      }
+    }
+  } catch (err) {
+    showToast('Failed to update lead: ' + err.message, 'error');
+  }
+}
+
+function skipCaptchaLead() {
+  if (captchaQueue.length <= 1) return;
+  currentCaptchaIndex = (currentCaptchaIndex + 1) % captchaQueue.length;
+  showCaptchaAssistLead(captchaQueue[currentCaptchaIndex]);
+}
+
 
 // ==========================================================================
 // Corporate Profile & Two-Way Synchronization Controller

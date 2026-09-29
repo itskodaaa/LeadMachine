@@ -10,139 +10,32 @@ import { getDbPath } from './paths.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const getDatabasePath = () => getDbPath();
 
+import {
+  US_STATES,
+  US_STATE_CITIES,
+  EUROPE_COUNTRIES,
+  EUROPE_CITIES,
+  NORTH_AMERICA_REGIONS,
+  NORTH_AMERICA_CITIES,
+  CHINA_PROVINCES,
+  CHINA_CITIES,
+  INDIA_STATES,
+  INDIA_CITIES,
+  TERRITORY_GROUPS,
+  getBroadSearchMetros,
+  resolveTerritoryCities
+} from './geo_data.mjs';
+
 // ==========================================================================
-// Comprehensive US Commercial & Manufacturing Cities by State
+// Comprehensive Multi-Region Commercial & Manufacturing Cities
+// Covers All 50 US States, Europe (excl. UK), North America, China, India
 // ==========================================================================
 export const STATE_CITIES = {
-  'Illinois': [
-    'Chicago', 'Aurora', 'Joliet', 'Naperville', 'Rockford', 'Elgin', 'Springfield', 'Peoria',
-    'Waukegan', 'Champaign', 'Bloomington', 'Decatur', 'Evanston', 'Arlington Heights', 'Schaumburg',
-    'Bolingbrook', 'Palatine', 'Skokie', 'Des Plaines', 'Orland Park', 'Tinley Park', 'Oak Lawn',
-    'Berwyn', 'Mount Prospect', 'Wheaton', 'Normal', 'Hoffman Estates', 'Oak Park', 'Downers Grove',
-    'Elmhurst', 'Lombard', 'DeKalb', 'Belleville', 'Moline', 'Buffalo Grove', 'Bartlett', 'Urbana',
-    'Quincy', 'Crystal Lake', 'Carol Stream', 'Streamwood', 'Romeoville', 'Plainfield', 'Rock Island',
-    'Hanover Park', 'Carpentersville', 'Wheeling', 'Park Ridge', 'Elk Grove Village', 'Addison',
-    'St. Charles', 'Batavia', 'Geneva', 'Woodridge', 'Libertyville', 'Lake Zurich', 'Mundelein', 'Gurnee'
-  ],
-  'Texas': [
-    'Houston', 'San Antonio', 'Dallas', 'Austin', 'Fort Worth', 'El Paso', 'Arlington', 'Corpus Christi',
-    'Plano', 'Lubbock', 'Laredo', 'Irving', 'Garland', 'Frisco', 'McKinney', 'Amarillo', 'Grand Prairie',
-    'Brownsville', 'Killeen', 'Pasadena', 'Mesquite', 'McAllen', 'Carrollton', 'Midland', 'Waco',
-    'Denton', 'Abilene', 'Odessa', 'Beaumont', 'Round Rock', 'The Woodlands', 'Richardson', 'Pearland',
-    'College Station', 'Wichita Falls', 'Lewisville', 'Tyler', 'San Angelo', 'League City', 'Allen',
-    'Sugar Land', 'Edinburg', 'Mission', 'Longview', 'Bryan', 'Pharr', 'Baytown', 'Missouri City', 'Temple',
-    'Conroe', 'New Braunfels', 'Grapevine', 'Waxahachie', 'Mansfield', 'Rowlett', 'Sherman', 'Burleson'
-  ],
-  'California': [
-    'Los Angeles', 'San Diego', 'San Jose', 'San Francisco', 'Fresno', 'Sacramento', 'Long Beach', 'Oakland',
-    'Bakersfield', 'Anaheim', 'Santa Ana', 'Riverside', 'Irvine', 'Stockton', 'Chula Vista', 'Fremont',
-    'San Bernardino', 'Modesto', 'Fontana', 'Oxnard', 'Moreno Valley', 'Huntington Beach', 'Glendale',
-    'Santa Clarita', 'Garden Grove', 'Oceanside', 'Rancho Cucamonga', 'Santa Rosa', 'Ontario', 'Lancaster',
-    'Elk Grove', 'Corona', 'Palmdale', 'Salinas', 'Pomona', 'Hayward', 'Escondido', 'Sunnyvale', 'Torrance',
-    'Pasadena', 'Orange', 'Fullerton', 'Thousand Oaks', 'Visalia', 'Roseville', 'Concord', 'Simi Valley',
-    'Santa Clara', 'Victorville', 'Vallejo', 'Berkeley', 'El Monte', 'Downey', 'Costa Mesa', 'Inglewood',
-    'Carlsbad', 'Temecula', 'Murrieta', 'Burbank', 'San Mateo', 'Compton', 'South Gate', 'Carson', 'Santa Monica'
-  ],
-  'Florida': [
-    'Jacksonville', 'Miami', 'Tampa', 'Orlando', 'St. Petersburg', 'Hialeah', 'Port St. Lucie', 'Cape Coral',
-    'Tallahassee', 'Fort Lauderdale', 'Pembroke Pines', 'Hollywood', 'Gainesville', 'Miramar', 'Coral Springs',
-    'Clearwater', 'Palm Bay', 'Pompano Beach', 'West Palm Beach', 'Lakeland', 'Davie', 'Boca Raton',
-    'Sunrise', 'Plantation', 'Miami Gardens', 'Deltona', 'Fort Myers', 'Palm Coast', 'Largo', 'Melbourne',
-    'Boynton Beach', 'Deerfield Beach', 'Kissimmee', 'Homestead', 'Tamarac', 'Bradenton', 'Ocala',
-    'Sanford', 'Sarasota', 'Pensacola', 'Bradenton', 'Pinellas Park', 'Daytona Beach', 'Winter Haven'
-  ],
-  'New York': [
-    'New York City', 'Buffalo', 'Rochester', 'Yonkers', 'Syracuse', 'Albany', 'New Rochelle', 'Mount Vernon',
-    'Schenectady', 'Utica', 'White Plains', 'Hempstead', 'Troy', 'Niagara Falls', 'Binghamton', 'Freeport',
-    'Valley Stream', 'Long Beach', 'Rome', 'Ithaca', 'Poughkeepsie', 'North Tonawanda', 'Jamestown', 'Elmira',
-    'Newburgh', 'Middletown', 'Auburn', 'Watertown', 'Glen Cove', 'Kingston', 'Peekskill', 'Lockport'
-  ],
-  'Pennsylvania': [
-    'Philadelphia', 'Pittsburgh', 'Allentown', 'Reading', 'Erie', 'Scranton', 'Bethlehem', 'Lancaster',
-    'Harrisburg', 'York', 'Wilkes-Barre', 'Chester', 'Williamsport', 'Easton', 'Lebanon', 'Hazleton',
-    'New Castle', 'Johnstown', 'McKeesport', 'Hermitage', 'Greensburg', 'Pottsville', 'Sharon', 'Butler',
-    'State College', 'Norristown', 'Bethel Park', 'Monroeville', 'King of Prussia', 'Altoona', 'Upper Darby',
-    'Lansdale', 'West Chester', 'Malvern', 'Exton', 'Horsham', 'Fort Washington', 'Warminster', 'Phoenixville',
-    'Pottstown', 'Coatesville', 'Carlisle', 'Chambersburg', 'Hanover', 'Bloomsburg', 'Lewisburg', 'Sunbury',
-    'Cranberry Township', 'Penn Hills', 'Mount Lebanon', 'North Huntingdon', 'Murrysville', 'Wexford', 'Bridgeville',
-    'Radnor', 'Conshohocken', 'Wayne', 'Bryn Mawr', 'Doylestown', 'Quakertown', 'Perkasie', 'Sellersville',
-    'Mechanicsburg', 'Camp Hill', 'Shippensburg', 'Waynesboro'
-  ],
-  'Ohio': [
-    'Columbus', 'Cleveland', 'Cincinnati', 'Toledo', 'Akron', 'Dayton', 'Parma', 'Canton', 'Youngstown',
-    'Lorain', 'Hamilton', 'Springfield', 'Kettering', 'Elyria', 'Lakewood', 'Cuyahoga Falls', 'Euclid',
-    'Middletown', 'Mansfield', 'Newark', 'Mentor', 'Cleveland Heights', 'Beavercreek', 'Strongsville', 'Fairfield',
-    'Findlay', 'Lima', 'Warren', 'Marion', 'Troy', 'Bowling Green', 'Zanesville', 'Massillon', 'Wooster',
-    'Medina', 'Perrysburg', 'Westerville', 'Dublin', 'Mason', 'Reynoldsburg', 'Grove City', 'Delaware'
-  ],
-  'Michigan': [
-    'Detroit', 'Grand Rapids', 'Warren', 'Sterling Heights', 'Ann Arbor', 'Lansing', 'Dearborn', 'Livonia',
-    'Troy', 'Westland', 'Flint', 'Kalamazoo', 'Canton', 'Macomb', 'Clinton', 'Farmington Hills', 'Southfield',
-    'Rochester Hills', 'Pontiac', 'Taylor', 'St. Clair Shores', 'Royal Oak', 'Novi', 'Dearborn Heights', 'Battle Creek',
-    'Holland', 'Zeeland', 'Auburn Hills', 'Plymouth', 'Romulus', 'Wixom', 'Saginaw', 'Midland', 'Bay City',
-    'Jackson', 'Muskegon', 'Port Huron', 'Monroe', 'Adrian', 'Ypsilanti', 'Waterford', 'Clarkston',
-    'Shelby Township', 'Chesterfield', 'Traverse City', 'Marquette', 'Benton Harbor', 'St. Joseph', 'Coldwater',
-    'Sturgis', 'Hastings', 'Ionia', 'Owosso', 'Mount Pleasant', 'Big Rapids', 'Cadillac', 'Alpena',
-    'Escanaba', 'Sault Ste. Marie', 'Howell', 'Brighton', 'Saline', 'Southgate', 'Lincoln Park', 'Wyandotte',
-    'Allen Park', 'Garden City', 'Inkster', 'Madison Heights', 'Hazel Park', 'Ferndale', 'Oak Park', 'Clawson'
-  ],
-  'North Carolina': [
-    'Charlotte', 'Raleigh', 'Greensboro', 'Durham', 'Winston-Salem', 'Fayetteville', 'Cary', 'Wilmington',
-    'High Point', 'Concord', 'Asheville', 'Gastonia', 'Jacksonville', 'Apex', 'Huntersville', 'Chapel Hill',
-    'Burlington', 'Kannapolis', 'Rocky Mount', 'Mooresville', 'Wake Forest', 'Wilson', 'Hickory', 'Statesville'
-  ],
-  'Georgia': [
-    'Atlanta', 'Augusta', 'Columbus', 'Macon', 'Savannah', 'Athens', 'Sandy Springs', 'South Fulton',
-    'Roswell', 'Johns Creek', 'Warner Robins', 'Albany', 'Alpharetta', 'Marietta', 'Stonecrest', 'Smyrna',
-    'Valdosta', 'Dunwoody', 'Gainesville', 'Newnan', 'Peachtree Corners', 'Dalton', 'Rome', 'Woodstock'
-  ],
-  'Indiana': [
-    'Indianapolis', 'Fort Wayne', 'Evansville', 'South Bend', 'Carmel', 'Fishers', 'Bloomington', 'Hammond',
-    'Gary', 'Lafayette', 'Muncie', 'Noblesville', 'Terre Haute', 'Greenwood', 'Kokomo', 'Elkhart',
-    'Mishawaka', 'Lawrence', 'Columbus', 'Jeffersonville', 'Westfield', 'Portage', 'Richmond', 'Anderson',
-    'Warsaw', 'Goshen', 'Auburn', 'Crown Point', 'Valparaiso', 'La Porte', 'Marion', 'Seymour', 'Shelbyville'
-  ],
-  'Wisconsin': [
-    'Milwaukee', 'Madison', 'Green Bay', 'Kenosha', 'Racine', 'Appleton', 'Waukesha', 'Eau Claire',
-    'Oshkosh', 'Janesville', 'West Allis', 'La Crosse', 'Sheboygan', 'Wauwatosa', 'Fond du Lac', 'Brookfield',
-    'Wausau', 'New Berlin', 'Beloit', 'Greenfield', 'Manitowoc', 'West Bend', 'Sun Prairie', 'Superior',
-    'Stevens Point', 'Neenah', 'Menasha', 'Watertown', 'Marshfield', 'Wisconsin Rapids', 'Menomonee Falls'
-  ],
-  'New Jersey': [
-    'Newark', 'Jersey City', 'Paterson', 'Elizabeth', 'Lakewood', 'Edison', 'Woodbridge', 'Toms River',
-    'Hamilton Township', 'Trenton', 'Clifton', 'Camden', 'Brick', 'Cherry Hill', 'Passaic', 'Union City',
-    'Middletown', 'Bayonne', 'East Orange', 'Old Bridge', 'Gloucester', 'Franklin', 'North Bergen', 'Vineland'
-  ],
-  'Virginia': [
-    'Virginia Beach', 'Chesapeake', 'Norfolk', 'Richmond', 'Newport News', 'Alexandria', 'Hampton',
-    'Roanoke', 'Portsmouth', 'Suffolk', 'Lynchburg', 'Harrisonburg', 'Charlottesville', 'Danville',
-    'Manassas', 'Petersburg', 'Fredericksburg', 'Winchester', 'Salem', 'Staunton', 'Fairfax', 'Hopewell'
-  ],
-  'Washington': [
-    'Seattle', 'Spokane', 'Tacoma', 'Vancouver', 'Bellevue', 'Kent', 'Everett', 'Renton', 'Spokane Valley',
-    'Federal Way', 'Yakima', 'Bellingham', 'Kennewick', 'Auburn', 'Pasco', 'Marysville', 'Lakewood',
-    'Redmond', 'Shoreline', 'Richland', 'Kirkland', 'Olympia', 'Sammamish', 'Lacey', 'Edmonds', 'Bremerton'
-  ],
-  'Arizona': [
-    'Phoenix', 'Tucson', 'Mesa', 'Chandler', 'Scottsdale', 'Gilbert', 'Tempe', 'Peoria', 'Surprise',
-    'Yuma', 'Avondale', 'Flagstaff', 'Goodyear', 'Lake Havasu City', 'Buckeye', 'Casa Grande', 'Maricopa'
-  ],
-  'Colorado': [
-    'Denver', 'Colorado Springs', 'Aurora', 'Fort Collins', 'Lakewood', 'Thornton', 'Arvada', 'Westminster',
-    'Pueblo', 'Greeley', 'Boulder', 'Longmont', 'Loveland', 'Broomfield', 'Castle Rock', 'Grand Junction'
-  ],
-  'Missouri': [
-    'Kansas City', 'St. Louis', 'Springfield', 'Columbia', 'Independence', 'Lee\'s Summit', 'O\'Fallon',
-    'St. Joseph', 'St. Charles', 'St. Peters', 'Blue Springs', 'Florissant', 'Joplin', 'Chesterfield', 'Jefferson City'
-  ],
-  'Tennessee': [
-    'Nashville', 'Memphis', 'Knoxville', 'Chattanooga', 'Clarksville', 'Murfreesboro', 'Franklin', 'Johnson City',
-    'Jackson', 'Hendersonville', 'Bartlett', 'Kingsport', 'Smyrna', 'Spring Hill', 'Collierville', 'Cleveland'
-  ],
-  'Minnesota': [
-    'Minneapolis', 'St. Paul', 'Rochester', 'Bloomington', 'Duluth', 'Brooklyn Park', 'Plymouth', 'Woodbury',
-    'Lakeville', 'Blaine', 'Maple Grove', 'St. Cloud', 'Eagan', 'Burnsville', 'Eden Prairie', 'Coon Rapids'
-  ]
+  ...US_STATE_CITIES,
+  ...EUROPE_CITIES,
+  ...NORTH_AMERICA_CITIES,
+  ...CHINA_CITIES,
+  ...INDIA_CITIES
 };
 
 // ==========================================================================
@@ -716,12 +609,11 @@ export class LeadHunter {
 
   /**
    * Generates a multi-tier task queue with geographic & synonym expansion.
+   * Broad searches systematically rotate across all states/countries in the selected region.
    */
-  generateTierTasks({ tier = 1, query, state, city, limit = 1000, existingTasks = [] }) {
+  generateTierTasks({ tier = 1, query, state = 'Illinois', city = '', limit = 1000, existingTasks = [] }) {
     const tasks = [];
     const existingQueries = new Set(existingTasks.map(t => (t.query || '').toLowerCase().trim()));
-    const stateCities = STATE_CITIES[state] || [state];
-    const stateCounties = STATE_COUNTIES[state] || [];
     const expansions = getSemanticExpansions(query);
 
     const addTask = (q, taskCity, taskState, meta = {}) => {
@@ -736,6 +628,7 @@ export class LeadHunter {
         baseQuery: meta.baseQuery || query,
         city: taskCity || '',
         state: taskState || state,
+        country: meta.country || (EUROPE_CITIES[taskState] ? taskState : 'United States'),
         tier: meta.tier || tier,
         tierName: meta.tierName || this.currentTierName,
         status: 'pending',
@@ -743,112 +636,137 @@ export class LeadHunter {
       });
     };
 
-    if (city && city.trim()) {
-      const cleanCity = city.trim();
+    const normState = (state || '').trim().toLowerCase();
+    const isBroad = !state ||
+                    normState === 'all' ||
+                    normState === 'all states (nationwide)' ||
+                    normState === 'united states' ||
+                    normState === 'us' ||
+                    normState.includes('all europe') ||
+                    normState.includes('all north america') ||
+                    normState.includes('all china') ||
+                    normState.includes('all india');
+
+    if (isBroad) {
+      // Broad Search: Systematically cycle across all states / countries in the chosen territory!
+      const broadMetros = getBroadSearchMetros(state);
+      this.currentTierName = `Broad Regional Scan (${state || 'United States'})`;
+
       if (tier === 1) {
-        this.currentTierName = `City Focus: ${cleanCity}`;
-        for (const q of expansions.slice(0, 4)) {
-          addTask(`${q} in ${cleanCity}, ${state}`, cleanCity, state, { baseQuery: q, tier: 1, tierName: this.currentTierName });
+        // Tier 1: Primary commercial cities across all states in region
+        const queriesToUse = limit <= 1000 ? expansions.slice(0, 2) : expansions.slice(0, 3);
+        for (const q of queriesToUse) {
+          for (const m of broadMetros) {
+            addTask(`${q} in ${m.city}, ${m.state}`, m.city, m.state, { baseQuery: q, country: m.country, tier: 1, tierName: this.currentTierName });
+          }
         }
       } else if (tier === 2) {
-        this.currentTierName = `Metro Corridors: ${cleanCity} Area`;
-        for (const q of expansions.slice(0, 3)) {
-          for (const c of stateCities.slice(0, 25)) {
-            addTask(`${q} in ${c}, ${state}`, c, state, { baseQuery: q, tier: 2, tierName: this.currentTierName });
+        // Tier 2: Secondary cities & extended corridors
+        for (const q of expansions.slice(2, 6)) {
+          for (const m of broadMetros) {
+            addTask(`${q} in ${m.city}, ${m.state}`, m.city, m.state, { baseQuery: q, country: m.country, tier: 2, tierName: `Extended Corridors` });
           }
         }
-      } else if (tier === 3) {
-        this.currentTierName = `County Subdivisions: ${state}`;
-        for (const q of expansions.slice(0, 3)) {
-          for (const co of stateCounties.slice(0, 35)) {
-            addTask(`${q} in ${co} County, ${state}`, co, state, { baseQuery: q, tier: 3, tierName: this.currentTierName });
-          }
-        }
-      } else if (tier === 4) {
-        this.currentTierName = `Statewide Industrial Expansion: ${state}`;
-        for (const q of expansions.slice(3, 10)) {
-          for (const c of stateCities.slice(0, 30)) {
-            addTask(`${q} in ${c}, ${state}`, c, state, { baseQuery: q, tier: 4, tierName: this.currentTierName });
-          }
-        }
-      } else if (tier === 5) {
-        this.currentTierName = `Regional Corridor Spillover`;
-        const neighbors = REGIONAL_EXPANSIONS[state] || [];
-        for (const neighborState of neighbors) {
-          const neighborCities = (STATE_CITIES[neighborState] || []).slice(0, 20);
-          for (const q of expansions.slice(0, 3)) {
-            for (const nc of neighborCities) {
-              addTask(`${q} in ${nc}, ${neighborState}`, nc, neighborState, { baseQuery: q, tier: 5, tierName: `Regional (${neighborState})` });
-            }
-          }
-        }
-      } else if (tier >= 6) {
-        this.currentTierName = `Nationwide Enterprise Grid`;
-        for (const metro of NATIONWIDE_METROS) {
-          for (const q of expansions.slice(0, 3)) {
-            addTask(`${q} in ${metro.city}, ${metro.state}`, metro.city, metro.state, { baseQuery: q, tier: 6, tierName: 'Nationwide' });
+      } else {
+        // Tier 3+: Deep industry synonyms across all regional metros
+        for (const q of expansions.slice(6, 16)) {
+          for (const m of broadMetros) {
+            addTask(`${q} in ${m.city}, ${m.state}`, m.city, m.state, { baseQuery: q, country: m.country, tier, tierName: `Deep Industry Synonyms` });
           }
         }
       }
     } else {
-      // Statewide Multi-Tier Geographic & Synonym Expansion
-      if (tier === 1) {
-        // Tier 1: Primary Manufacturing & Commercial Hubs
-        this.currentTierName = `Primary Cities (${state})`;
-        const primaryCities = stateCities.slice(0, 35);
-        const queriesToUse = limit <= 1000 ? expansions.slice(0, 2) : expansions.slice(0, 4);
-        for (const q of queriesToUse) {
-          for (const c of primaryCities) {
-            addTask(`${q} in ${c}, ${state}`, c, state, { baseQuery: q, tier: 1, tierName: `Primary Cities (${state})` });
+      // SPECIFIC STATE / COUNTRY / REGION SEARCH
+      const resolvedCities = resolveTerritoryCities(state);
+      const stateCities = (resolvedCities && resolvedCities.length > 0) ? resolvedCities : [state];
+      const stateCounties = STATE_COUNTIES[state] || [];
+
+      if (city && city.trim()) {
+        const cleanCity = city.trim();
+        if (tier === 1) {
+          this.currentTierName = `City Focus: ${cleanCity}`;
+          for (const q of expansions.slice(0, 4)) {
+            addTask(`${q} in ${cleanCity}, ${state}`, cleanCity, state, { baseQuery: q, tier: 1, tierName: this.currentTierName });
           }
-        }
-      } else if (tier === 2) {
-        // Tier 2: Extended Cities & Industrial Corridors
-        this.currentTierName = `Extended Townships & Corridors (${state})`;
-        const extendedCities = stateCities.length > 35 ? stateCities.slice(35) : stateCities.slice(15);
-        const queriesToUse = expansions.slice(0, 4);
-        for (const q of queriesToUse) {
-          for (const c of extendedCities) {
-            addTask(`${q} in ${c}, ${state}`, c, state, { baseQuery: q, tier: 2, tierName: `Extended Townships (${state})` });
-          }
-        }
-      } else if (tier === 3) {
-        // Tier 3: County Subdivisions (Catches industrial parks outside city borders)
-        this.currentTierName = `County Subdivisions (${state})`;
-        const queriesToUse = expansions.slice(0, 3);
-        for (const q of queriesToUse) {
-          for (const co of stateCounties) {
-            addTask(`${q} in ${co} County, ${state}`, co, state, { baseQuery: q, tier: 3, tierName: `County Subdivisions (${state})` });
-          }
-        }
-      } else if (tier === 4) {
-        // Tier 4: Deep B2B Industry Synonyms across Top Hubs
-        this.currentTierName = `Deep Industry Synonyms (${state})`;
-        const deepSynonyms = expansions.slice(4, 14);
-        const topHubs = stateCities.slice(0, 25);
-        for (const q of deepSynonyms) {
-          for (const c of topHubs) {
-            addTask(`${q} in ${c}, ${state}`, c, state, { baseQuery: q, tier: 4, tierName: `Deep Synonyms (${state})` });
-          }
-        }
-      } else if (tier === 5) {
-        // Tier 5: Regional Neighboring State Expansion
-        this.currentTierName = `Regional Great Lakes / Midwest Corridor`;
-        const neighbors = REGIONAL_EXPANSIONS[state] || [];
-        for (const neighborState of neighbors) {
-          const neighborCities = (STATE_CITIES[neighborState] || []).slice(0, 25);
+        } else if (tier === 2) {
+          this.currentTierName = `Metro Corridors: ${cleanCity} Area`;
           for (const q of expansions.slice(0, 3)) {
-            for (const nc of neighborCities) {
-              addTask(`${q} in ${nc}, ${neighborState}`, nc, neighborState, { baseQuery: q, tier: 5, tierName: `Regional (${neighborState})` });
+            for (const c of stateCities.slice(0, 25)) {
+              addTask(`${q} in ${c}, ${state}`, c, state, { baseQuery: q, tier: 2, tierName: this.currentTierName });
+            }
+          }
+        } else if (tier === 3) {
+          this.currentTierName = `County Subdivisions: ${state}`;
+          for (const q of expansions.slice(0, 3)) {
+            for (const co of stateCounties.slice(0, 35)) {
+              addTask(`${q} in ${co} County, ${state}`, co, state, { baseQuery: q, tier: 3, tierName: this.currentTierName });
+            }
+          }
+        } else {
+          this.currentTierName = `Statewide Industrial Expansion: ${state}`;
+          for (const q of expansions.slice(3, 10)) {
+            for (const c of stateCities.slice(0, 30)) {
+              addTask(`${q} in ${c}, ${state}`, c, state, { baseQuery: q, tier: 4, tierName: this.currentTierName });
             }
           }
         }
-      } else if (tier >= 6) {
-        // Tier 6: Nationwide Manufacturing Hubs
-        this.currentTierName = `Nationwide Enterprise Metros`;
-        for (const metro of NATIONWIDE_METROS) {
-          for (const q of expansions.slice(0, 3)) {
-            addTask(`${q} in ${metro.city}, ${metro.state}`, metro.city, metro.state, { baseQuery: q, tier: 6, tierName: 'Nationwide' });
+      } else {
+        // Targeted State or Country
+        if (tier === 1) {
+          this.currentTierName = `Primary Cities (${state})`;
+          const primaryCities = stateCities.slice(0, 35);
+          const queriesToUse = limit <= 1000 ? expansions.slice(0, 2) : expansions.slice(0, 4);
+          for (const q of queriesToUse) {
+            for (const c of primaryCities) {
+              addTask(`${q} in ${c}, ${state}`, c, state, { baseQuery: q, tier: 1, tierName: `Primary Cities (${state})` });
+            }
+          }
+        } else if (tier === 2) {
+          this.currentTierName = `Extended Townships & Corridors (${state})`;
+          const extendedCities = stateCities.length > 35 ? stateCities.slice(35) : stateCities.slice(15);
+          const queriesToUse = expansions.slice(0, 4);
+          for (const q of queriesToUse) {
+            for (const c of extendedCities) {
+              addTask(`${q} in ${c}, ${state}`, c, state, { baseQuery: q, tier: 2, tierName: `Extended Townships (${state})` });
+            }
+          }
+        } else if (tier === 3) {
+          this.currentTierName = `County Subdivisions (${state})`;
+          const queriesToUse = expansions.slice(0, 3);
+          for (const q of queriesToUse) {
+            for (const co of stateCounties) {
+              addTask(`${q} in ${co} County, ${state}`, co, state, { baseQuery: q, tier: 3, tierName: `County Subdivisions (${state})` });
+            }
+          }
+        } else if (tier === 4) {
+          this.currentTierName = `Deep Industry Synonyms (${state})`;
+          const deepSynonyms = expansions.slice(4, 14);
+          const topHubs = stateCities.slice(0, 25);
+          for (const q of deepSynonyms) {
+            for (const c of topHubs) {
+              addTask(`${q} in ${c}, ${state}`, c, state, { baseQuery: q, tier: 4, tierName: `Deep Synonyms (${state})` });
+            }
+          }
+        } else {
+          // Regional Neighboring State Expansion or Nationwide
+          const neighbors = REGIONAL_EXPANSIONS[state] || [];
+          if (neighbors.length > 0) {
+            this.currentTierName = `Regional Neighboring Expansion`;
+            for (const neighborState of neighbors) {
+              const neighborCities = (STATE_CITIES[neighborState] || []).slice(0, 20);
+              for (const q of expansions.slice(0, 3)) {
+                for (const nc of neighborCities) {
+                  addTask(`${q} in ${nc}, ${neighborState}`, nc, neighborState, { baseQuery: q, tier: 5, tierName: `Regional (${neighborState})` });
+                }
+              }
+            }
+          } else {
+            this.currentTierName = `Nationwide Enterprise Grid`;
+            for (const metro of NATIONWIDE_METROS) {
+              for (const q of expansions.slice(0, 3)) {
+                addTask(`${q} in ${metro.city}, ${metro.state}`, metro.city, metro.state, { baseQuery: q, tier: 6, tierName: 'Nationwide' });
+              }
+            }
           }
         }
       }
@@ -926,8 +844,8 @@ export class LeadHunter {
       LIMIT 1
     `);
     const insertLeadStmt = db.prepare(`
-      INSERT INTO leads (company_name, website, city, state, phone, email, notes, contact_person, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'not_contacted')
+      INSERT INTO leads (company_name, website, city, state, country, phone, email, notes, contact_person, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'not_contacted')
     `);
 
     const seenDomains = new Set();
@@ -1062,11 +980,13 @@ export class LeadHunter {
 
               // Verified reachable: insert into database
               try {
+                const leadCountry = task.country || (EUROPE_CITIES[task.state] ? task.state : 'United States');
                 const info = insertLeadStmt.run(
                   item.name,
                   cleanUrl,
                   task.city || state,
                   task.state || state,
+                  leadCountry,
                   item.phone || '',
                   '', // email
                   `Google Maps Hunter: ${task.query}`,
@@ -1083,6 +1003,7 @@ export class LeadHunter {
                   phone: item.phone || '',
                   city: task.city || state,
                   state: task.state || state,
+                  country: leadCountry,
                   verified: true,
                   timestamp: new Date().toISOString()
                 };

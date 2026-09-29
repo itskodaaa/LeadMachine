@@ -215,7 +215,7 @@ function getSystemSpecs() {
   const contacted = counts?.contacted || 0;
   const unableToReach = counts?.unable_to_reach || 0;
   const total = counts?.total || 0;
-  const states = db.prepare("SELECT state, count(*) as count FROM leads WHERE status = 'not_contacted' AND state IS NOT NULL GROUP BY state ORDER BY count DESC LIMIT 15").all();
+  const states = db.prepare("SELECT state, count(*) as count FROM leads WHERE status = 'not_contacted' AND state IS NOT NULL GROUP BY state ORDER BY count DESC").all();
 
   return {
     cpuCount,
@@ -904,13 +904,195 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/leads' && req.method === 'GET') {
     try {
       const db = orchestrator.getDb();
-      const rows = db.prepare("SELECT id, company_name, website, phone, status, notes, failure_reason, debug_screenshot, created_at FROM leads ORDER BY id DESC").all();
+      const rows = db.prepare("SELECT id, company_name, website, city, state, country, phone, email, status, notes, failure_reason, debug_screenshot, created_at FROM leads ORDER BY id DESC").all();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, leads: rows }));
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: err.message }));
     }
+    return;
+  }
+
+  // Update Single Lead
+  if (pathname === '/api/leads/update' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const id = Number(payload.id);
+        if (!id) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Valid lead ID is required.' }));
+          return;
+        }
+
+        const db = orchestrator.getDb();
+        const existing = db.prepare('SELECT id, status, notes FROM leads WHERE id = ?').get(id);
+        if (!existing) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Lead not found.' }));
+          return;
+        }
+
+        const company = payload.company_name !== undefined ? String(payload.company_name).trim() : null;
+        const website = payload.website !== undefined ? String(payload.website).trim() : null;
+        const city = payload.city !== undefined ? String(payload.city).trim() : null;
+        const state = payload.state !== undefined ? String(payload.state).trim() : null;
+        const country = payload.country !== undefined ? String(payload.country).trim() : null;
+        const phone = payload.phone !== undefined ? String(payload.phone).trim() : null;
+        const email = payload.email !== undefined ? String(payload.email).trim() : null;
+        const status = payload.status !== undefined ? String(payload.status).trim() : null;
+        const notes = payload.notes !== undefined ? String(payload.notes).trim() : null;
+
+        db.prepare(`
+          UPDATE leads
+          SET company_name = COALESCE(?, company_name),
+              website = COALESCE(?, website),
+              city = COALESCE(?, city),
+              state = COALESCE(?, state),
+              country = COALESCE(?, country),
+              phone = COALESCE(?, phone),
+              email = COALESCE(?, email),
+              status = COALESCE(?, status),
+              notes = COALESCE(?, notes),
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(company, website, city, state, country, phone, email, status, notes, id);
+
+        const updated = db.prepare('SELECT id, company_name, website, city, state, country, phone, email, status, notes, failure_reason, debug_screenshot, created_at FROM leads WHERE id = ?').get(id);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, lead: updated }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // Delete Single Lead
+  if (pathname === '/api/leads/delete' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const id = Number(payload.id);
+        if (!id) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Valid lead ID is required.' }));
+          return;
+        }
+
+        const db = orchestrator.getDb();
+        db.transaction(() => {
+          try { db.prepare('DELETE FROM contact_logs WHERE lead_id = ?').run(id); } catch (_) {}
+          db.prepare('DELETE FROM leads WHERE id = ?').run(id);
+        })();
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, id }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // Batch Delete Leads
+  if (pathname === '/api/leads/batch-delete' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const ids = Array.isArray(payload.ids) ? payload.ids.map(Number).filter(n => Boolean(n) && !isNaN(n)) : [];
+        if (ids.length === 0) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Array of lead IDs is required.' }));
+          return;
+        }
+
+        const db = orchestrator.getDb();
+        const placeholders = ids.map(() => '?').join(',');
+        db.transaction(() => {
+          try { db.prepare(`DELETE FROM contact_logs WHERE lead_id IN (${placeholders})`).run(...ids); } catch (_) {}
+          db.prepare(`DELETE FROM leads WHERE id IN (${placeholders})`).run(...ids);
+        })();
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, count: ids.length, deletedIds: ids }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // Batch Update Status
+  if (pathname === '/api/leads/batch-status' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const ids = Array.isArray(payload.ids) ? payload.ids.map(Number).filter(n => Boolean(n) && !isNaN(n)) : [];
+        const status = (payload.status || '').trim();
+        if (ids.length === 0 || !status) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Array of lead IDs and target status are required.' }));
+          return;
+        }
+
+        const db = orchestrator.getDb();
+        const placeholders = ids.map(() => '?').join(',');
+        db.prepare(`
+          UPDATE leads
+          SET status = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id IN (${placeholders})
+        `).run(status, ...ids);
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, count: ids.length, status }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // Clear Entire Database (Wipe All Leads)
+  if (pathname === '/api/leads/clear-db' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const parsed = JSON.parse(body || '{}');
+        if (parsed.confirm !== 'CLEAR') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Confirmation phrase "CLEAR" required to purge database.' }));
+          return;
+        }
+
+        const db = orchestrator.getDb();
+        db.transaction(() => {
+          try { db.exec('DELETE FROM contact_logs;'); } catch (_) {}
+          db.exec('DELETE FROM leads;');
+        })();
+        try { db.exec('VACUUM;'); } catch (_) {}
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, message: 'All leads and campaign records cleared successfully.' }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
     return;
   }
 
@@ -1382,6 +1564,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Static File Serving
+  if (pathname === '/favicon.ico') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
   let filePath = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
   if (!filePath.startsWith(PUBLIC_DIR)) {
     res.writeHead(403);

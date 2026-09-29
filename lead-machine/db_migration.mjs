@@ -35,6 +35,7 @@ export function migrateDatabase(db) {
           website TEXT NOT NULL UNIQUE,
           city TEXT,
           state TEXT,
+          country TEXT DEFAULT 'United States',
           phone TEXT,
           email TEXT,
           contact_person TEXT,
@@ -63,6 +64,9 @@ export function migrateDatabase(db) {
       if (!colNames.has('debug_screenshot')) {
         try { db.exec('ALTER TABLE leads ADD COLUMN debug_screenshot TEXT;'); } catch (_) {}
       }
+      if (!colNames.has('country')) {
+        try { db.exec("ALTER TABLE leads ADD COLUMN country TEXT DEFAULT 'United States';"); } catch (_) {}
+      }
     }
 
     // Ensure high-performance seeking indexes exist for 4GB low-spec machines
@@ -70,6 +74,7 @@ export function migrateDatabase(db) {
       db.exec(`
         CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
         CREATE INDEX IF NOT EXISTS idx_leads_state ON leads(state);
+        CREATE INDEX IF NOT EXISTS idx_leads_country ON leads(country);
         CREATE INDEX IF NOT EXISTS idx_leads_website ON leads(website);
         CREATE INDEX IF NOT EXISTS idx_leads_website_nocase ON leads(website COLLATE NOCASE);
         CREATE INDEX IF NOT EXISTS idx_leads_company_nocase ON leads(company_name COLLATE NOCASE);

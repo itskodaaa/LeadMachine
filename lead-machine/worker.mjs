@@ -1433,12 +1433,14 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
         return null;
       }, ERROR_SIGNALS).catch(() => null);
 
+      const isCaptcha = explicitError && /\b(captcha|recaptcha|hcaptcha|turnstile|human|security[_\s-]?question|bot|challenge|cloudflare|datadome|perimeterx|arkose|puzzle)\b/i.test(explicitError);
+      const targetStatus = isCaptcha ? 'captcha_blocked' : 'form_submit_error';
       const failureNote = explicitError ? `Submission rejected: ${explicitError}` : 'Unconfirmed post-submission';
-      console.log(`[${agentName}] ⚠️ #${lead.id} ${failureNote} (${elapsed}s)`);
+      console.log(`[${agentName}] ⚠️ #${lead.id} ${failureNote} (${elapsed}s) [status: ${targetStatus}]`);
       const shot = await captureFailureScreenshot(page, lead.id);
-      saveLeadResult(lead.id, 'form_submit_error', `Contact form: ${contactPageUrl} (${failureNote})`, isSandbox, explicitError || 'Submission unconfirmed or rejected', shot);
+      saveLeadResult(lead.id, targetStatus, `Contact form: ${contactPageUrl} (${failureNote})`, isSandbox, explicitError || 'Submission unconfirmed or rejected', shot);
       await safeClose(page);
-      return { id: lead.id, company: lead.company_name, status: 'form_submit_error', time: elapsed, result: failureNote };
+      return { id: lead.id, company: lead.company_name, status: targetStatus, time: elapsed, result: failureNote };
     }
 
   } catch (err) {
@@ -1463,8 +1465,9 @@ async function processLead(browser, lead, agentName, isSandbox = false) {
 
     console.log(`[${agentName}] ❌ #${lead.id} Error: ${err.message} (${elapsed}s)`);
     const isTimeout = (err.message || '').toLowerCase().includes('timeout') || (err.message || '').toLowerCase().includes('net::');
-    const targetStatus = isTimeout ? 'unreachable' : 'form_submit_error';
-    const reasonText = isTimeout ? 'Connection Timeout / DNS Failure' : `Automation Error: ${err.message.split('\n')[0]}`;
+    const isCaptcha = /\b(captcha|recaptcha|hcaptcha|turnstile|human|security[_\s-]?question|bot|challenge|cloudflare|datadome|perimeterx|arkose|puzzle)\b/i.test(err.message || '');
+    const targetStatus = isCaptcha ? 'captcha_blocked' : (isTimeout ? 'unreachable' : 'form_submit_error');
+    const reasonText = isCaptcha ? `Security Challenge / CAPTCHA: ${err.message.split('\n')[0]}` : (isTimeout ? 'Connection Timeout / DNS Failure' : `Automation Error: ${err.message.split('\n')[0]}`);
     const shot = await captureFailureScreenshot(page, lead.id);
     saveLeadResult(lead.id, targetStatus, `Error during browser automation: ${err.message.split('\n')[0]}`, isSandbox, reasonText, shot);
     await safeClose(page);

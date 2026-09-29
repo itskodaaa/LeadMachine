@@ -288,8 +288,8 @@ export class CampaignOrchestrator extends EventEmitter {
     try {
       const dbCheck = this.getDb();
       let uncontactedCount = 0;
-      if (stateFilter && stateFilter !== 'all') {
-        uncontactedCount = dbCheck.prepare("SELECT count(*) as c FROM leads WHERE status = 'not_contacted' AND state = ?").get(stateFilter)?.c || 0;
+      if (stateFilter && stateFilter !== 'all' && !stateFilter.toLowerCase().startsWith('all ')) {
+        uncontactedCount = dbCheck.prepare("SELECT count(*) as c FROM leads WHERE status = 'not_contacted' AND (state = ? OR country = ?)").get(stateFilter, stateFilter)?.c || 0;
       } else {
         uncontactedCount = dbCheck.prepare("SELECT count(*) as c FROM leads WHERE status = 'not_contacted'").get()?.c || 0;
       }
@@ -364,9 +364,9 @@ export class CampaignOrchestrator extends EventEmitter {
       const db = this.getDb();
       let query = "SELECT id, company_name, website FROM leads WHERE status = 'not_contacted'";
       const params = [];
-      if (stateFilter && stateFilter !== 'all') {
-        query += " AND state = ?";
-        params.push(stateFilter);
+      if (stateFilter && stateFilter !== 'all' && !stateFilter.toLowerCase().startsWith('all ')) {
+        query += " AND (state = ? OR country = ?)";
+        params.push(stateFilter, stateFilter);
       }
       query += " ORDER BY id ASC LIMIT ?";
       params.push(fetchLimit);
@@ -388,8 +388,8 @@ export class CampaignOrchestrator extends EventEmitter {
             await new Promise(r => setTimeout(r, 2000));
             waitCycles++;
             const dbPoll = this.getDb();
-            const countCheck = stateFilter && stateFilter !== 'all'
-              ? (dbPoll.prepare("SELECT count(*) as c FROM leads WHERE status = 'not_contacted' AND state = ?").get(stateFilter)?.c || 0)
+            const countCheck = stateFilter && stateFilter !== 'all' && !stateFilter.toLowerCase().startsWith('all ')
+              ? (dbPoll.prepare("SELECT count(*) as c FROM leads WHERE status = 'not_contacted' AND (state = ? OR country = ?)").get(stateFilter, stateFilter)?.c || 0)
               : (dbPoll.prepare("SELECT count(*) as c FROM leads WHERE status = 'not_contacted'").get()?.c || 0);
             dbPoll.close();
             if (countCheck > 0) {
