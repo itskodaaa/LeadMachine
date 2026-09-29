@@ -10,21 +10,46 @@ import { getDbPath } from './paths.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const getDatabasePath = () => getDbPath();
 
-import {
-  US_STATES,
-  US_STATE_CITIES,
-  EUROPE_COUNTRIES,
-  EUROPE_CITIES,
-  NORTH_AMERICA_REGIONS,
-  NORTH_AMERICA_CITIES,
-  CHINA_PROVINCES,
-  CHINA_CITIES,
-  INDIA_STATES,
-  INDIA_CITIES,
-  TERRITORY_GROUPS,
-  getBroadSearchMetros,
-  resolveTerritoryCities
-} from './geo_data.mjs';
+let geoModule = null;
+try {
+  geoModule = await import('./geo_data.mjs');
+} catch (_) {
+  try {
+    const geoPath = path.join(__dirname, 'geo_data.mjs');
+    if (!fs.existsSync(geoPath)) {
+      const https = await import('https');
+      const url = 'https://raw.githubusercontent.com/leadmachine-core/installer/main/lead-machine/geo_data.mjs';
+      const content = await new Promise((resolve, reject) => {
+        https.get(url, { headers: { 'User-Agent': 'LeadMachine-Hunter' } }, (res) => {
+          if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
+          let d = '';
+          res.on('data', chunk => d += chunk);
+          res.on('end', () => resolve(d));
+        }).on('error', reject);
+      });
+      if (content && content.length > 500) {
+        fs.writeFileSync(geoPath, content, 'utf8');
+        geoModule = await import('./geo_data.mjs');
+      }
+    }
+  } catch (healErr) {
+    console.warn('[Hunter] Self-healing geo_data.mjs recovery failed:', healErr.message);
+  }
+}
+
+const US_STATES = geoModule?.US_STATES || [];
+const US_STATE_CITIES = geoModule?.US_STATE_CITIES || {};
+const EUROPE_COUNTRIES = geoModule?.EUROPE_COUNTRIES || [];
+const EUROPE_CITIES = geoModule?.EUROPE_CITIES || {};
+const NORTH_AMERICA_REGIONS = geoModule?.NORTH_AMERICA_REGIONS || [];
+const NORTH_AMERICA_CITIES = geoModule?.NORTH_AMERICA_CITIES || {};
+const CHINA_PROVINCES = geoModule?.CHINA_PROVINCES || [];
+const CHINA_CITIES = geoModule?.CHINA_CITIES || {};
+const INDIA_STATES = geoModule?.INDIA_STATES || [];
+const INDIA_CITIES = geoModule?.INDIA_CITIES || {};
+const TERRITORY_GROUPS = geoModule?.TERRITORY_GROUPS || {};
+const getBroadSearchMetros = geoModule?.getBroadSearchMetros || ((t) => []);
+const resolveTerritoryCities = geoModule?.resolveTerritoryCities || ((t) => []);
 
 // ==========================================================================
 // Comprehensive Multi-Region Commercial & Manufacturing Cities
