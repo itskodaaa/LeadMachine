@@ -46,6 +46,7 @@ const lmFilesToCopy = [
   'auth.mjs',
   'url_importer.mjs',
   'db_migration.mjs',
+  'geo_data.mjs',
   'config.json',
   'launch.ps1'
 ];

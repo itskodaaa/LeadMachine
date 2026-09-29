@@ -599,7 +599,7 @@ const server = http.createServer(async (req, res) => {
     if (fs.existsSync(cfgPath)) {
       try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
     }
-    const currentVer = cfg.settings?.version || '2.5.7';
+    const currentVer = cfg.settings?.version || '2.6.0';
     const currentCommit = cfg.settings?.buildCommit || 'master';
     const repo = 'leadmachine-core/installer';
     const branch = 'main';
@@ -752,7 +752,7 @@ const server = http.createServer(async (req, res) => {
 
     try {
       let latestCommit = '';
-      let remoteVer = '2.5.5';
+      let remoteVer = '2.6.0';
 
       // 1. Resolve absolute latest HEAD of master branch (bypasses any intermediate commit)
       try {
@@ -793,6 +793,7 @@ const server = http.createServer(async (req, res) => {
         { remote: `${baseUrl}/lead-machine/paths.mjs${cacheBust}`, local: path.join(__dirname, 'paths.mjs') },
         { remote: `${baseUrl}/lead-machine/migration.mjs${cacheBust}`, local: path.join(__dirname, 'migration.mjs') },
         { remote: `${baseUrl}/lead-machine/db_migration.mjs${cacheBust}`, local: path.join(__dirname, 'db_migration.mjs') },
+        { remote: `${baseUrl}/lead-machine/geo_data.mjs${cacheBust}`, local: path.join(__dirname, 'geo_data.mjs') },
         { remote: `${baseUrl}/lead-machine/auth.mjs${cacheBust}`, local: path.join(__dirname, 'auth.mjs') },
         { remote: `${baseUrl}/lead-machine/hunter.mjs${cacheBust}`, local: path.join(__dirname, 'hunter.mjs') },
         { remote: `${baseUrl}/lead-machine/orchestrator.mjs${cacheBust}`, local: path.join(__dirname, 'orchestrator.mjs') },
