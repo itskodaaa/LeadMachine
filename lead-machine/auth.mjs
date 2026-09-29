@@ -95,7 +95,8 @@ function readConfig() {
   try {
     const cfgPath = getConfigFilePath();
     if (fs.existsSync(cfgPath)) {
-      return JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+      const content = fs.readFileSync(cfgPath, 'utf8').replace(/^\uFEFF/, '');
+      return JSON.parse(content);
     }
   } catch (_) {}
   return {};

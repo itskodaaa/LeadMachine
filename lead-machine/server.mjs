@@ -24,6 +24,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT, 10) || 3333;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
+export function readUserConfig() {
+  try {
+    const cfgPath = getConfigPath();
+    if (fs.existsSync(cfgPath)) {
+      const raw = fs.readFileSync(cfgPath, 'utf8').replace(/^\uFEFF/, '');
+      return JSON.parse(raw);
+    }
+  } catch (_) {}
+  return {};
+}
+
 async function fetchRemote(urlStr, options = {}) {
   const timeoutMs = options.timeout || 10000;
   if (typeof fetch === 'function') {
@@ -192,11 +203,7 @@ function getSystemSpecs() {
   const govEval = resourceGovernor.evaluateConcurrency(maxWorkers);
   const recommendedWorkers = govEval.targetWorkers;
 
-  let config = {};
-  try {
-    const cfgPath = getConfigPath();
-    if (fs.existsSync(cfgPath)) config = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
-  } catch (_) {}
+  const config = readUserConfig();
 
   const settings = config.settings || {};
   if (settings.debugMode === undefined) settings.debugMode = false;
@@ -480,11 +487,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === '/api/profile' && req.method === 'GET') {
-    const cfgPath = getConfigPath();
-    let cfg = {};
-    if (fs.existsSync(cfgPath)) {
-      try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
-    }
+    const cfg = readUserConfig();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true, profile: cfg.sender || {} }));
     return;
@@ -497,10 +500,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const profile = JSON.parse(body || '{}');
         const cfgPath = getConfigPath();
-        let cfg = {};
-        if (fs.existsSync(cfgPath)) {
-          try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
-        }
+        const cfg = readUserConfig();
 
         // Two-way name synthesis
         let fullName = (profile.fullName || '').trim();
@@ -594,11 +594,7 @@ const server = http.createServer(async (req, res) => {
 
   // System Version & Updates
   if (pathname === '/api/system/version' && req.method === 'GET') {
-    const cfgPath = getConfigPath();
-    let cfg = {};
-    if (fs.existsSync(cfgPath)) {
-      try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
-    }
+    const cfg = readUserConfig();
     const currentVer = cfg.settings?.version || '2.6.0';
     const currentCommit = cfg.settings?.buildCommit || 'master';
     const repo = 'leadmachine-core/installer';
@@ -854,16 +850,14 @@ const server = http.createServer(async (req, res) => {
 
       // Update config.json build metadata while preserving user profile & database
       const cfgPath = getConfigPath();
-      if (fs.existsSync(cfgPath)) {
-        try {
-          const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
-          if (!cfg.settings) cfg.settings = {};
-          if (shortCommit) cfg.settings.buildCommit = shortCommit;
-          if (remoteVer) cfg.settings.version = remoteVer;
-          cfg.settings.lastUpdated = new Date().toISOString();
-          fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), 'utf8');
-        } catch (_) {}
-      }
+      try {
+        const cfg = readUserConfig();
+        if (!cfg.settings) cfg.settings = {};
+        if (shortCommit) cfg.settings.buildCommit = shortCommit;
+        if (remoteVer) cfg.settings.version = remoteVer;
+        cfg.settings.lastUpdated = new Date().toISOString();
+        fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), 'utf8');
+      } catch (_) {}
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
@@ -1338,11 +1332,7 @@ const server = http.createServer(async (req, res) => {
 
   // System Settings (Debug Mode, Concurrency, etc.)
   if (pathname === '/api/settings' && req.method === 'GET') {
-    const cfgPath = getConfigPath();
-    let cfg = {};
-    if (fs.existsSync(cfgPath)) {
-      try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
-    }
+    const cfg = readUserConfig();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true, settings: cfg.settings || {} }));
     return;
@@ -1355,10 +1345,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const payload = JSON.parse(body || '{}');
         const cfgPath = getConfigPath();
-        let cfg = {};
-        if (fs.existsSync(cfgPath)) {
-          try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (_) {}
-        }
+        const cfg = readUserConfig();
         if (!cfg.settings) cfg.settings = {};
         if (payload.debugMode !== undefined) cfg.settings.debugMode = Boolean(payload.debugMode);
         if (payload.adaptiveMode !== undefined) cfg.settings.adaptiveMode = Boolean(payload.adaptiveMode);
