@@ -47,6 +47,7 @@ $requiredCoreFiles = @(
     "lead-machine\server.mjs",
     "lead-machine\migration.mjs",
     "lead-machine\db_migration.mjs",
+    "lead-machine\geo_data.mjs",
     "lead-machine\auth.mjs",
     "lead-machine\hunter.mjs",
     "lead-machine\orchestrator.mjs",
@@ -63,9 +64,13 @@ $requiredCoreFiles = @(
 function Repair-LeadMachineFiles {
     param([string[]]$targetFiles)
     Write-Host "[*] Automatically downloading runtime repairs from GitHub..." -ForegroundColor Cyan
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+    } catch {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    }
     $rawBase = "https://raw.githubusercontent.com/leadmachine-core/installer/main"
-    $wc = New-Object System.Net.WebClient
+    $curlExe = Get-Command curl.exe -ErrorAction SilentlyContinue
     foreach ($rf in $targetFiles) {
         $destFile = Join-Path $appRoot $rf
         $destFolder = Split-Path -Parent $destFile
@@ -74,11 +79,30 @@ function Repair-LeadMachineFiles {
         }
         $cb = [int](Get-Date -UFormat %s)
         $remoteUrl = "$rawBase/$($rf.Replace('\', '/'))?_cb=$cb"
-        try {
-            Write-Host "  -> Restoring $rf..." -ForegroundColor Gray
-            $wc.DownloadFile($remoteUrl, $destFile)
-        } catch {
-            Write-Host "  [!] Could not download $($rf): $($_.Exception.Message)" -ForegroundColor Red
+        $downloaded = $false
+
+        if ($curlExe) {
+            try {
+                & curl.exe -fSL -s --connect-timeout 8 --retry 2 -A "LeadMachineRepair/2.6.0" "$remoteUrl" -o "$destFile"
+                if ($LASTEXITCODE -eq 0 -and (Test-Path $destFile) -and ((Get-Item $destFile).Length -gt 50)) {
+                    Write-Host "  -> Restored $rf" -ForegroundColor Green
+                    $downloaded = $true
+                }
+            } catch {}
+        }
+
+        if (-not $downloaded) {
+            try {
+                Write-Host "  -> Restoring $rf..." -ForegroundColor Gray
+                $wc = New-Object System.Net.WebClient
+                $wc.Headers.Add("User-Agent", "LeadMachineRepair/2.6.0")
+                $wc.DownloadFile($remoteUrl, $destFile)
+                if ((Test-Path $destFile) -and ((Get-Item $destFile).Length -gt 50)) {
+                    $downloaded = $true
+                }
+            } catch {
+                Write-Host "  [!] Could not download $($rf): $($_.Exception.Message)" -ForegroundColor Red
+            }
         }
     }
 }

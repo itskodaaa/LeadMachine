@@ -18,8 +18,11 @@ param(
     [string]$LicenseKey = ""
 )
 
-$ErrorActionPreference = "Continue"
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+} catch {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+}
 
 $APP_NAME = "Lead Machine"
 $APP_VERSION = "2.6.0"
@@ -165,10 +168,65 @@ if ($isLocalRun) {
             Invoke-RestMethod -Uri $API_ZIP_URL -Headers $headers -OutFile $tempZip -MaximumRedirection 5
         } else {
             Write-Host "  [*] Downloading application archive from $ZIP_URL..." -ForegroundColor Gray
-            try {
-                Invoke-WebRequest -Uri $ZIP_URL -OutFile $tempZip -UseBasicParsing
-            } catch {
-                Invoke-WebRequest -Uri "https://github.com/$Repo/archive/refs/heads/$Branch.zip" -OutFile $tempZip -UseBasicParsing
+            $downloadSuccess = $false
+            $curlExe = Get-Command curl.exe -ErrorAction SilentlyContinue
+
+            # Tier 1: curl.exe (built-in on Windows 10/11, optimal SSL/TLS and chunk handling)
+            if ($curlExe) {
+                try {
+                    & curl.exe -fSL -s --connect-timeout 15 --retry 3 -A "LeadMachineInstaller/$APP_VERSION" "$ZIP_URL" -o "$tempZip"
+                    if ($LASTEXITCODE -eq 0 -and (Test-Path $tempZip) -and ((Get-Item $tempZip).Length -gt 50000)) {
+                        $downloadSuccess = $true
+                    }
+                } catch {}
+            }
+
+            # Tier 2: System.Net.WebClient with explicit User-Agent
+            if (-not $downloadSuccess) {
+                try {
+                    $wc = New-Object System.Net.WebClient
+                    $wc.Headers.Add("User-Agent", "LeadMachineInstaller/$APP_VERSION")
+                    $wc.DownloadFile($ZIP_URL, $tempZip)
+                    if ((Test-Path $tempZip) -and ((Get-Item $tempZip).Length -gt 50000)) {
+                        $downloadSuccess = $true
+                    }
+                } catch {}
+            }
+
+            # Tier 3: Invoke-WebRequest with User-Agent
+            if (-not $downloadSuccess) {
+                try {
+                    Invoke-WebRequest -Uri $ZIP_URL -OutFile $tempZip -UseBasicParsing -Headers @{ "User-Agent" = "LeadMachineInstaller/$APP_VERSION" }
+                    if ((Test-Path $tempZip) -and ((Get-Item $tempZip).Length -gt 50000)) {
+                        $downloadSuccess = $true
+                    }
+                } catch {}
+            }
+
+            # Tier 4: Fallback to GitHub repo zipball
+            if (-not $downloadSuccess) {
+                $fallbackZip = "https://github.com/$Repo/archive/refs/heads/$Branch.zip"
+                Write-Host "  [*] Primary binary package failed; falling back to GitHub archive..." -ForegroundColor Yellow
+                if ($curlExe) {
+                    try {
+                        & curl.exe -fSL -s --connect-timeout 15 --retry 3 -A "LeadMachineInstaller/$APP_VERSION" "$fallbackZip" -o "$tempZip"
+                        if ($LASTEXITCODE -eq 0 -and (Test-Path $tempZip) -and ((Get-Item $tempZip).Length -gt 50000)) {
+                            $downloadSuccess = $true
+                        }
+                    } catch {}
+                }
+                if (-not $downloadSuccess) {
+                    try {
+                        Invoke-WebRequest -Uri $fallbackZip -OutFile $tempZip -UseBasicParsing -Headers @{ "User-Agent" = "LeadMachineInstaller/$APP_VERSION" }
+                        if ((Test-Path $tempZip) -and ((Get-Item $tempZip).Length -gt 50000)) {
+                            $downloadSuccess = $true
+                        }
+                    } catch {}
+                }
+            }
+
+            if (-not $downloadSuccess -or (-not (Test-Path $tempZip)) -or ((Get-Item $tempZip).Length -lt 50000)) {
+                throw "Failed to download complete application package (archive missing or incomplete)."
             }
         }
 
